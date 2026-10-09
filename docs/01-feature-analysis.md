@@ -163,6 +163,11 @@ Phases are defined in [04-roadmap.md](04-roadmap.md). Libraries named below are 
 2. **Your own voice:** import an audio file, or **record per step** in the browser (microphone through `getUserMedia` + `MediaRecorder`).
 3. **Generated voiceover, free and local:** **Kokoro** (an 82-million-parameter open model, Apache-2.0) runs in a Web Worker through `kokoro-js`. The model is downloaded once and cached: about 90 MB for the compact build, up to about 330 MB for the highest quality (fastest with WebGPU in Chrome). Several voices are available. Optional later: a cloud TTS provider using your own API key.
 
+**In the clickable mockup** (`design/mockup/editor.html`) each step has a **Source**: generated voice, my recorded voice, audio file, original audio, or none. It plays for real while you play the timeline, and in the guide preview:
+- *Generated voice* uses the browser's built-in speech (Kokoro replaces it in the app). The browser can't seek or fade speech, so it starts at the top of the voice bar and ignores fades; the bar's length is measured from the first time it plays.
+- *Recorded* and *file* clips are decoded for their length and a waveform, then follow the playhead, the speed (pitch kept), volume and fades. Recording needs microphone access, which an embedded or published page may not get; importing a file always works.
+- Clips live outside the undo history (the step keeps a small pointer), so undo and redo never copy audio. **M** turns sound off.
+
 **Timing rule.** A step's hold lasts at least as long as its narration: `hold = max(minHold, narrationDuration + 0.4 s, revealGroups × revealInterval)`. In the player, step audio starts when the still appears. Browsers block autoplay with sound, so guides with audio start with a "Start guide" button; that first click unlocks audio.
 
 ## F9 — Interactive guide player ("Widget")
