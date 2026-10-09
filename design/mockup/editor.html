@@ -1683,6 +1683,7 @@ function resizeRect(o, ed, dx, dy) {
   if (ed.includes('s')) h = clamp(o[3] + dy, mh, 1 - o[1]);
   return [x, y, w, h];
 }
+const inRect = (p, r) => p[0] >= r[0] && p[0] <= r[0] + r[2] && p[1] >= r[1] && p[1] <= r[1] + r[3];
 const rectFrom = (a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])];
 function moveAnn(a, o, dx, dy) {
   const mv = p => [clamp(p[0] + dx, 0, 1), clamp(p[1] + dy, 0, 1)];
@@ -1700,18 +1701,27 @@ frameEl.addEventListener('pointerdown', e => {
   const zHandle = e.target.closest('[data-zoom-handle]'), zBox = e.target.closest('[data-zoom]'), aHandle = e.target.closest('[data-ann-handle]');
   if (ui.tool === 'pin') { pinStep(p); return; }
   if (ui.tool === 'select') {
-    if (st && st.zoom && (zHandle || zBox)) {
+    /* the selected object owns its own area: a drag that starts inside it always moves it, whatever is drawn underneath or on top */
+    let active = null, activeAnn = null, activeBlur = null;
+    if (st && ui.sel) {
+      if (ui.sel.kind === 'zoom' && st.zoom && inRect(p, st.zoom)) active = 'zoom';
+      else if (ui.sel.kind === 'ann') { activeAnn = st.annotations.find(x => x.id === ui.sel.id); if (activeAnn && activeAnn.rect && inRect(p, activeAnn.rect)) active = 'ann'; }
+      else if (ui.sel.kind === 'blur') { activeBlur = doc.blurs.find(x => x.id === ui.sel.id); const src = curSrc(); if (activeBlur && src >= activeBlur.from - 1e-6 && src <= activeBlur.to + 1e-6 && inRect(p, activeBlur.rect)) active = 'blur'; }
+    }
+    if (st && st.zoom && (zHandle || active === 'zoom' || (zBox && active !== 'ann' && active !== 'blur'))) {
       ui.sel = { kind:'zoom', stepId:st.id }; ui.tab = 'selection'; renderSteps(); renderAtTime(); renderInspector(); renderTimeline();
       drag = { kind: zHandle ? 'resize-zoom' : 'move-zoom', corner: zHandle ? zHandle.dataset.zoomHandle : null, step:st, orig:st.zoom.slice(), start:p, snap:clone(doc), moved:false };
     } else if (aHandle && st && ui.sel && ui.sel.kind === 'ann') {
       const a = st.annotations.find(x => x.id === ui.sel.id); if (!a) return;
       drag = { kind:'resize-ann', step:st, ann:a, edge:aHandle.dataset.annHandle, orig:clone(a), start:p, snap:clone(doc), moved:false };
-    } else if (annTarget && st) {
+    } else if (active === 'ann') {
+      drag = { kind:'move-ann', step:st, ann:activeAnn, orig:clone(activeAnn), start:p, snap:clone(doc), moved:false };
+    } else if (annTarget && active !== 'blur' && st) {
       const a = st.annotations.find(x => x.id === annTarget.dataset.ann); if (!a) return;
       selectAnn(st, a.id);
       drag = { kind:'move-ann', step:st, ann:a, orig:clone(a), start:p, snap:clone(doc), moved:false };
-    } else if (blurTarget) {
-      const b = doc.blurs.find(x => x.id === blurTarget.dataset.blur); if (!b) return;
+    } else if (blurTarget || active === 'blur') {
+      const b = active === 'blur' ? activeBlur : doc.blurs.find(x => x.id === blurTarget.dataset.blur); if (!b) return;
       const bh = e.target.closest('[data-bh]');
       ui.sel = { kind:'blur', id:b.id }; ui.tab = 'selection'; renderAtTime(); renderInspector(); renderTimeline(); renderSteps();
       drag = { kind: bh ? 'resize-blur' : 'move-blur', edge: bh ? bh.dataset.bh : null, blur:b, orig:clone(b), start:p, snap:clone(doc), moved:false };
