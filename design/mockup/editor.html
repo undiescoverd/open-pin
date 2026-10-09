@@ -158,6 +158,8 @@ button{cursor:pointer}
 .stage-status b{color:var(--text); font-weight:600}
 .stage-status .dot{width:8px; height:8px; border-radius:50%; background:var(--pin); flex:none}
 .stage-status .dot.off{background:var(--line-strong)}
+.stage-status.waiting{border-color:var(--pin-line); background:var(--pin-tint); color:var(--text)}
+.stage-status .btn{height:26px; padding:0 10px; font-size:12px}
 
 /* annotations (content colors: drawn on the recording, identical in both themes) */
 .ann-layer svg{position:absolute; left:0; top:0; overflow:visible}
@@ -396,6 +398,8 @@ details[open] summary{margin-bottom:8px}
 .pl-tick{position:absolute; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%; border:2px solid var(--panel); background:var(--line-strong); padding:0}
 .pl-tick.done{background:var(--acc)}
 .pl-mode{font-size:12px; color:var(--text-2)}
+.pl-stage.waiting{cursor:pointer}
+.pl-hint{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:rgba(14,17,22,.8); color:#FFFFFF; font-size:12.5px; font-weight:500; white-space:nowrap; pointer-events:none}
 
 /* ---------- responsive ---------- */
 @media (max-width:1180px){
@@ -625,6 +629,7 @@ details[open] summary{margin-bottom:8px}
           <button class="btn pl-acc" id="pl-start-btn"><svg class="ic fill" aria-hidden="true"><use href="#i-play"/></svg>Start guide</button>
         </div>
       </div>
+      <div class="pl-hint" id="pl-hint" hidden></div>
       <div class="pl-overlay" id="pl-end" hidden>
         <div class="pl-card">
           <h3>That's the whole guide</h3>
@@ -765,7 +770,7 @@ let doc = {
   audio: { original:true },
   analytics: { on:false, url:'' },
 };
-const ui = { tl:0, playing:false, tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false };
+const ui = { tl:0, playing:false, waiting:false, stopAt:null, tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false };
 const hist = { undo:[], redo:[] };
 
 /* ---------- time mapping (steps are anchored to source time) ---------- */
@@ -1031,17 +1036,21 @@ function renderAtTime() {
   if (key !== last.annKey) { annEl.innerHTML = annHTML(st, { prefix:'ed', editing:true, selId:selAnn }); last.annKey = key; }
   updatePlayhead();
   renderStatus(st);
-  if (last.playing !== ui.playing) {
-    const pb = $('#btn-play'); last.playing = ui.playing;
+  const pk = ui.playing + '|' + ui.waiting;
+  if (last.playing !== pk) {
+    const pb = $('#btn-play'); last.playing = pk;
     pb.innerHTML = icon(ui.playing ? 'pause' : 'play', 'fill');
-    pb.setAttribute('aria-label', ui.playing ? 'Pause' : 'Play');
+    pb.setAttribute('aria-label', ui.playing ? 'Pause' : ui.waiting ? 'Continue to the next step' : 'Play');
   }
 }
 function renderStatus(st) {
   if (ui.empty) return;
   const tool = TOOLS.find(t => t.id === ui.tool);
   let h;
-  if (ui.tool !== 'select') h = `<b>${tool.label}</b><span>${tool.hint[0].toUpperCase() + tool.hint.slice(1)}.</span><span class="kbd">esc</span><span>to stop</span>`;
+  const waiting = ui.waiting && !ui.playing && st;
+  statusEl.classList.toggle('waiting', !!waiting);
+  if (waiting) { const i = stepIndex(st), lastStep = i === doc.steps.length - 1; h = `<span class="dot" aria-hidden="true"></span><b>Stopped at step ${i + 1} of ${doc.steps.length}</b><span>${esc(st.title)}</span><button class="btn primary sm" data-act="continue">${icon('play', 'fill')}${lastStep ? 'Play to the end' : 'Continue'}</button><span class="kbd">Space</span>`; }
+  else if (ui.tool !== 'select') h = `<b>${tool.label}</b><span>${tool.hint[0].toUpperCase() + tool.hint.slice(1)}.</span><span class="kbd">esc</span><span>to stop</span>`;
   else if (st) { const i = stepIndex(st); h = `<span class="dot" aria-hidden="true"></span><b>Step ${i + 1} of ${doc.steps.length}</b><span>${esc(st.title)}</span>`; }
   else h = `<span class="dot off" aria-hidden="true"></span><b>${fmt(ui.tl)}</b><span>Not a step yet. Press</span><span class="kbd">P</span><span>and click the frame to pin it.</span>`;
   if (last.status !== h) { statusEl.innerHTML = h; last.status = h; }
@@ -1202,13 +1211,14 @@ function updatePlayhead() {
 /* ---------- selection and editing actions ---------- */
 function selectStep(id, opts = {}) {
   const s = stepById(id); if (!s) return;
-  pause(); ui.sel = { kind:'step', id }; ui.tab = 'selection';
+  pause(); ui.waiting = false; ui.sel = { kind:'step', id }; ui.tab = 'selection';
   if (opts.move !== false) ui.tl = srcToTl(s.t);
   renderSteps(); renderAtTime(); renderInspector(); renderTimeline();
   const card = stepList.querySelector(`[data-step="${id}"]`); if (card) card.scrollIntoView({ block:'nearest', inline:'nearest' });
 }
 function selectAnn(step, id) { ui.sel = { kind:'ann', stepId:step.id, id }; ui.tab = 'selection'; renderSteps(); renderAtTime(); renderInspector(); renderTimeline(); }
 function setPlayhead(t, snap) {
+  ui.waiting = false;
   ui.tl = clamp(t, 0, tlDur());
   if (snap) { const lw = laneW(), T = tlDur(); for (const s of doc.steps) { const st = srcToTl(s.t); if (Math.abs(st - ui.tl) / T * lw < 7) { ui.tl = st; break; } } }
   const s = ui.sel; if (s && s.kind === 'ann') { const cs = currentStep(); if (!cs || cs.id !== s.stepId) ui.sel = { kind:'step', id:s.stepId }; }
@@ -1267,20 +1277,34 @@ function setTool(id) { ui.tool = id; renderTools(); renderStatus(currentStep());
 
 /* ---------- playback ---------- */
 let raf = 0, lastTs = 0;
+function nextStopAfter(t) {
+  const times = doc.steps.map(s => srcToTl(s.t)).filter(x => x > t + 0.5 / FPS).sort((a, b) => a - b);
+  return times.length ? times[0] : null;
+}
 function play() {
   if (ui.playing || ui.empty) return;
   if (ui.tl >= tlDur() - 1e-3) ui.tl = 0;
+  ui.waiting = false; ui.stopAt = nextStopAfter(ui.tl);
   if (ui.sel && ui.sel.kind === 'ann') { ui.sel = { kind:'step', id:ui.sel.stepId }; renderInspector(); }
   ui.playing = true; lastTs = performance.now(); raf = requestAnimationFrame(tick); renderAtTime();
 }
 function tick(ts) {
   const dt = Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
-  ui.tl = Math.min(tlDur(), ui.tl + dt * ui.previewSpeed);
+  const next = Math.min(tlDur(), ui.tl + dt * ui.previewSpeed);
+  if (ui.stopAt != null && next >= ui.stopAt) { ui.tl = ui.stopAt; stopAtStep(); return; }
+  ui.tl = next;
   renderAtTime();
   if (ui.tl >= tlDur()) { pause(); return; }
   raf = requestAnimationFrame(tick);
 }
 function pause() { if (!ui.playing) return; ui.playing = false; cancelAnimationFrame(raf); renderAtTime(); }
+function stopAtStep() {
+  ui.playing = false; ui.waiting = true; ui.stopAt = null; cancelAnimationFrame(raf);
+  const st = currentStep();
+  if (st) { ui.sel = { kind:'step', id:st.id }; ui.tab = 'selection'; }
+  renderSteps(); renderAtTime(); renderInspector(); renderTimeline();
+  const card = st && stepList.querySelector(`[data-step="${st.id}"]`); if (card) card.scrollIntoView({ block:'nearest', inline:'nearest' });
+}
 const togglePlay = () => (ui.playing ? pause() : play());
 
 /* ---------- canvas pointer interactions ---------- */
@@ -1456,6 +1480,7 @@ tlInner.addEventListener('pointercancel', () => { scrub = null; });
 /* ---------- top bar, transport and tools ---------- */
 $('#tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) setTool(b.dataset.tool); });
 $('#btn-play').addEventListener('click', togglePlay);
+statusEl.addEventListener('click', e => { if (e.target.closest('[data-act="continue"]')) play(); });
 $('#btn-prev-frame').addEventListener('click', () => frameStep(-1));
 $('#btn-next-frame').addEventListener('click', () => frameStep(1));
 $('#btn-prev-step').addEventListener('click', () => jumpStep(-1));
@@ -1642,6 +1667,10 @@ function pvRender() {
   $('#pl-prev').disabled = PV.i <= 0 && !PV.end;
   const next = $('#pl-next'); next.disabled = PV.end;
   next.firstChild.textContent = PV.i < 0 ? 'Start' : PV.i === n - 1 ? 'Finish' : 'Next';
+  const waitPv = PV.i >= 0 && !PV.end && !PV.animating;
+  plStage.classList.toggle('waiting', waitPv);
+  const hint = $('#pl-hint'); hint.hidden = !(waitPv && doc.player.mode === 'guided');
+  hint.textContent = PV.i === n - 1 ? 'Click anywhere to finish' : 'Click anywhere to continue';
   $('#pl-mode').textContent = `Playback: ${{ guided:'Guided. Each step waits for the viewer.', auto:'Auto. Steps move on by themselves.', video:'Video. Plays straight through.' }[doc.player.mode]}`;
 }
 function openPreview() {
@@ -1652,6 +1681,7 @@ pvDlg.addEventListener('close', pvClear);
 $('#btn-preview').addEventListener('click', openPreview);
 $('#pl-start-btn').addEventListener('click', () => pvGo(0, true));
 $('#pl-next').addEventListener('click', pvNext);
+plStage.addEventListener('click', e => { if (e.target.closest('button, a')) return; if (PV.i >= 0 && !PV.end && !PV.animating) pvNext(); });
 $('#pl-prev').addEventListener('click', pvPrev);
 $('#pl-replay').addEventListener('click', () => { pvReset(); $('#pl-start-btn').focus(); });
 $('#pl-full').addEventListener('click', () => { try { const r = document.fullscreenElement ? document.exitFullscreen() : player.requestFullscreen(); if (r && r.catch) r.catch(() => {}); } catch (err) { /* fullscreen unavailable here */ } });
