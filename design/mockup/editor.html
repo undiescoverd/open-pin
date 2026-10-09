@@ -352,6 +352,14 @@ input[type="range"]{width:100%; accent-color:var(--sel); margin:2px 0}
 .tc-cell input,input.tc{font-variant-numeric:tabular-nums}
 .btn-row{display:flex; gap:6px; flex-wrap:wrap}
 .chip-note{font-size:11.5px; color:var(--text-2)}
+.recbox{display:flex; flex-direction:column; gap:8px; padding:10px; border-radius:var(--r-md); background:var(--pin-tint); border:1px solid var(--pin-line)}
+.meter{height:8px; border-radius:999px; background:var(--panel); border:1px solid var(--line); overflow:hidden}
+.meter i{display:block; height:100%; width:0; background:var(--pin); transition:width .06s linear}
+.cliprow{display:flex; align-items:center; gap:10px; min-width:0}
+.cliprow > div{min-width:0; display:flex; flex-direction:column}
+.cliprow b{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.cliprow small{color:var(--text-2); font-variant-numeric:tabular-nums}
+audio{width:100%; height:34px}
 
 /* ---------- timeline ---------- */
 .timeline{grid-area:tl}
@@ -362,6 +370,7 @@ input[type="range"]{width:100%; accent-color:var(--sel); margin:2px 0}
 .play{width:36px; height:36px; border-radius:999px; border:0; background:var(--inverse); color:var(--on-inverse); display:grid; place-items:center; margin:0 4px}
 .play:hover{opacity:.88}
 .transport-end{display:flex; align-items:center; gap:10px}
+#btn-sound.off .vol-wave{opacity:.25}
 .mini{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2)}
 .mini select{width:auto; padding:3px 6px; font-size:12px}
 .mini input[type="range"]{width:90px}
@@ -393,6 +402,9 @@ input[type="range"]{width:100%; accent-color:var(--sel); margin:2px 0}
 .music-bar{background:var(--music); border-color:var(--music-line)}
 .voice-bar.selected,.music-bar.selected{box-shadow:0 0 0 2px var(--sel); border-color:var(--sel)}
 .lane-bar.muted{opacity:.55}
+.voice-bar.placeholder{background:transparent; border-style:dashed}
+.wf{position:absolute; left:0; top:2px; width:100%; height:calc(100% - 4px); pointer-events:none; z-index:0; opacity:.6}
+.wf path{fill:none; stroke:var(--voice-line); stroke-width:1; vector-effect:non-scaling-stroke}
 .lane-bar > span,.lane-bar > .ic{position:relative; z-index:1}
 .th{position:absolute; top:0; bottom:0; width:10px; cursor:ew-resize; z-index:2}
 .th-l{left:0} .th-r{right:0}
@@ -535,6 +547,7 @@ details[open] summary{margin-bottom:8px}
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l.8 12.5h9.4L17.5 7M9.5 7V4.5h5V7"/></symbol>
   <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="6.5" cy="17.5" r="2.5"/><path d="M8.6 8l11 10M8.6 16l11-10"/></symbol>
   <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="vol-wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></symbol>
   <symbol id="i-film" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7.5 4.5v15M16.5 4.5v15M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4"/></symbol>
   <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H17.5A2.5 2.5 0 1 0 15 6.5v11a2.5 2.5 0 1 0 2.5-2.5h-11A2.5 2.5 0 1 0 9 17.5z"/></symbol>
@@ -674,6 +687,7 @@ details[open] summary{margin-bottom:8px}
       <div class="transport-end">
         <button class="icon-btn sm" id="btn-snap" aria-pressed="true" aria-label="Snapping" data-tip="Snapping on: edges snap to the nearest edge on any layer.  N, or hold Alt to flip it"><svg class="ic" aria-hidden="true"><use href="#i-magnet"/></svg></button>
         <button class="icon-btn sm" id="btn-ripple" aria-pressed="true" aria-label="Ripple trim" data-tip="Ripple trim on: trimming a clip closes the gap.  ⇧R"><svg class="ic" aria-hidden="true"><use href="#i-ripple"/></svg></button>
+        <button class="icon-btn sm" id="btn-sound" aria-pressed="true" aria-label="Sound" data-tip="Sound on: narration plays while you play the timeline.  M"><svg class="ic" aria-hidden="true"><use href="#i-volume"/></svg></button>
         <button class="btn ghost sm" id="btn-split" data-tip="Split the clip at the playhead  R"><svg class="ic" aria-hidden="true"><use href="#i-scissors"/></svg>Split</button>
         <label class="mini" for="preview-speed">Preview
           <select id="preview-speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
@@ -815,7 +829,7 @@ const TOOLS = [
 ];
 const TYPE_LABEL = { callout:'Callout', arrow:'Arrow', spotlight:'Spotlight', box:'Box', click:'Click marker' };
 const TYPE_ICON = { callout:'callout', arrow:'arrow', spotlight:'spot', box:'box', click:'target' };
-const VOICES = [['none','No narration'],['tts-heart','Generated voice · Heart (US)'],['tts-lewis','Generated voice · Lewis (UK)'],['record','My recorded voice'],['original','Original audio only']];
+const NARR = [['none','No narration'],['tts','Generated voice'],['record','My recorded voice'],['file','Audio file'],['original','Original audio only']];
 const PLACE = { auto:'Auto', top:'Above', bottom:'Below', left:'Left', right:'Right' };
 const MODE_HELP = { guided:'Stops at every step until the viewer clicks Next.', auto:'Pauses on each step for its pause time, then continues.', video:'Plays straight through, with step markers on the progress bar.' };
 const BLUR_DEF = { amount:45, radius:4, opacity:100, fadeIn:0, fadeOut:0, solid:'ink' };
@@ -833,19 +847,19 @@ let doc = {
   name: 'Weekly summary emails',
   clips: [ { id:'c1', in:0, out:2.6, speed:2 }, { id:'c2', in:2.6, out:SRC_DUR, speed:1 } ],
   steps: [
-    { id:'s1', t:3.4, title:'Open Settings', note:'Settings sits at the bottom of the sidebar.', hold:2.5, narration:'tts-heart', zoom:null, annotations:[
+    { id:'s1', t:3.4, title:'Open Settings', note:'Settings sits at the bottom of the sidebar.', hold:2.5, narration:'tts', zoom:null, annotations:[
       { id:'a1', type:'spotlight', rect:[0.00625,0.9025,0.1625,0.06], color:'coral', reveal:1 },
       { id:'a2', type:'click', at:[0.0875,0.9325], color:'coral', reveal:1 },
       { id:'a3', type:'callout', at:[0.1766,0.9325], text:'Open Settings at the bottom of the sidebar', placement:'right', color:'ink', reveal:2 } ] },
-    { id:'s2', t:7.1, title:'Go to Notifications', note:'', hold:2.5, narration:'tts-heart', zoom:null, annotations:[
+    { id:'s2', t:7.1, title:'Go to Notifications', note:'', hold:2.5, narration:'tts', zoom:null, annotations:[
       { id:'a4', type:'click', at:[0.3219,0.235], color:'coral', reveal:1 },
       { id:'a5', type:'arrow', from:[0.47,0.43], to:[0.338,0.262], curve:0.22, color:'coral', reveal:1 },
       { id:'a6', type:'callout', at:[0.47,0.445], text:'Email settings live under Notifications', placement:'bottom', color:'ink', reveal:2 } ] },
-    { id:'s3', t:11.6, title:'Turn on the weekly summary', note:'Viewers can turn it off again from the same screen.', hold:3, narration:'tts-heart', zoom:[0.409,0.2935,0.588,0.588], annotations:[
+    { id:'s3', t:11.6, title:'Turn on the weekly summary', note:'Viewers can turn it off again from the same screen.', hold:3, narration:'tts', zoom:[0.409,0.2935,0.588,0.588], annotations:[
       { id:'a7', type:'spotlight', rect:[0.2,0.505,0.775,0.1], color:'coral', reveal:1 },
       { id:'a8', type:'click', at:[0.9266,0.555], color:'coral', reveal:1 },
       { id:'a9', type:'callout', at:[0.9266,0.6], text:"Every Monday you'll get last week's totals and what's due", placement:'bottom', color:'ink', reveal:2 } ] },
-    { id:'s4', t:15.2, title:'Save your changes', note:'', hold:2.5, narration:'tts-heart', zoom:null, annotations:[
+    { id:'s4', t:15.2, title:'Save your changes', note:'', hold:2.5, narration:'tts', zoom:null, annotations:[
       { id:'a10', type:'box', rect:[0.8531,0.715,0.1219,0.075], color:'coral', reveal:1 },
       { id:'a11', type:'click', at:[0.9141,0.7525], color:'coral', reveal:1 },
       { id:'a12', type:'callout', at:[0.848,0.7525], text:'Save to start getting the summary', placement:'left', color:'ink', reveal:2 } ] },
@@ -862,7 +876,7 @@ let doc = {
   audio: { original:true },
   analytics: { on:false, url:'' },
 };
-const ui = { tl:0, playing:false, waiting:false, stopAt:null, dir:1, rate:1, shuttle:false, view:'edit', tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false, snap:true, snapAt:null, scaleT:null, ripple:true, closed:{} };
+const ui = { tl:0, playing:false, waiting:false, stopAt:null, dir:1, rate:1, shuttle:false, view:'edit', tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false, snap:true, snapAt:null, scaleT:null, ripple:true, sound:true, closed:{} };
 const hist = { undo:[], redo:[] };
 
 /* ---------- time mapping (steps are anchored to source time) ---------- */
@@ -887,11 +901,22 @@ const currentStep = () => stepAtSrc(curSrc());
 const stepById = id => doc.steps.find(s => s.id === id);
 const stepIndex = s => doc.steps.indexOf(s);
 const words = s => (s.trim().match(/\S+/g) || []).length;
-const baseNarr = s => s.narration.startsWith('tts') ? 0.6 + words(s.title) * 0.38 : s.narration === 'record' ? 2.4 : 0;
+/* narration sources: 'tts' (browser speech), 'record' (microphone), 'file' (imported audio), 'original', 'none'.
+   Recorded and imported audio lives in clipStore (blobs can't be cloned into undo snapshots); a step keeps only a small pointer in voiceClips. */
+const clipStore = { clips:{}, measured:{}, voices:[] };
+const voicePlay = new Map();
+let rec = null, recMsg = '', ttsBusy = null;
+const narrKind = s => (s.narration.startsWith('tts') ? 'tts' : s.narration);
+const narrClip = s => (s.voiceClips || {})[narrKind(s)] || null;
+const ttsOf = s => ({ voice:'', ...(s.tts || {}) });
+const scriptOf = s => (s.script && s.script.trim()) || s.title;
+const ttsKey = s => s.id + '|' + scriptOf(s) + '|' + ttsOf(s).voice;
+const baseNarr = s => { const k = narrKind(s); return k === 'tts' ? clipStore.measured[ttsKey(s)] || 0.6 + words(scriptOf(s)) * 0.38 : k === 'record' || k === 'file' ? (narrClip(s) ? narrClip(s).dur : 2.4) : 0; };
+const narrReal = s => { const k = narrKind(s); return k === 'tts' || ((k === 'record' || k === 'file') && !!narrClip(s)); };
 const VOICE_DEF = { delay:0, rate:1, vol:100, fadeIn:0, fadeOut:0, mute:false };
 const voiceOf = s => ({ ...VOICE_DEF, ...(s.voice || {}) });
 const narrDur = s => baseNarr(s) / voiceOf(s).rate;
-const effHold = s => Math.max(s.hold, (baseNarr(s) ? Math.max(0, voiceOf(s).delay) : 0) + narrDur(s) + 0.4);
+const effHold = s => !narrReal(s) ? s.hold : Math.max(s.hold, (narrReal(s) ? Math.max(0, voiceOf(s).delay) : 0) + narrDur(s) + 0.4);
 const maxReveal = s => s.annotations.reduce((m, a) => Math.max(m, a.reveal), 0);
 const ZMIN = 0.25, ZMAX = 0.8;   /* box size as a share of the frame: 4× to 1.25× */
 const zoomFactor = r => clamp(Math.min(1 / r[2], 1 / r[3]), 1, 4);
@@ -1298,6 +1323,36 @@ function renderInspector() {
   if (selKey !== inspBody.dataset.sel) { inspBody.dataset.sel = selKey; inspBody.scrollTop = 0; }   /* a new selection opens at the top */
   if (focusId) { const el = document.getElementById(focusId); if (el) el.focus(); }
 }
+/* narration source: a picker plus the controls for the chosen source */
+const micOK = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+const speechOK = () => 'speechSynthesis' in window && typeof SpeechSynthesisUtterance === 'function';
+function clipRow(st) {
+  const c = narrClip(st), cs = c && clipStore.clips[c.id]; if (!c) return '';
+  return `<div class="cliprow"><span class="ann-ic">${icon('mic')}</span><div><b title="${esc(c.name)}">${esc(c.name)}</b><small>${c.dur.toFixed(1)} s</small></div></div>${cs ? `<audio controls preload="metadata" src="${cs.url}"></audio>` : ''}`;
+}
+function narrSource(st) {
+  const k = narrKind(st), nd = narrDur(st);
+  const pick = `<div class="field"><label for="f-narr">Source</label><select id="f-narr" data-field="narration">${NARR.map(([v, l]) => `<option value="${v}" ${k === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
+  let body;
+  if (k === 'tts') {
+    const t = ttsOf(st), ok = speechOK(), vs = clipStore.voices;
+    body = `<div class="field"><label for="f-voice">Voice</label>${ok ? `<select id="f-voice" data-field="ttsvoice"><option value="">Browser default</option>${vs.map(v => `<option value="${esc(v.voiceURI)}" ${t.voice === v.voiceURI ? 'selected' : ''}>${esc(v.name)} · ${esc(v.lang)}</option>`).join('')}</select>` : `<p class="help">This browser can't generate speech, so use a recording or an audio file.</p>`}</div>
+    <div class="field"><label for="f-script">What to say <span class="opt">· empty reads the step title</span></label><textarea id="f-script" data-field="script" rows="2" placeholder="${esc(st.title)}">${esc(st.script || '')}</textarea></div>
+    <div class="btn-row"><button class="btn secondary sm" id="btn-tts-prev" data-act="tts-preview" ${ok ? '' : 'disabled'}>${icon(ttsBusy === st.id ? 'pause' : 'play', 'fill')}${ttsBusy === st.id ? 'Stop' : 'Preview'}</button></div>
+    <p class="help">About ${nd.toFixed(1)} s. ${ok ? (vs.length ? 'The voices come from this device, so the same guide sounds different on another computer.' : 'No voices were found on this device yet.') : ''}</p>`;
+  } else if (k === 'record') {
+    const r = rec && rec.stepId === st.id ? rec : null, c = narrClip(st);
+    body = r
+      ? `<div class="recbox"><div class="row"><b>Recording</b><output id="rec-time" aria-live="off">0:00</output></div><div class="meter" aria-hidden="true"><i id="rec-meter"></i></div><button class="btn primary sm" data-act="rec-stop" style="align-self:flex-start">Stop</button></div>`
+      : `${clipRow(st)}<div class="btn-row"><button class="btn ${c ? 'secondary' : 'primary'} sm" data-act="rec-start" ${micOK() ? '' : 'disabled'}>${icon('mic')}${c ? 'Record again' : 'Record'}</button>${c ? `<button class="btn ghost sm" data-act="clip-remove">Remove</button>` : ''}</div>
+      <p class="help">${recMsg || (micOK() ? 'Records from your microphone. The browser asks for permission the first time.' : "This view can't use a microphone. Choose Audio file to import a recording instead, or open the page directly in Chrome.")}</p>`;
+  } else if (k === 'file') {
+    const c = narrClip(st);
+    body = `${clipRow(st)}<div class="btn-row"><label class="btn ${c ? 'secondary' : 'primary'} sm file-btn" for="f-vfile">${icon('file')}${c ? 'Replace file…' : 'Choose audio file…'}</label>${c ? `<button class="btn ghost sm" data-act="clip-remove">Remove</button>` : ''}</div><input class="sr-only" id="f-vfile" type="file" accept="audio/*" data-field="vfile">
+    <p class="help">MP3, WAV, M4A or OGG. It stays on this computer.</p>`;
+  } else body = `<p class="help">${k === 'original' ? "Plays the recording's own audio for this part." : 'This step is silent.'}</p>`;
+  return pick + body;
+}
 function inspStep(s) {
   const i = stepIndex(s), here = currentStep() === s, nd = narrDur(s);
   const anns = s.annotations.slice().sort((a, b) => a.reveal - b.reveal);
@@ -1321,8 +1376,7 @@ function inspStep(s) {
       : `<p class="help">No annotations yet. Pick Callout (<span class="kbd">C</span>), Arrow (<span class="kbd">A</span>) or Spotlight (<span class="kbd">S</span>) and use it on the frame.</p>`}
   </section>
   <section class="section"><h3>Narration</h3>
-    <label class="sr-only" for="f-narr">Narration</label><select id="f-narr" data-field="narration">${VOICES.map(([v, l]) => `<option value="${v}" ${s.narration === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
-    <p class="help">${s.narration.startsWith('tts') ? `Reads the title aloud (${nd.toFixed(1)} s). The voice is generated on this computer.` : s.narration === 'record' ? 'Record from your microphone, step by step.' : s.narration === 'original' ? "Plays the recording's own audio for this part." : 'This step is silent.'}</p>
+    ${narrSource(s)}
     ${nd > 0 ? `<button class="btn secondary sm" data-act="sel-voice" style="align-self:flex-start">${icon('sliders')}Voice settings</button>` : ''}
   </section>
   <button class="btn danger-ghost" data-act="del-step">${icon('trash')}Delete step</button>`;
@@ -1437,7 +1491,7 @@ function inspVoice(st) {
   return `
   <button class="back" data-act="back-step">${icon('chev-left')}Step ${i + 1} · ${esc(st.title)}</button>
   <div class="insp-title"><span class="ann-ic">${icon('mic')}</span><div><h3 class="insp-h">Narration</h3><p class="insp-sub">${fmt(vs)}–${fmt(ve)}</p></div></div>
-  <div class="field"><label for="f-narr">Voice</label><select id="f-narr" data-field="narration">${VOICES.map(([v, l]) => `<option value="${v}" ${st.narration === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+  ${narrSource(st)}
   ${grp('voice-timing', 'Timing', timing)}
   ${grp('voice-audio', 'Audio', audio)}
   <button class="btn danger-ghost" data-act="del-voice">${icon('trash')}Remove narration</button>`;
@@ -1544,7 +1598,14 @@ function renderTimeline() {
   const blurs = doc.blurs.map(raw => { const b = blurOf(raw), [a, e] = blurSpan(b); return `<button class="lane-bar blur-bar ${is('blur', b.id)}" data-blur="${b.id}" style="left:${x(a)}px;width:${Math.max(10, x(e) - x(a))}px;top:${5 + bp.row[b.id] * 26}px;bottom:auto;height:22px">${fd(srcToTl(b.from + b.fadeIn) - a, e - srcToTl(b.to - b.fadeOut))}${icon('blur')}<span>${esc(b.label)}</span>${EDGES}</button>`; }).join('');
   const vs = doc.steps.filter(s => narrDur(s) > 0);
   const vp = packRows(vs.map(s => { const [a, e] = voiceSpan(s); return { id:s.id, s:a, e }; }));
-  const voices = vs.map(s => { const [a, e] = voiceSpan(s), v = voiceOf(s); return `<button class="lane-bar voice-bar ${is('voice', s.id)} ${v.mute ? 'muted' : ''}" data-voice="${s.id}" style="left:${x(a)}px;width:${Math.max(26, x(e) - x(a))}px;top:${5 + vp.row[s.id] * 26}px;bottom:auto;height:22px" aria-label="Narration for ${esc(s.title)}">${fd(v.fadeIn, v.fadeOut)}${icon('mic')}<span>${s.narration === 'record' ? 'Recorded' : s.narration === 'tts-lewis' ? 'Lewis' : 'Heart'} · ${(e - a).toFixed(1)} s${v.rate !== 1 ? ` · ${v.rate.toFixed(2)}×` : ''}</span>${EDGES}</button>`; }).join('');
+  const wfPath = pk => pk.map((p, i) => `M${((i + 0.5) * 100 / pk.length).toFixed(2)} ${(10 - p * 9).toFixed(1)}V${(10 + p * 9).toFixed(1)}`).join('');
+  const voiceLabel = s => { const k = narrKind(s), c = narrClip(s); if (k === 'tts') { const v = clipStore.voices.find(x => x.voiceURI === ttsOf(s).voice); return v ? v.name : 'Voice'; } if (k === 'record') return c ? 'Recorded' : 'Record…'; return c ? c.name : 'Choose a file…'; };
+  const voices = vs.map(s => {
+    const [a, e] = voiceSpan(s), v = voiceOf(s), k = narrKind(s), c = narrClip(s), cs = c && clipStore.clips[c.id];
+    const ph = (k === 'record' || k === 'file') && !c;
+    const wf = cs && cs.peaks ? `<svg class="wf" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true"><path d="${wfPath(cs.peaks)}"/></svg>` : '';
+    return `<button class="lane-bar voice-bar ${is('voice', s.id)} ${v.mute ? 'muted' : ''} ${ph ? 'placeholder' : ''}" data-voice="${s.id}" style="left:${x(a)}px;width:${Math.max(26, x(e) - x(a))}px;top:${5 + vp.row[s.id] * 26}px;bottom:auto;height:22px" aria-label="Narration for ${esc(s.title)}">${fd(v.fadeIn, v.fadeOut)}${wf}${icon('mic')}<span>${esc(voiceLabel(s))}${ph ? '' : ` · ${(e - a).toFixed(1)} s`}${v.rate !== 1 ? ` · ${v.rate.toFixed(2)}×` : ''}</span>${EDGES}</button>`;
+  }).join('');
   let music;
   if (doc.music) { const [a, e] = musicSpan(), m = musicOf(); music = `<button class="lane-bar music-bar ${is('music')} ${m.mute ? 'muted' : ''}" data-music="1" style="left:${x(a)}px;width:${Math.max(30, x(e) - x(a))}px">${fd(m.fadeIn, m.fadeOut)}${icon('music')}<span>${esc(doc.music.name)} · ${m.mute ? 'muted' : doc.music.volume + '%'}</span>${EDGES}</button>`; }
   else music = `<button class="lane-add" data-act="add-music">${icon('plus')}Add music</button>`;
@@ -1611,7 +1672,7 @@ function selectStep(id, opts = {}) {
 }
 function selectAnn(step, id) { ui.sel = { kind:'ann', stepId:step.id, id }; ui.tab = 'selection'; renderSteps(); renderAtTime(); renderInspector(); renderTimeline(); }
 function setPlayhead(t, snap, invert) {
-  ui.waiting = false;
+  ui.waiting = false; stopVoices();
   t = clamp(t, 0, tlDur()); ui.snapAt = null;
   if (snap && snapEnabled(invert)) { const r = snapNear([t], { playhead:true }); if (r) { t += r.delta; ui.snapAt = r.at; } }
   ui.tl = clamp(t, 0, tlDur());
@@ -1687,7 +1748,7 @@ function pinStep(point) {
       if (point) { const c = ex.annotations.find(a => a.type === 'click'); if (c) c.at = point; else ex.annotations.push({ id:uid('a'), type:'click', at:point, color:'coral', reveal:1 }); }
       ui.sel = { kind:'step', id:ex.id };
     } else {
-      created = { id:uid('s'), t:src, title:'New step', note:'', hold:2.5, narration:'tts-heart', zoom:null, annotations: point ? [{ id:uid('a'), type:'click', at:point, color:'coral', reveal:1 }] : [] };
+      created = { id:uid('s'), t:src, title:'New step', note:'', hold:2.5, narration:'tts', zoom:null, annotations: point ? [{ id:uid('a'), type:'click', at:point, color:'coral', reveal:1 }] : [] };
       doc.steps.push(created); doc.steps.sort((a, b) => a.t - b.t);
       ui.sel = { kind:'step', id:created.id };
     }
@@ -1746,26 +1807,189 @@ function play(dir = 1, rate = 1, shuttle = false) {
   ui.dir = dir; ui.rate = rate; ui.shuttle = shuttle;
   ui.waiting = false; ui.stopAt = dir > 0 ? nextStopAfter(ui.tl) : nextStopBefore(ui.tl);
   if (ui.sel && (ui.sel.kind === 'ann' || ui.sel.kind === 'zoom')) { ui.sel = { kind:'step', id:ui.sel.stepId }; renderInspector(); }
-  ui.playing = true; lastTs = performance.now(); raf = requestAnimationFrame(tick); renderAtTime();
+  ui.playing = true; lastTs = performance.now(); raf = requestAnimationFrame(tick); voiceTick(); renderAtTime();
 }
 function tick(ts) {
-  const dt = Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
+  const dt = clamp((ts - lastTs) / 1000, 0, 0.1); lastTs = ts;   /* the first frame's timestamp can precede lastTs, which would step the playhead back */
   const T = tlDur(), next = clamp(ui.tl + dt * (ui.shuttle ? ui.rate : ui.previewSpeed) * ui.dir, 0, T);
   if (ui.stopAt != null && (ui.dir > 0 ? next >= ui.stopAt : next <= ui.stopAt)) { ui.tl = ui.stopAt; stopAtStep(); return; }
   ui.tl = next;
+  voiceTick();
   renderAtTime();
   if (ui.dir > 0 ? ui.tl >= T : ui.tl <= 0) { pause(); return; }
   raf = requestAnimationFrame(tick);
 }
-function pause() { if (!ui.playing) return; ui.playing = false; ui.rate = 1; cancelAnimationFrame(raf); renderAtTime(); }
+function pause() { if (!ui.playing) return; ui.playing = false; ui.rate = 1; cancelAnimationFrame(raf); stopVoices(); renderAtTime(); }
 function stopAtStep() {            /* keeps dir and rate, so the same key carries on at the same speed */
-  ui.playing = false; ui.waiting = true; ui.stopAt = null; cancelAnimationFrame(raf);
+  ui.playing = false; ui.waiting = true; ui.stopAt = null; cancelAnimationFrame(raf); stopVoices();
   const st = currentStep();
   if (st) { ui.sel = { kind:'step', id:st.id }; ui.tab = 'selection'; }
   renderSteps(); renderAtTime(); renderInspector(); renderTimeline();
   const card = st && stepList.querySelector(`[data-step="${st.id}"]`); if (card) card.scrollIntoView({ block:'nearest', inline:'nearest' });
 }
 const togglePlay = () => (ui.playing ? pause() : play());
+
+/* ---------- narration audio ---------- */
+/* Generated voice uses the browser's speech engine: it can't seek or fade, so it only starts at the top of a voice bar. Recorded and imported clips are real audio and follow the playhead, rate and fades. */
+const spd = () => (pvDlg.open ? 1 : ui.shuttle ? ui.rate : ui.previewSpeed);
+function loadVoices() {
+  if (!speechOK()) return;
+  const all = speechSynthesis.getVoices(), en = v => /^en/i.test(v.lang);
+  clipStore.voices = [...all.filter(en), ...all.filter(v => !en(v))];
+}
+loadVoices();
+if (speechOK()) speechSynthesis.addEventListener('voiceschanged', () => { loadVoices(); if (!(deferInsp || isTextEntry(document.activeElement))) renderInspector(); renderTimeline(); });
+function makeUtter(s, speed) {
+  const u = new SpeechSynthesisUtterance(scriptOf(s)), v = speechSynthesis.getVoices().find(x => x.voiceURI === ttsOf(s).voice);
+  if (v) { u.voice = v; u.lang = v.lang; }
+  u.rate = clamp(voiceOf(s).rate * speed, 0.1, 10); u.volume = clamp(voiceOf(s).vol / 100, 0, 1);
+  return u;
+}
+/* what the speech engine really took, so the bar on the timeline matches what viewers will wait for */
+function measureUtter(s, u) {
+  let t0 = 0;
+  u.addEventListener('start', () => { t0 = performance.now(); });
+  u.addEventListener('end', () => {
+    if (!t0 || !stepById(s.id)) return;
+    const d = (performance.now() - t0) / 1000 * u.rate;
+    if (d > 0.2 && Math.abs(d - baseNarr(s)) > 0.15) { clipStore.measured[ttsKey(s)] = d; renderTimeline(); if (ui.sel && ui.sel.kind !== 'ann' && !(deferInsp || isTextEntry(document.activeElement))) renderInspector(); }
+  });
+}
+function voiceGain(s, t) {
+  const v = voiceOf(s), [a, e] = voiceSpan(s);
+  const fi = v.fadeIn > 0 ? clamp((t - a) / v.fadeIn, 0, 1) : 1, fo = v.fadeOut > 0 ? clamp((e - t) / v.fadeOut, 0, 1) : 1;
+  return clamp(v.vol / 100, 0, 1) * Math.min(fi, fo);
+}
+function startVoice(s, off) {
+  if (voicePlay.has(s.id) || !narrReal(s)) return;
+  const k = narrKind(s), v = voiceOf(s);
+  if (k === 'tts') {
+    if (!speechOK() || off > 0.35) return;
+    const u = makeUtter(s, spd()), p = { done:false };
+    measureUtter(s, u);
+    u.addEventListener('end', () => { p.done = true; }); u.addEventListener('error', () => { p.done = true; });
+    voicePlay.set(s.id, p); speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } else {
+    const c = narrClip(s), cs = c && clipStore.clips[c.id]; if (!cs) return;
+    const a = new Audio(cs.url), p = { audio:a, done:false };
+    a.preservesPitch = true; a.currentTime = Math.max(0, off * v.rate); a.playbackRate = clamp(v.rate * spd(), 0.25, 4); a.volume = voiceGain(s, ui.tl);
+    a.addEventListener('ended', () => { p.done = true; });
+    voicePlay.set(s.id, p); const pr = a.play(); if (pr && pr.catch) pr.catch(() => { p.done = true; });
+  }
+}
+function stopVoice(id) {
+  const p = voicePlay.get(id); if (!p) return;
+  if (p.audio) { p.audio.pause(); p.audio.removeAttribute('src'); p.audio.load(); }
+  voicePlay.delete(id);
+}
+function stopVoices() {
+  if (!voicePlay.size && !(speechOK() && speechSynthesis.speaking && !ttsBusy)) return;
+  for (const id of [...voicePlay.keys()]) stopVoice(id);
+  if (speechOK() && !ttsBusy) speechSynthesis.cancel();
+}
+/* runs every frame while the timeline plays forward: starts the narration the playhead has reached and keeps its volume and speed current */
+function voiceTick() {
+  if (!ui.playing || ui.dir < 0 || !ui.sound) { stopVoices(); return; }
+  const t = ui.tl;
+  for (const id of [...voicePlay.keys()]) if (!stepById(id)) stopVoice(id);
+  for (const s of doc.steps) {
+    if (!narrReal(s) || voiceOf(s).mute) { stopVoice(s.id); continue; }
+    const [a, e] = voiceSpan(s), p = voicePlay.get(s.id);
+    if (t >= a - 1e-6 && t < e) {
+      if (!p) startVoice(s, t - a);
+      else if (p.audio) { p.audio.volume = voiceGain(s, t); p.audio.playbackRate = clamp(voiceOf(s).rate * spd(), 0.25, 4); }
+    } else if (p) stopVoice(s.id);
+  }
+}
+function toggleSound() {
+  ui.sound = !ui.sound; const b = $('#btn-sound');
+  b.setAttribute('aria-pressed', String(ui.sound));
+  b.dataset.tip = ui.sound ? 'Sound on: narration plays while you play the timeline.  M' : 'Sound off: the timeline plays silently.  M';
+  b.classList.toggle('off', !ui.sound);
+  if (!ui.sound) stopVoices();
+  toast(ui.sound ? 'Sound on' : 'Sound off');
+}
+$('#btn-sound').addEventListener('click', toggleSound);
+/* guide preview: the same narration, started when a step arrives */
+function pvSpeak(st) {
+  if (!ui.sound || !narrReal(st) || voiceOf(st).mute) return;
+  PV.timers.push(setTimeout(() => startVoice(st, 0), Math.max(0, voiceOf(st).delay) * 1000));
+}
+
+/* generated-voice preview in the Inspector */
+function setPrevBtn() {
+  const b = $('#btn-tts-prev'), st = ui.sel && stepById(selStepId()); if (!b || !st) return;
+  b.innerHTML = icon(ttsBusy === st.id ? 'pause' : 'play', 'fill') + (ttsBusy === st.id ? 'Stop' : 'Preview');
+}
+function ttsPreview(st) {
+  if (!speechOK()) return;
+  if (ttsBusy === st.id) { ttsBusy = null; speechSynthesis.cancel(); setPrevBtn(); return; }
+  pause(); stopVoices();
+  const u = makeUtter(st, 1), id = st.id; measureUtter(st, u);
+  const over = () => { if (ttsBusy === id) { ttsBusy = null; setPrevBtn(); } };
+  u.addEventListener('end', over); u.addEventListener('error', over);
+  ttsBusy = id; speechSynthesis.cancel(); speechSynthesis.speak(u); setPrevBtn();
+}
+
+/* clips: decode for the length and a waveform; store the blob outside the document so undo never copies audio */
+const MAX_CLIP_MB = 40;
+async function decodeClip(blob) {
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) throw new Error('no audio');
+  const ctx = new AC();
+  try {
+    const ab = await ctx.decodeAudioData(await blob.arrayBuffer());
+    const ch = ab.getChannelData(0), N = 120, per = Math.max(1, Math.floor(ch.length / N)), peaks = [];
+    for (let i = 0; i < N; i++) { let m = 0; for (let j = i * per, e = Math.min(ch.length, j + per); j < e; j += 8) m = Math.max(m, Math.abs(ch[j])); peaks.push(m); }
+    const mx = Math.max(...peaks, 0.02);
+    return { dur: ab.duration, peaks: peaks.map(p => Math.min(1, p / mx)) };
+  } finally { if (ctx.close) ctx.close(); }
+}
+async function addClip(stepId, kind, blob, name) {
+  if (blob.size > MAX_CLIP_MB * 1048576) { toast(`That file is over ${MAX_CLIP_MB} MB. Use a shorter clip.`); return false; }
+  let info; try { info = await decodeClip(blob); } catch (err) { info = null; }
+  if (!info || !(info.dur > 0)) { toast("Couldn't read that as audio. Try an MP3, WAV, M4A or OGG file."); return false; }
+  if (!stepById(stepId)) return false;
+  const id = uid('m'); clipStore.clips[id] = { url:URL.createObjectURL(blob), peaks:info.peaks, name };
+  commit(() => { const s = stepById(stepId); s.narration = kind; s.voiceClips = { ...(s.voiceClips || {}), [kind]: { id, name, dur:info.dur } }; });
+  toast(`${kind === 'record' ? 'Recording' : 'Audio'} added: ${info.dur.toFixed(1)} s.`);
+  return true;
+}
+const REC_MAX = 120;
+async function recStart(st) {
+  if (rec || !micOK()) return;
+  pause(); recMsg = '';
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+  catch (err) { recMsg = err && err.name === 'NotAllowedError' ? 'The microphone is blocked. Allow it for this page in the browser settings, or choose Audio file to import a recording.' : 'No microphone was found.'; renderInspector(); return; }
+  const mr = new MediaRecorder(stream), chunks = [];
+  let ctx = null, an = null, buf = null;
+  try { const AC = window.AudioContext || window.webkitAudioContext; ctx = new AC(); an = ctx.createAnalyser(); an.fftSize = 512; ctx.createMediaStreamSource(stream).connect(an); buf = new Uint8Array(an.fftSize); } catch (err) { an = null; }
+  rec = { stepId:st.id, mr, stream, ctx, an, buf, t0:performance.now(), raf:0 };
+  const me = rec;
+  mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  mr.onstop = async () => {
+    cancelAnimationFrame(me.raf); stream.getTracks().forEach(t => t.stop()); if (ctx && ctx.close) ctx.close();
+    if (rec === me) rec = null;
+    const blob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
+    const ok = blob.size ? await addClip(me.stepId, 'record', blob, 'Recording') : false;
+    if (!ok) recMsg = 'Nothing was recorded.';
+    renderInspector();
+  };
+  mr.start(250); renderInspector(); recLoop();
+}
+function recLoop() {
+  if (!rec) return;
+  const secs = (performance.now() - rec.t0) / 1000, tEl = $('#rec-time'), mEl = $('#rec-meter');
+  if (tEl) tEl.textContent = Math.floor(secs / 60) + ':' + String(Math.floor(secs % 60)).padStart(2, '0');
+  if (mEl && rec.an) { rec.an.getByteTimeDomainData(rec.buf); let m = 0; for (const b of rec.buf) m = Math.max(m, Math.abs(b - 128)); mEl.style.width = Math.min(100, m / 128 * 140) + '%'; }
+  if (secs >= REC_MAX) { recStop(); return; }
+  rec.raf = requestAnimationFrame(recLoop);
+}
+function recStop() { if (rec && rec.mr.state !== 'inactive') rec.mr.stop(); }
+function removeClip(st) {
+  const k = narrKind(st);
+  commit(() => { const s = stepById(st.id), vc = { ...(s.voiceClips || {}) }; delete vc[k]; s.voiceClips = vc; });
+}
 /* J / L: first press plays that way at 1x, each further press in the same direction doubles it up to 4x; the other direction restarts at 1x */
 function shuttle(dir) {
   if (ui.empty) return;
@@ -1922,7 +2146,7 @@ inspBody.addEventListener('input', e => {
   const el = e.target, f = el.dataset.field; if (!f) return;
   const st = ui.sel && stepById(selStepId());
   const ann = ui.sel && ui.sel.kind === 'ann' && st ? st.annotations.find(a => a.id === ui.sel.id) : null;
-  if (['title','note','hold','text','curve','padding','radius','cta-label','cta-url','music-vol','analytics-url','zoom-amount','prm','ptext'].includes(f)) takeSnap(); else return;
+  if (['title','note','hold','text','curve','padding','radius','cta-label','cta-url','music-vol','analytics-url','zoom-amount','prm','ptext','script'].includes(f)) takeSnap(); else return;
   if (f === 'prm') {
     const d = reg[el.dataset.pid]; if (!d) return;
     let v = parseFloat(el.value); if (!isFinite(v)) return;
@@ -1937,6 +2161,7 @@ inspBody.addEventListener('input', e => {
   if (f === 'zoom-amount' && st && st.zoom) { const z = st.zoom; st.zoom = zoomBox(z[0] + z[2] / 2, z[1] + z[3] / 2, 1 / +el.value); $('#o-zamt').textContent = (+el.value).toFixed(1) + '×'; last.annKey = null; renderAtTime(); }
   if (f === 'title' && st) { st.title = el.value; const c = stepList.querySelector(`[data-step="${st.id}"] .step-title`); if (c) c.textContent = el.value || 'Untitled step'; renderStatus(currentStep()); renderTimeline(); }
   if (f === 'note' && st) st.note = el.value;
+  if (f === 'script' && st) { st.script = el.value; renderTimeline(); }
   if (f === 'hold' && st) { st.hold = +el.value; $('#o-hold').textContent = st.hold.toFixed(1) + ' s'; }
   if (f === 'text' && ann) { ann.text = el.value; renderAtTime(); }
   if (f === 'curve' && ann) { ann.curve = +el.value; $('#o-curve').textContent = Math.round(ann.curve * 100); renderAtTime(); }
@@ -1970,7 +2195,9 @@ function onInspChange(e) {
   if (f === 'original') { commit(() => { doc.audio.original = el.checked; }); return; }
   if (f === 'analytics') { commit(() => { doc.analytics.on = el.checked; }); return; }
   if (f === 'logo' && el.files && el.files[0]) { const url = URL.createObjectURL(el.files[0]); commit(() => { doc.logo.src = url; }); toast('Logo added to every frame.'); return; }
-  if (['title','note','text','padding','radius'].includes(f)) { renderSteps(); renderTimeline(); }
+  if (f === 'ttsvoice' && st) { commit(() => { const s2 = stepById(st.id); s2.tts = { ...ttsOf(s2), voice:el.value }; }); return; }
+  if (f === 'vfile') { const file = el.files && el.files[0], id = st && st.id; el.value = ''; if (file && id) addClip(id, 'file', file, file.name).then(ok => { if (!ok) renderInspector(); }); return; }
+  if (['title','note','text','padding','radius','script'].includes(f)) { renderSteps(); renderTimeline(); }
 }
 inspBody.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -1990,6 +2217,10 @@ inspBody.addEventListener('click', e => {
       commit(() => { doc.clips.find(x => x.id === c.id).speed = +v; ui.tl = srcToTl(src); });
       break; }
     case 'split': splitAtPlayhead(); break;
+    case 'tts-preview': if (st) ttsPreview(st); break;
+    case 'rec-start': if (st) recStart(st); break;
+    case 'rec-stop': recStop(); break;
+    case 'clip-remove': if (st) removeClip(st); break;
     case 'bstyle': commit(() => { doc.blurs.find(x => x.id === ui.sel.id).style = v; }); break;
     case 'bg': commit(() => { doc.frame.preset = v; }); break;
     case 'mode': commit(() => { doc.player.mode = v; }); break;
@@ -2270,6 +2501,7 @@ function commands() {
     { label:'Split clip at playhead', key:'R', run:splitAtPlayhead },
     { label:'Toggle snapping', key:'N', run:toggleSnap },
     { label:'Toggle ripple trim', key:'⇧R', run:toggleRipple },
+    { label:'Turn sound on or off', key:'M', run:toggleSound },
     { label:'Copy current frame', run:() => toast('Mockup only: the app copies the finished frame to your clipboard.') },
     ...TOOLS.map(t => ({ label:`Tool: ${t.label}`, key:t.key.toUpperCase(), run:() => setTool(t.id) })),
     ...doc.steps.map((s, i) => ({ label:`Go to step ${i + 1}: ${s.title}`, run:() => selectStep(s.id) })),
@@ -2320,7 +2552,7 @@ $('#file-rec').addEventListener('change', e => { if (e.target.files && e.target.
 /* ---------- preview player ---------- */
 const pvDlg = $('#dlg-preview'), player = $('#player'), plStage = $('#pl-stage');
 const PV = { i:-1, src:0, reveal:0, animating:false, end:false, timers:[], raf:0, scr:null, fresh:0 };
-function pvClear() { PV.timers.forEach(clearTimeout); PV.timers = []; cancelAnimationFrame(PV.raf); PV.animating = false; }
+function pvClear() { PV.timers.forEach(clearTimeout); PV.timers = []; cancelAnimationFrame(PV.raf); PV.animating = false; stopVoices(); }
 function pvReset() { pvClear(); PV.i = -1; PV.src = 0; PV.reveal = 0; PV.end = false; pvRender(); }
 function pvFit() {
   const availW = plStage.clientWidth || 800;
@@ -2335,6 +2567,7 @@ function pvArrive(i) {
   const st = doc.steps[i]; PV.i = i; PV.src = st.t; PV.animating = false; PV.reveal = 1; PV.fresh = 1; pvRender();
   const g = maxReveal(st);
   for (let k = 2; k <= g; k++) PV.timers.push(setTimeout(() => { PV.reveal = k; PV.fresh = k; pvRender(); }, (k - 1) * 480));
+  pvSpeak(st);
   if (doc.player.mode !== 'guided') PV.timers.push(setTimeout(pvNext, Math.max(0, g - 1) * 480 + effHold(st) * 1000));
 }
 function pvGo(i, animate) {
@@ -2455,6 +2688,7 @@ document.addEventListener('keydown', e => {
   if (e.shiftKey && !e.altKey && (k === 'k' || k === 'i')) { e.preventDefault(); selectLayer(k === 'k' ? 1 : -1); return; }   /* by lowercase key, so it also works with Caps Lock on */
   if (e.altKey || e.shiftKey) return;
   if (k === 'n') { e.preventDefault(); toggleSnap(); return; }
+  if (k === 'm') { e.preventDefault(); toggleSound(); return; }
   if (k === 'r') { e.preventDefault(); splitAtPlayhead(); return; }
   const t = TOOLS.find(x => x.key === k); if (t) { e.preventDefault(); setTool(t.id); }
 });
