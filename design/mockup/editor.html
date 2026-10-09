@@ -667,7 +667,7 @@ details[open] summary{margin-bottom:8px}
       <div class="transport-mid">
         <button class="icon-btn" id="btn-prev-step" aria-label="Previous step" data-tip="Previous step  ⌥←"><svg class="ic" aria-hidden="true"><use href="#i-skip-back"/></svg></button>
         <button class="icon-btn" id="btn-prev-frame" aria-label="Previous frame" data-tip="Previous frame  ←"><svg class="ic" aria-hidden="true"><use href="#i-chev-left"/></svg></button>
-        <button class="play" id="btn-play" aria-label="Play" data-tip="Play or pause  Space"><svg class="ic fill" aria-hidden="true"><use href="#i-play"/></svg></button>
+        <button class="play" id="btn-play" aria-label="Play" data-tip="Play or pause  Space or K. L plays forward and J backward, faster with each press."><svg class="ic fill" aria-hidden="true"><use href="#i-play"/></svg></button>
         <button class="icon-btn" id="btn-next-frame" aria-label="Next frame" data-tip="Next frame  →"><svg class="ic" aria-hidden="true"><use href="#i-chev-right"/></svg></button>
         <button class="icon-btn" id="btn-next-step" aria-label="Next step" data-tip="Next step  ⌥→"><svg class="ic" aria-hidden="true"><use href="#i-skip-fwd"/></svg></button>
       </div>
@@ -678,7 +678,7 @@ details[open] summary{margin-bottom:8px}
         <label class="mini" for="preview-speed">Preview
           <select id="preview-speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
         </label>
-        <label class="mini" for="tl-zoom">Zoom<input id="tl-zoom" type="range" min="1" max="4" step="0.25" value="1"></label>
+        <label class="mini" for="tl-zoom" data-tip="Zoom the timeline  = in, - out">Zoom<input id="tl-zoom" type="range" min="1" max="8" step="0.05" value="1"></label>
       </div>
     </div>
     <div class="tl-scroll" id="tl-scroll">
@@ -862,7 +862,7 @@ let doc = {
   audio: { original:true },
   analytics: { on:false, url:'' },
 };
-const ui = { tl:0, playing:false, waiting:false, stopAt:null, view:'edit', tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false, snap:true, snapAt:null, scaleT:null, ripple:true, closed:{} };
+const ui = { tl:0, playing:false, waiting:false, stopAt:null, dir:1, rate:1, shuttle:false, view:'edit', tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false, snap:true, snapAt:null, scaleT:null, ripple:true, closed:{} };
 const hist = { undo:[], redo:[] };
 
 /* ---------- time mapping (steps are anchored to source time) ---------- */
@@ -1217,7 +1217,8 @@ function renderStatus(st) {
   let h;
   const waiting = ui.waiting && !ui.playing && st;
   statusEl.classList.toggle('waiting', !!waiting);
-  if (waiting) { const i = stepIndex(st), lastStep = i === doc.steps.length - 1; h = `<span class="dot" aria-hidden="true"></span><b>Stopped at step ${i + 1} of ${doc.steps.length}</b><span>${esc(st.title)}</span><button class="btn primary sm" data-act="continue">${icon('play', 'fill')}${lastStep ? 'Play to the end' : 'Continue'}</button><span>or click the frame</span>${ui.view === 'edit' ? '<button class="btn secondary sm" data-act="edit-here">Edit this step</button>' : ''}`; }
+  if (waiting) { const i = stepIndex(st), lastStep = i === doc.steps.length - 1; h = `<span class="dot" aria-hidden="true"></span><b>Stopped at step ${i + 1} of ${doc.steps.length}</b><span>${esc(st.title)}</span><button class="btn primary sm" data-act="continue">${icon('play', 'fill')}${ui.shuttle && ui.dir < 0 ? (i === 0 ? 'Rewind to the start' : 'Keep rewinding') : lastStep ? 'Play to the end' : 'Continue'}</button><span>or click the frame</span>${ui.view === 'edit' ? '<button class="btn secondary sm" data-act="edit-here">Edit this step</button>' : ''}`; }
+  else if (ui.playing && ui.shuttle) h = `<span class="dot" aria-hidden="true"></span><b>${ui.dir < 0 ? 'Rewinding' : 'Playing'}</b><span class="kbd">${ui.rate}×</span><span>Stops at the ${ui.dir < 0 ? 'previous' : 'next'} step. Press</span><span class="kbd">K</span><span>to pause.</span>`;
   else if (ui.playing) h = `<span class="dot" aria-hidden="true"></span><b>Playing</b><span>Stops at the next step. Press</span><span class="kbd">Space</span><span>to pause.</span>`;
   else if (ui.view === 'viewer') h = st
     ? `<span class="dot" aria-hidden="true"></span><b>Viewer view</b><span>Step ${stepIndex(st) + 1} of ${doc.steps.length} · ${esc(st.title)}. Click the frame or press</span><span class="kbd">Space</span><span>to continue.</span>`
@@ -1587,6 +1588,17 @@ function updatePlayhead() {
   const ph = $('#playhead'), T = tlDur();
   if (ph) ph.style.left = (84 + (ui.tl / tScale()) * laneW()) + 'px';
   timecodeEl.innerHTML = `${fmt(ui.tl)} <span>/ ${fmt(T)}</span>`;
+  if (ph && !scrub && !tdrag) {   /* when zoomed in, keep the playhead in view */
+    const x = ph.offsetLeft, l = tlScroll.scrollLeft, w = tlScroll.clientWidth;
+    if (x < l + 88 || x > l + w - 16) tlScroll.scrollLeft = Math.max(0, x - w / 2);
+  }
+}
+function setTimelineZoom(z) {
+  z = clamp(z, 1, 8); if (Math.abs(z - ui.zoom) < 1e-6) return;
+  const ph = $('#playhead'), before = ph ? ph.offsetLeft - tlScroll.scrollLeft : null;
+  ui.zoom = z; $('#tl-zoom').value = z; renderTimeline();
+  const ph2 = $('#playhead');
+  if (ph2) { const w = tlScroll.clientWidth, keep = before != null && before > 88 && before < w - 16; tlScroll.scrollLeft = Math.max(0, ph2.offsetLeft - (keep ? before : w / 2)); }
 }
 
 /* ---------- selection and editing actions ---------- */
@@ -1617,6 +1629,16 @@ function jumpStep(dir) {
   const times = doc.steps.map(s => srcToTl(s.t));
   let target = null;
   if (dir > 0) target = times.find(t => t > ui.tl + eps); else for (const t of times) if (t < ui.tl - eps) target = t;
+  if (target == null) target = dir > 0 ? tlDur() : 0;
+  setPlayhead(target); afterMove();
+}
+/* next / previous edit: the nearest of every place the playhead can snap to (cuts, pins, voice, blur and music edges, the ends) */
+function jumpEdit(dir) {
+  if (ui.empty) return;
+  pause();
+  const pts = snapPoints({ playhead:true }).sort((a, b) => a - b).filter((p, i, arr) => !i || p - arr[i - 1] > PIN_EPS);
+  let target = null;
+  if (dir > 0) target = pts.find(p => p > ui.tl + PIN_EPS); else for (const p of pts) if (p < ui.tl - PIN_EPS) target = p;
   if (target == null) target = dir > 0 ? tlDur() : 0;
   setPlayhead(target); afterMove();
 }
@@ -1672,28 +1694,36 @@ function setView(v) {
 
 /* ---------- playback ---------- */
 let raf = 0, lastTs = 0;
+const PIN_EPS = 0.5 / FPS;
 function nextStopAfter(t) {
-  const times = doc.steps.map(s => srcToTl(s.t)).filter(x => x > t + 0.5 / FPS).sort((a, b) => a - b);
+  const times = doc.steps.map(s => srcToTl(s.t)).filter(x => x > t + PIN_EPS).sort((a, b) => a - b);
   return times.length ? times[0] : null;
 }
-function play() {
+function nextStopBefore(t) {
+  const times = doc.steps.map(s => srcToTl(s.t)).filter(x => x < t - PIN_EPS).sort((a, b) => b - a);
+  return times.length ? times[0] : null;
+}
+/* dir: +1 forward, -1 backward. A shuttle (J/L) has its own speed; plain play follows the Preview menu. Either way it stops at every pinned step. */
+function play(dir = 1, rate = 1, shuttle = false) {
   if (ui.playing || ui.empty) return;
-  if (ui.tl >= tlDur() - 1e-3) ui.tl = 0;
-  ui.waiting = false; ui.stopAt = nextStopAfter(ui.tl);
+  if (dir > 0 && ui.tl >= tlDur() - 1e-3) ui.tl = 0;
+  if (dir < 0 && ui.tl <= 1e-3) return;
+  ui.dir = dir; ui.rate = rate; ui.shuttle = shuttle;
+  ui.waiting = false; ui.stopAt = dir > 0 ? nextStopAfter(ui.tl) : nextStopBefore(ui.tl);
   if (ui.sel && (ui.sel.kind === 'ann' || ui.sel.kind === 'zoom')) { ui.sel = { kind:'step', id:ui.sel.stepId }; renderInspector(); }
   ui.playing = true; lastTs = performance.now(); raf = requestAnimationFrame(tick); renderAtTime();
 }
 function tick(ts) {
   const dt = Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
-  const next = Math.min(tlDur(), ui.tl + dt * ui.previewSpeed);
-  if (ui.stopAt != null && next >= ui.stopAt) { ui.tl = ui.stopAt; stopAtStep(); return; }
+  const T = tlDur(), next = clamp(ui.tl + dt * (ui.shuttle ? ui.rate : ui.previewSpeed) * ui.dir, 0, T);
+  if (ui.stopAt != null && (ui.dir > 0 ? next >= ui.stopAt : next <= ui.stopAt)) { ui.tl = ui.stopAt; stopAtStep(); return; }
   ui.tl = next;
   renderAtTime();
-  if (ui.tl >= tlDur()) { pause(); return; }
+  if (ui.dir > 0 ? ui.tl >= T : ui.tl <= 0) { pause(); return; }
   raf = requestAnimationFrame(tick);
 }
-function pause() { if (!ui.playing) return; ui.playing = false; cancelAnimationFrame(raf); renderAtTime(); }
-function stopAtStep() {
+function pause() { if (!ui.playing) return; ui.playing = false; ui.rate = 1; cancelAnimationFrame(raf); renderAtTime(); }
+function stopAtStep() {            /* keeps dir and rate, so the same key carries on at the same speed */
   ui.playing = false; ui.waiting = true; ui.stopAt = null; cancelAnimationFrame(raf);
   const st = currentStep();
   if (st) { ui.sel = { kind:'step', id:st.id }; ui.tab = 'selection'; }
@@ -1701,6 +1731,17 @@ function stopAtStep() {
   const card = st && stepList.querySelector(`[data-step="${st.id}"]`); if (card) card.scrollIntoView({ block:'nearest', inline:'nearest' });
 }
 const togglePlay = () => (ui.playing ? pause() : play());
+/* J / L: first press plays that way at 1x, each further press in the same direction doubles it up to 4x; the other direction restarts at 1x */
+function shuttle(dir) {
+  if (ui.empty) return;
+  if (ui.playing && ui.shuttle && ui.dir === dir) { ui.rate = Math.min(4, ui.rate * 2); renderAtTime(); return; }
+  const carryOn = ui.waiting && !ui.playing && ui.shuttle && ui.dir === dir;
+  const rate = carryOn ? ui.rate : 1;
+  pause(); play(dir, rate, true);
+}
+const resume = () => (ui.shuttle && ui.dir < 0 ? play(-1, ui.rate, true) : ui.shuttle ? play(1, ui.rate, true) : play());
+function goStart() { if (ui.empty) return; pause(); setPlayhead(0); afterMove(); play(); }
+function goEnd() { if (ui.empty) return; pause(); setPlayhead(tlDur()); afterMove(); }
 
 /* ---------- canvas pointer interactions ---------- */
 function toFrame(e) { const r = frameEl.getBoundingClientRect(); return [clamp((e.clientX - r.left) / r.width, 0, 1), clamp((e.clientY - r.top) / r.height, 0, 1)]; }
@@ -2096,7 +2137,7 @@ $('#tools').addEventListener('click', e => { const b = e.target.closest('[data-t
 $('#view-toggle').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
 $('#btn-play').addEventListener('click', togglePlay);
 statusEl.addEventListener('click', e => {
-  if (e.target.closest('[data-act="continue"]')) play();
+  if (e.target.closest('[data-act="continue"]')) resume();
   if (e.target.closest('[data-act="edit-here"]')) { ui.waiting = false; renderAtTime(); renderInspector(); }
 });
 $('#btn-prev-frame').addEventListener('click', () => frameStep(-1));
@@ -2119,7 +2160,7 @@ function toggleRipple() {
 }
 $('#btn-ripple').addEventListener('click', toggleRipple);
 $('#preview-speed').addEventListener('change', e => { ui.previewSpeed = +e.target.value; });
-$('#tl-zoom').addEventListener('input', e => { ui.zoom = +e.target.value; renderTimeline(); const ph = $('#playhead'); if (ph) tlScroll.scrollLeft = Math.max(0, ph.offsetLeft - tlScroll.clientWidth / 2); });
+$('#tl-zoom').addEventListener('input', e => setTimelineZoom(+e.target.value));
 $('#btn-undo').addEventListener('click', undo);
 $('#btn-redo').addEventListener('click', redo);
 $('#tab-selection').addEventListener('click', () => setTab('selection'));
@@ -2199,6 +2240,14 @@ function commands() {
     ...doc.steps.map((s, i) => ({ label:`Go to step ${i + 1}: ${s.title}`, run:() => selectStep(s.id) })),
     { label:'Guide settings', run:() => setTab('guide') },
     { label:'Play or pause', key:'Space', run:togglePlay },
+    { label:'Play forward (press again for 2×, then 4×)', key:'L', run:() => shuttle(1) },
+    { label:'Play backward (press again for 2×, then 4×)', key:'J', run:() => shuttle(-1) },
+    { label:'Jump to the next edit', key:'⇧L', run:() => jumpEdit(1) },
+    { label:'Jump to the previous edit', key:'⇧J', run:() => jumpEdit(-1) },
+    { label:'Play from the very start', key:'⌘,', run:goStart },
+    { label:'Jump to the very end', key:'⌘.', run:goEnd },
+    { label:'Zoom the timeline in', key:'=', run:() => setTimelineZoom(ui.zoom * 1.5) },
+    { label:'Zoom the timeline out', key:'-', run:() => setTimelineZoom(ui.zoom / 1.5) },
     { label:'Undo', key:'⌘Z', run:undo },
     { label:'Redo', key:'⇧⌘Z', run:redo },
     { label:'Switch light or dark theme', run:toggleTheme },
@@ -2327,7 +2376,25 @@ pvDlg.addEventListener('keydown', e => {
 });
 
 /* ---------- keyboard shortcuts ---------- */
+const isTextEntry = el => !!el && (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || (el.tagName === 'INPUT' && /^(text|search|url|number|email|tel|password)$/.test(el.type)));
 const isTyping = el => el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+/* J K L, jump to next/previous edit, timeline zoom. Works from a focused slider or checkbox too, but never while typing in a text field. */
+function transportKey(e) {
+  if (e.altKey) return false;
+  const k = e.key.toLowerCase();
+  if (e.shiftKey) {
+    if (k === 'l') { jumpEdit(1); return true; }
+    if (k === 'j') { jumpEdit(-1); return true; }
+    if (e.key === '+' || e.key === '=') { setTimelineZoom(ui.zoom * 1.5); return true; }
+    if (e.key === '_' || e.key === '-') { setTimelineZoom(ui.zoom / 1.5); return true; }
+    return false;
+  }
+  if (k === 'l' || k === 'j') { if (!e.repeat) shuttle(k === 'l' ? 1 : -1); return true; }
+  if (k === 'k') { if (!e.repeat) togglePlay(); return true; }
+  if (e.key === '=') { setTimelineZoom(ui.zoom * 1.5); return true; }
+  if (e.key === '-') { setTimelineZoom(ui.zoom / 1.5); return true; }
+  return false;
+}
 document.addEventListener('keydown', e => {
   if (document.querySelector('dialog[open]')) return;
   const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase(), typing = isTyping(e.target);
@@ -2336,6 +2403,8 @@ document.addEventListener('keydown', e => {
   if (mod && k === 'b' && !typing) { e.preventDefault(); splitAtPlayhead(); return; }
   if (mod && k === 'e') { e.preventDefault(); openExportMenu(); return; }
   if (mod && e.key === 'Enter') { e.preventDefault(); openPreview(); return; }
+  if (mod && !typing && (e.key === ',' || e.key === '.')) { e.preventDefault(); if (e.key === ',') goStart(); else goEnd(); return; }
+  if (!mod && !ui.empty && !isTextEntry(e.target) && transportKey(e)) { e.preventDefault(); return; }
   if (typing || mod || ui.empty) return;
   const onButton = e.target.closest && e.target.closest('button, a, summary');
   switch (e.key) {
@@ -2344,8 +2413,8 @@ document.addEventListener('keydown', e => {
     case 'ArrowRight': e.preventDefault(); if (e.altKey) jumpStep(1); else if (e.shiftKey) { pause(); setPlayhead(ui.tl + 1); afterMove(); } else frameStep(1); return;
     case 'Escape': if (ui.tool !== 'select') setTool('select'); else if (ui.waiting) { ui.waiting = false; renderAtTime(); } else if (ui.view === 'viewer') setView('edit'); else if (ui.sel && (ui.sel.kind === 'ann' || ui.sel.kind === 'zoom')) { ui.sel = { kind:'step', id:ui.sel.stepId }; renderAtTime(); renderInspector(); } return;
     case 'Backspace': case 'Delete': if (onButton && !e.target.closest('.step-card')) return; e.preventDefault(); deleteSelection(); return;
-    case 'P': if (e.shiftKey) { e.preventDefault(); pinStep(null); } return;
-    case 'R': if (e.shiftKey) { e.preventDefault(); toggleRipple(); } return;
+    case 'P': if (e.shiftKey) { e.preventDefault(); pinStep(null); return; } break;
+    case 'R': if (e.shiftKey) { e.preventDefault(); toggleRipple(); return; } break;
   }
   if (e.altKey || e.shiftKey) return;
   if (k === 'n') { e.preventDefault(); toggleSnap(); return; }
