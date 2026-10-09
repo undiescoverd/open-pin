@@ -789,7 +789,7 @@ const icon = (n, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use hr
 const uid = p => p + Math.random().toString(36).slice(2, 8);
 const clone = o => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-function fmt(t) { t = Math.max(0, t); const m = Math.floor(t / 60); const s = t - m * 60; return m + ':' + s.toFixed(2).padStart(5, '0'); }
+function fmt(t) { t = Math.round(Math.max(0, t) * 100) / 100; const m = Math.floor(t / 60); const s = t - m * 60; return m + ':' + s.toFixed(2).padStart(5, '0'); }
 
 /* ---------- content colors and presets ---------- */
 const ANN = {
@@ -1446,7 +1446,7 @@ function inspGap(c) {
   const id = c.id, C = () => doc.clips.find(x => x.id === id), i = doc.clips.indexOf(c);
   return `
   <div class="insp-title"><span class="ann-ic">${icon('film')}</span><div><h3 class="insp-h">Gap</h3><p class="insp-sub">${c.gap.toFixed(2)} s before clip ${i + 1}</p></div></div>
-  ${prm({ id:'gap-len', label:'Length', min:0.05, max:30, step:0.05, unit:'s', get:() => C().gap, set:v => { C().gap = v; } })}
+  ${prm({ id:'gap-len', label:'Length', min:0.05, max:30, step:0.05, unit:'s', get:() => C().gap, set:v => { C().gap = v; ui.tl = clamp(ui.tl, 0, tlDur()); } })}
   <p class="help">Empty time. Viewers see the last frame of the clip before it, held still.</p>
   <button class="btn secondary sm" data-act="close-gap" style="align-self:flex-start">${icon('scissors')}Close gap</button>
   <p class="help">Closing it moves everything after it up. You can also drag the neighbouring clip's edge back out to fill it.</p>`;
@@ -1809,7 +1809,7 @@ let drag = null;
 frameEl.addEventListener('pointerdown', e => {
   if (e.button !== 0 || ui.empty) return;
   if (ui.playing) { pause(); return; }
-  if (viewerish()) { play(); return; }
+  if (viewerish()) { if (ui.waiting) resume(); else play(); return; }   /* stopped at a step: carry on the way the status bar's button would */
   const p = toFrame(e), st = currentStep();
   const annTarget = e.target.closest('[data-ann]'), blurTarget = e.target.closest('[data-blur]');
   const zHandle = e.target.closest('[data-zoom-handle]'), zBox = e.target.closest('[data-zoom]'), aHandle = e.target.closest('[data-ann-handle]');
@@ -2241,7 +2241,7 @@ function renderShare() {
   const base = shareBase();
   $('#share-url').value = base;
   $('#share-code').value = `<div data-openpin="${base}guide.json"></div>\n<script src="${base}player.js" async><\/script>`;
-  $('#share-iframe').value = `<iframe src="${base}" width="960" height="640" style="border:0" allow="fullscreen" title="${doc.name.replace(/"/g, '&quot;')}"></iframe>`;
+  $('#share-iframe').value = `<iframe src="${base}" width="960" height="640" style="border:0" allow="fullscreen" title="${esc(doc.name)}"></iframe>`;
 }
 function openShare() { pause(); renderShare(); shareDlg.showModal(); }
 shareDlg.addEventListener('change', renderShare);
@@ -2263,7 +2263,8 @@ function commands() {
     { label:'Pin step at playhead', key:'⇧P', run:() => pinStep(null) },
     { label:'Preview guide', key:'⌘↩', run:openPreview },
     { label:'Share guide…', run:openShare },
-    { label:'Export video (MP4)', key:'⌘E', run:() => exportItem('mp4') },
+    { label:'Export…', key:'⌘E', run:openExportMenu },
+    { label:'Export video (MP4)', run:() => exportItem('mp4') },
     { label:'Export PDF guide', run:() => exportItem('pdf') },
     { label:'Export screenshots', run:() => exportItem('png') },
     { label:'Export guide folder', run:() => exportItem('folder') },
@@ -2377,8 +2378,9 @@ function pvRender() {
   const done = PV.end ? n : PV.i + 1;
   $('#pl-fill').style.width = (n ? (done / n) * 100 : 0) + '%';
   let ticks = prog.querySelectorAll('.pl-tick');
-  if (ticks.length !== n) {
-    ticks.forEach(t => t.remove());
+  const tickKey = doc.steps.map(s => s.title).join('\n');   /* rebuilt when a title changes too, so the labels stay current */
+  if (ticks.length !== n || prog.dataset.ticks !== tickKey) {
+    ticks.forEach(t => t.remove()); prog.dataset.ticks = tickKey;
     doc.steps.forEach((s, i) => { const b = document.createElement('button'); b.className = 'pl-tick'; b.style.left = ((i + 1) / n * 100) + '%'; b.setAttribute('aria-label', `Go to step ${i + 1}: ${s.title}`); b.addEventListener('click', () => pvGo(i, false)); prog.appendChild(b); });
     ticks = prog.querySelectorAll('.pl-tick');
   }
@@ -2392,6 +2394,9 @@ function pvRender() {
   const hint = $('#pl-hint'); hint.hidden = !(waitPv && doc.player.mode === 'guided');
   hint.textContent = PV.i === n - 1 ? 'Click anywhere to finish' : 'Click anywhere to continue';
   $('#pl-mode').textContent = `Playback: ${{ guided:'Guided. Each step waits for the viewer.', auto:'Auto. Steps move on by themselves.', video:'Video. Plays straight through.' }[doc.player.mode]}`;
+  /* the focused control can get hidden (Start) or disabled (Finish): hand focus to the one that carries on */
+  const fa = document.activeElement;
+  if (pvDlg.open && (!pvDlg.contains(fa) || fa.disabled || fa.closest('[hidden]'))) (PV.end ? $('#pl-replay') : next).focus();
 }
 function openPreview() {
   if (ui.empty || !doc.steps.length) { toast('Pin at least one step to preview the guide.'); return; }
@@ -2406,7 +2411,8 @@ $('#pl-prev').addEventListener('click', pvPrev);
 $('#pl-replay').addEventListener('click', () => { pvReset(); $('#pl-start-btn').focus(); });
 $('#pl-full').addEventListener('click', () => { try { const r = document.fullscreenElement ? document.exitFullscreen() : player.requestFullscreen(); if (r && r.catch) r.catch(() => {}); } catch (err) { /* fullscreen unavailable here */ } });
 document.addEventListener('fullscreenchange', () => { if (pvDlg.open) requestAnimationFrame(pvFit); });
-pvDlg.addEventListener('keydown', e => {
+document.addEventListener('keydown', e => {     /* on the document, so the keys still work if focus has dropped out of the dialog */
+  if (!pvDlg.open) return;
   if (e.target.closest('button, a, input, select, textarea') && (e.key === ' ' || e.key === 'Enter')) return;
   if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); pvNext(); }
   if (e.key === 'ArrowLeft') { e.preventDefault(); pvPrev(); }
@@ -2449,10 +2455,12 @@ document.addEventListener('keydown', e => {
     case 'ArrowRight': e.preventDefault(); if (e.altKey) jumpStep(1); else if (e.shiftKey) { pause(); setPlayhead(ui.tl + 1); afterMove(); } else frameStep(1); return;
     case 'Escape': if (ui.tool !== 'select') setTool('select'); else if (ui.waiting) { ui.waiting = false; renderAtTime(); } else if (ui.view === 'viewer') setView('edit'); else if (ui.sel && (ui.sel.kind === 'ann' || ui.sel.kind === 'zoom')) { ui.sel = { kind:'step', id:ui.sel.stepId }; renderAtTime(); renderInspector(); } return;
     case 'Backspace': case 'Delete': if (onButton && !e.target.closest('.step-card')) return; e.preventDefault(); deleteSelection(); return;
-    case 'P': if (e.shiftKey) { e.preventDefault(); pinStep(null); return; } break;
-    case 'R': if (e.shiftKey) { e.preventDefault(); toggleRipple(); return; } break;
   }
-  if (e.shiftKey && !e.altKey && (k === 'k' || k === 'i')) { e.preventDefault(); selectLayer(k === 'k' ? 1 : -1); return; }   /* by lowercase key, so it also works with Caps Lock on */
+  if (e.shiftKey && !e.altKey) {   /* by lowercase key, so these also work with Caps Lock on */
+    if (k === 'p') { e.preventDefault(); pinStep(null); return; }
+    if (k === 'r') { e.preventDefault(); toggleRipple(); return; }
+    if (k === 'k' || k === 'i') { e.preventDefault(); selectLayer(k === 'k' ? 1 : -1); return; }
+  }
   if (e.altKey || e.shiftKey) return;
   if (k === 'n') { e.preventDefault(); toggleSnap(); return; }
   if (k === 'r') { e.preventDefault(); splitAtPlayhead(); return; }
