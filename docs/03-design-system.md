@@ -1,6 +1,6 @@
 # 03 — Design system and editor UI
 
-OpenPin should be immediately familiar to anyone who has used a video or guide editor, but look like its own product and be much easier to use than FramePin's editor. This doc covers what's wrong with FramePin's UI, the redesigned editor layout, and **PinKit**, our React component library and design tokens.
+Waypost should be immediately familiar to anyone who has used a video or guide editor, but look like its own product and be much easier to use than FramePin's editor. This doc covers what's wrong with FramePin's UI, the redesigned editor layout, and **PinKit**, our React component library and design tokens.
 
 **Clickable mockup:** [`design/mockup/editor.html`](../design/mockup/editor.html) puts this layout and these tokens into a working page: open it in Chrome. It has a sample project, all the tools, timeline editing, the guide preview, the Share dialog and the ⌘K command palette. Nothing is saved or exported; it's for judging the design before real code exists.
 
@@ -8,7 +8,7 @@ OpenPin should be immediately familiar to anyone who has used a video or guide e
 
 From the editor screenshot (described in [01-feature-analysis.md](01-feature-analysis.md#what-the-editor-screenshot-shows)):
 
-| # | Problem | Effect | OpenPin fix |
+| # | Problem | Effect | Waypost fix |
 |---|---|---|---|
 | 1 | **Three stacked navigation layers** in the left panel: header buttons (Export/Widget), a button group (Settings/Blur Info/Voice Over), then tabs (Frames/Background/Logo). | You can't tell which are modes, which are panels and what "Settings" means. | One **context inspector** on the right that shows the properties of whatever is selected. Project-wide options live in one "Guide" panel with clear sections. Blur and voice become tools and timeline lanes, not modes. |
 | 2 | **The main action is hidden.** You create a step by "clicking on the screen", explained only in an empty state; the blue pin button has no label. | New users don't know how to start. | A labelled **Pin tool (P)** in the canvas toolbar and a **"+ Pin step"** button at the top of the step list, both with shortcut hints. |
@@ -26,7 +26,7 @@ From the editor screenshot (described in [01-feature-analysis.md](01-feature-ana
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────┐
-│ ◆ OpenPin  ‹ Projects   Onboarding flow ▾   ↶ ↷      Preview   Export ▾   [Share]  │
+│ ◆ Waypost  ‹ Projects   Onboarding flow ▾   ↶ ↷      Preview   Export ▾   [Share]  │
 ├──────────────┬──────────────────────────────────────────────────┬──────────────────┤
 │ STEPS  + Pin │ [Select|Pin|Callout|Arrow|Spot|Box|Zoom|Blur]    │ INSPECTOR        │
 │              │                                                  │ Step 2           │
@@ -69,7 +69,7 @@ From the editor screenshot (described in [01-feature-analysis.md](01-feature-ana
 
 ## Color tokens
 
-All values live in `design/tokens.json`. A small build script turns them into CSS custom properties (`--op-*`), Tailwind's `@theme`, and the player's stylesheet, so the editor and player can't drift apart.
+All values live in `design/tokens.json`. A small build script turns them into CSS custom properties (`--wp-*`), Tailwind's `@theme`, and the player's stylesheet, so the editor and player can't drift apart.
 
 ### Neutrals (Graphite)
 
@@ -180,7 +180,7 @@ React components built on Radix primitives (for keyboard, focus and screen-reade
 - `RevealOrderList`: reorderable reveal groups for the selected step.
 
 ### Player counterparts
-The player has its own tiny CSS (no React) using the same tokens: `op-stage`, `op-controls`, `op-progress` (with step markers), `op-counter`, `op-cta`, `op-start` (the "Start guide" overlay). The guide's accent overrides `--op-accent`.
+The player has its own tiny CSS (no React) using the same tokens: `wp-stage`, `wp-controls`, `wp-progress` (with step markers), `wp-counter`, `wp-cta`, `wp-start` (the "Start guide" overlay). The guide's accent overrides `--wp-accent`.
 
 ## Accessibility checklist
 

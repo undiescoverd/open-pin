@@ -1,6 +1,6 @@
-# OpenPin
+# Waypost
 
-A free, open-source web app that turns screen recordings into interactive, click-through product guides, with MP4, PDF and screenshot exports too. It's a self-hosted alternative to [FramePin](https://framepin.com/).
+A web app that turns screen recordings into interactive, click-through product guides, with MP4, PDF and screenshot exports too. It's an alternative to [FramePin](https://framepin.com/) that you buy once instead of subscribing to.
 
 **Status:** research and design. No app code yet.
 
@@ -14,7 +14,7 @@ A free, open-source web app that turns screen recordings into interactive, click
 6. Add narration (keep the original audio, record your voice, or generate a free voiceover that runs in your browser) and background music.
 7. Export an interactive guide as a static folder you can host anywhere and embed with two lines of HTML, or export MP4 (up to 4K), PDF or PNG/WebP.
 
-Everything runs in your browser. There's no account, no subscription and no server; you host guides on GitHub Pages, Cloudflare Pages, S3 or any static host.
+Everything runs in your browser. It's a one-off purchase with no subscription and no server; you host guides on GitHub Pages, Cloudflare Pages, S3 or any static host.
 
 ## Platform
 
@@ -26,11 +26,11 @@ Everything runs in your browser. There's no account, no subscription and no serv
 
 | Doc | Contents |
 |---|---|
-| [01 — Feature analysis](docs/01-feature-analysis.md) | Every FramePin feature (including ones visible in its editor), how it likely works, how OpenPin builds it |
+| [01 — Feature analysis](docs/01-feature-analysis.md) | Every FramePin feature (including ones visible in its editor), how it likely works, how Waypost builds it |
 | [02 — Architecture](docs/02-architecture.md) | Browser targets, tech stack, repo layout, data model, threads, rendering pipeline, storage, guide format |
 | [03 — Design system and editor UI](docs/03-design-system.md) | What's wrong with FramePin's editor, our layout, "Coral & Graphite" tokens, PinKit components |
 | [04 — Roadmap](docs/04-roadmap.md) | Phased build plan with acceptance criteria |
 | [05 — Editor interactions](docs/05-editor-interactions.md) | Exact timeline, canvas, Inspector and keyboard behaviour proven in the mockup: time model, trimming and ripple, snapping, playback, undo, acceptance checks |
 | [Editor mockup](design/mockup/editor.html) | Clickable single-file mockup of the editor and guide preview (open in Chrome) |
 
-OpenPin is an independent clean-room project built from FramePin's public product descriptions. It isn't affiliated with FramePin and uses none of its code or assets.
+Waypost is an independent clean-room project built from FramePin's public product descriptions. It isn't affiliated with FramePin and uses none of its code or assets.

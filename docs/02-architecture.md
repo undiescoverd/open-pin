@@ -1,19 +1,19 @@
 # 02 — Architecture
 
-How OpenPin is built as a web app: browser targets, tech stack, repo layout, data model, threading, rendering pipeline, storage, the published guide format, hosting and testing.
+How Waypost is built as a web app: browser targets, tech stack, repo layout, data model, threading, rendering pipeline, storage, the published guide format, hosting and testing.
 
 ## Decisions at a glance
 
 | Decision | Choice | Why |
 |---|---|---|
 | App type | **Static web app** (installable as a PWA) | No code signing, no notarization, no Apple Developer fee, no Xcode. Anyone can use it from a link. |
-| Backend | **None** | Everything runs in the browser; guides are static files you host anywhere. Removes the reason FramePin charges a subscription. |
+| Backend | **None** | Everything runs in the browser; guides are static files you host anywhere. That's what lets Waypost be a one-off purchase rather than a subscription. |
 | Editor browsers | **Chromium-based desktop browsers** (Chrome, Edge, Brave, Arc), current versions | Needs WebCodecs, the File System Access API, OffscreenCanvas in workers, and WebP encoding. FramePin has the same requirement. Safari and Firefox get a clear "best in Chrome" notice. |
 | Player browsers | **All modern browsers**, including Safari on iPhone and iPad | The player only needs `<video>`, canvas and Shadow DOM. |
 | Language | TypeScript everywhere | Editor, player, renderer and workers share types and code. |
 | UI | React + our own **PinKit** components on Radix primitives, styled with Tailwind using our tokens | Accessible behavior from Radix, our own look on top (see [03-design-system.md](03-design-system.md)). |
 | Media engine | **Mediabunny** (MPL-2.0) on top of WebCodecs | Reads and writes MP4/MOV/WebM/MKV, frame-accurate decoding, hardware-accelerated encoding, streaming I/O for large files. |
-| Rendering | One canvas renderer (`@openpin/render`) for editor, player and every export | What you see is exactly what you export and what viewers get. |
+| Rendering | One canvas renderer (`@waypost/render`) for editor, player and every export | What you see is exactly what you export and what viewers get. |
 
 ### What about macOS versions?
 
@@ -37,17 +37,17 @@ Versions current on npm at the time of writing; licenses checked from package me
 | @mediabunny/aac-encoder | MPL-2.0 | AAC fallback where the browser can't encode AAC |
 | Comlink | Apache-2.0 | Simple calls into Web Workers |
 | pdf-lib (+ fontkit) | MIT | PDF export with embedded fonts and selectable text |
-| fflate | MIT | Zip for `.openpin` project files, screenshot sets and guide bundles |
+| fflate | MIT | Zip for `.waypost` project files, screenshot sets and guide bundles |
 | kokoro-js | Apache-2.0 | On-device text-to-speech (model fetched on first use, then cached) |
 | vite-plugin-pwa | MIT | Installable app, offline support |
 | Vitest, Playwright | MIT / Apache-2.0 | Unit tests, browser tests, screenshot comparisons |
 
-MPL-2.0 is file-level copyleft: we can use Mediabunny in an MIT project freely. Only changes made *inside* Mediabunny's own files would have to be published, and we won't be modifying them.
+MPL-2.0 is file-level copyleft: we can use Mediabunny in a closed-source commercial app. Only changes made *inside* Mediabunny's own files would have to be published, and we won't be modifying them.
 
 ## Repo layout (pnpm workspaces)
 
 ```
-open-pin/
+waypost/
 ├─ apps/
 │  └─ editor/              React app: screens, panels, timeline, canvas interactions
 ├─ packages/
@@ -69,10 +69,10 @@ open-pin/
 
 ## Data model
 
-A project is a folder in the browser's private file system (OPFS). Saved to disk it becomes one `.openpin` file (a zip of the same folder):
+A project is a folder in the browser's private file system (OPFS). Saved to disk it becomes one `.waypost` file (a zip of the same folder):
 
 ```
-Onboarding.openpin  (zip)
+Onboarding.waypost  (zip)
 ├─ project.json        the document (below)
 ├─ sources/            the recording(s)
 ├─ audio/              recorded/imported narration, music, generated TTS (TTS is regenerable)
@@ -84,7 +84,7 @@ Onboarding.openpin  (zip)
 
 ```json
 {
-  "schema": "openpin.project/1",
+  "schema": "waypost.project/1",
   "sources": [{ "id": "src1", "file": "sources/recording.mov", "duration": 17.775, "size": [2880, 1800] }],
   "timeline": [
     { "id": "c1", "source": "src1", "in": 0.0, "out": 9.2,    "speed": 1 },
@@ -126,7 +126,7 @@ Rules:
 - **Geometry is normalized** (0–1 of the recording frame, independent of padding), so it scales to any output and survives framing changes.
 - **Time anchors are source time**, never timeline time (see F2 in [01-feature-analysis.md](01-feature-analysis.md#f2--trim-split-and-speed-with-frame-level-control)).
 - **IDs are stable strings.** Published file names use step IDs, so links survive reordering.
-- `schema` is versioned; `@openpin/core` holds a migration per version, and Zod validates on load.
+- `schema` is versioned; `@waypost/core` holds a migration per version, and Zod validates on load.
 
 ### State, commands and undo
 
@@ -158,7 +158,7 @@ Workers are called through Comlink, so they look like async functions.
       │ Mediabunny Input (demux) → WebCodecs decode
       ▼
  ┌───────────────────────────────────────────────────────────────┐
- │ @openpin/render — compose(frameImage, t, project, options)    │
+ │ @waypost/render — compose(frameImage, t, project, options)    │
  │  1. background + padding + rounded corners + shadow   (F18)   │
  │  2. recording frame with blur regions at source time  (F7)    │
  │  3. zoom/focus transform                               (F5)   │
@@ -181,17 +181,17 @@ Annotation text uses a bundled Figtree font (WOFF2), so canvas output is identic
 
 - **Projects:** OPFS folders (fast, private to the app's origin, large quota). A small IndexedDB table lists projects with thumbnails and dates.
 - **Persistence:** on first project, call `navigator.storage.persist()` so the browser doesn't evict data under storage pressure.
-- **Saving to disk:** "Save project" writes a `.openpin` zip. In Chrome this uses `showSaveFilePicker`, and the file handle is remembered so later saves go to the same file. Other browsers download it.
-- **Opening from Finder:** the installed PWA registers as a handler for `.openpin` files (Chrome's file-handling support for installed web apps).
-- **Warning in the UI:** "Projects live in this browser. Save a .openpin file to keep a copy." Clearing site data deletes unsaved projects.
+- **Saving to disk:** "Save project" writes a `.waypost` zip. In Chrome this uses `showSaveFilePicker`, and the file handle is remembered so later saves go to the same file. Other browsers download it.
+- **Opening from Finder:** the installed PWA registers as a handler for `.waypost` files (Chrome's file-handling support for installed web apps).
+- **Warning in the UI:** "Projects live in this browser. Save a .waypost file to keep a copy." Clearing site data deletes unsaved projects.
 
 ## The published guide bundle
 
 ```
 <guide-slug>/
 ├─ index.html            standalone page (also the iframe target)
-├─ player.js             @openpin/player (includes @openpin/render)
-├─ guide.json            schema "openpin.guide/1": steps, annotations, branding, cta, analytics
+├─ player.js             @waypost/player (includes @waypost/render)
+├─ guide.json            schema "waypost.guide/1": steps, annotations, branding, cta, analytics
 ├─ guide.pdf             compressed PDF copy
 ├─ steps/<step-id>.webp  exact pinned frame (framing/blur/logo baked in, no annotations)
 ├─ seg/<step-id>.mp4     motion leading into the step (H.264 for universal playback), ≤1920 px wide by default
@@ -201,7 +201,7 @@ Annotation text uses a bundled Figtree font (WOFF2), so canvas output is identic
 Embed:
 
 ```html
-<div data-openpin="https://you.github.io/guides/onboarding/guide.json"></div>
+<div data-waypost="https://you.github.io/guides/onboarding/guide.json"></div>
 <script src="https://you.github.io/guides/onboarding/player.js" async></script>
 ```
 
@@ -216,15 +216,15 @@ Embed:
 
 ## Hosting the editor
 
-- A static build deployed to **Cloudflare Pages** (free) is the recommended home. GitHub Pages works too.
+- A static build deployed to **Cloudflare Pages** (free plan). Pull requests get preview deploys. GitHub Pages isn't used: its terms don't allow hosting a commercial product.
 - Cloudflare Pages can set custom response headers, which keeps the door open for cross-origin isolation if we ever need multithreaded WebAssembly (`SharedArrayBuffer`). GitHub Pages can't set headers; the `coi-serviceworker` workaround exists if needed.
-- The editor is a PWA: "Install OpenPin" in Chrome gives it its own window and Dock icon, works offline, and opens `.openpin` files from Finder.
+- The editor is a PWA: "Install Waypost" in Chrome gives it its own window and Dock icon, works offline, and opens `.waypost` files from Finder.
 - No desktop wrapper is planned. A wrapper (Tauri or Electron) would bring code signing and notarization back.
 
 ## Testing
 
-- **`@openpin/core` unit tests (Vitest):** time mapping, segments and holds, schema migrations, command undo round-trips. No browser needed.
-- **`@openpin/render` screenshot tests (Playwright):** render each annotation type, blur style, framing preset and zoom state to PNG and compare with checked-in references. Because the editor, player and exports share this renderer, these tests cover all of them.
+- **`@waypost/core` unit tests (Vitest):** time mapping, segments and holds, schema migrations, command undo round-trips. No browser needed.
+- **`@waypost/render` screenshot tests (Playwright):** render each annotation type, blur style, framing preset and zoom state to PNG and compare with checked-in references. Because the editor, player and exports share this renderer, these tests cover all of them.
 - **Media tests (Playwright, in a real browser):** small fixture recordings (a few seconds), including a variable-frame-rate one. Check the frame index, exact frame reads and exported durations.
 - **End-to-end (Playwright):** import → pin 3 steps → annotate → export guide → load the bundle in a test page and click through it.
 - **Codec caveat:** Playwright's bundled Chromium on Linux lacks the proprietary H.264/AAC codecs. Media tests use VP9/WebM fixtures there; H.264 and AAC paths are tested on a runner using the real Chrome channel.
@@ -239,6 +239,6 @@ Embed:
 
 Node 22 + pnpm. `pnpm dev` runs the editor locally; `pnpm test` runs everything. The whole project builds and runs on any OS, including the Linux cloud environment these docs were written in (Chromium for Playwright is pre-installed there).
 
-## License
+## License and sales
 
-The owner's call. MIT is recommended: simplest for reuse, and compatible with every dependency above.
+Waypost is proprietary and sold as a one-off purchase; the code isn't open source. Every dependency above allows use in a closed-source commercial app: MIT, ISC and Apache-2.0 freely, MPL-2.0 (Mediabunny) as long as we don't modify its own files, and Figtree under the SIL Open Font License, which allows bundling the font. How purchases unlock the app is an open question in [04-roadmap.md](04-roadmap.md).
