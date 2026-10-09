@@ -154,6 +154,8 @@ button{cursor:pointer}
 .framebox{display:grid; place-items:center; transition:background .2s}
 .frame-holder{position:relative; overflow:hidden; background:#FFFFFF}
 .frame{position:absolute; left:0; top:0; width:1280px; height:800px; transform-origin:0 0; touch-action:none}
+/* dragging on the canvas, timeline or step rail must never highlight text; the Inspector's fields stay selectable */
+.frame,.tl-scroll,.step-list,.tool-palette,.transport{-webkit-user-select:none; user-select:none}
 .frame.t-select{cursor:default}
 .frame.t-draw{cursor:crosshair}
 .frame.viewer{cursor:pointer}
