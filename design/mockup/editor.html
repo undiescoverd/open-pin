@@ -2451,9 +2451,8 @@ document.addEventListener('keydown', e => {
     case 'Backspace': case 'Delete': if (onButton && !e.target.closest('.step-card')) return; e.preventDefault(); deleteSelection(); return;
     case 'P': if (e.shiftKey) { e.preventDefault(); pinStep(null); return; } break;
     case 'R': if (e.shiftKey) { e.preventDefault(); toggleRipple(); return; } break;
-    case 'K': if (e.shiftKey && !e.altKey) { e.preventDefault(); selectLayer(1); return; } break;
-    case 'I': if (e.shiftKey && !e.altKey) { e.preventDefault(); selectLayer(-1); return; } break;
   }
+  if (e.shiftKey && !e.altKey && (k === 'k' || k === 'i')) { e.preventDefault(); selectLayer(k === 'k' ? 1 : -1); return; }   /* by lowercase key, so it also works with Caps Lock on */
   if (e.altKey || e.shiftKey) return;
   if (k === 'n') { e.preventDefault(); toggleSnap(); return; }
   if (k === 'r') { e.preventDefault(); splitAtPlayhead(); return; }
