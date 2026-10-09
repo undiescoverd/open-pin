@@ -819,7 +819,7 @@ const SOLID = { ink:'#1D2420', gray:'#8A93A3', white:'#FFFFFF' };
 const MUSIC_DEF = { start:0, end:null, fadeIn:0, fadeOut:0, duck:true, duckTo:35, mute:false };
 const musicOf = () => ({ ...MUSIC_DEF, ...(doc.music || {}) });
 const clipOf = c => ({ vol:100, mute:false, ...c });
-const MIN_BAR = 0.1;
+const MIN_BAR = 0.1, MIN_CLIP = 0.2;
 const SPEEDS = [[1/3,'⅓×'],[0.5,'½×'],[1,'1×'],[2,'2×'],[5,'5×']];
 const speedLabel = v => (SPEEDS.find(s => Math.abs(s[0] - v) < 1e-6) || [v, v + '×'])[1];
 
@@ -857,7 +857,7 @@ let doc = {
   audio: { original:true },
   analytics: { on:false, url:'' },
 };
-const ui = { tl:0, playing:false, waiting:false, stopAt:null, view:'edit', tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false, snap:true, snapAt:null, closed:{} };
+const ui = { tl:0, playing:false, waiting:false, stopAt:null, view:'edit', tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false, snap:true, snapAt:null, scaleT:null, closed:{} };
 const hist = { undo:[], redo:[] };
 
 /* ---------- time mapping (steps are anchored to source time) ---------- */
@@ -1359,6 +1359,12 @@ function inspClip(c) {
   const i = doc.clips.indexOf(c), d = c.out - c.in, id = c.id, C = () => doc.clips.find(x => x.id === id), o = clipOf(c);
   return `
   <div class="insp-title"><span class="ann-ic">${icon('film')}</span><div><h3 class="insp-h">Clip ${i + 1}</h3><p class="insp-sub">${fmt(c.in)}–${fmt(c.out)} of the recording</p></div></div>
+  ${grp('clip-trim', 'Trim', `<div class="tc-row">
+      ${tcCell({ id:'clip-in', label:'In', get:() => C().in, set:v => { const l = clipLimits(C(), 'l'); if (v < l.lo - 1e-6 || v > l.hi + 1e-6) return false; C().in = v; ui.tl = clamp(ui.tl, 0, tlDur()); } })}
+      ${tcCell({ id:'clip-out', label:'Out', get:() => C().out, set:v => { const l = clipLimits(C(), 'r'); if (v < l.lo - 1e-6 || v > l.hi + 1e-6) return false; C().out = v; ui.tl = clamp(ui.tl, 0, tlDur()); } })}
+      ${tcCell({ id:'clip-len', label:'Plays for', get:() => (C().out - C().in) / C().speed, set:v => { const l = clipLimits(C(), 'r'), o = C().in + v * C().speed; if (o < l.lo - 1e-6 || o > l.hi + 1e-6) return false; C().out = o; ui.tl = clamp(ui.tl, 0, tlDur()); } })}
+    </div>
+    <p class="help">Drag the edges of the clip on the timeline, or type a time. Everything after it moves up to close the gap. Trimmed footage isn't lost: drag the edge back out to get it again. A pinned step stops the trim, so move or delete the step first.</p>`)}
   ${grp('clip-speed', 'Speed', `<div class="field"><span class="label" id="lbl-speed">Presets</span><div class="seg" role="group" aria-labelledby="lbl-speed">${SPEEDS.map(([v, l]) => `<button data-act="speed" data-v="${v}" aria-pressed="${Math.abs(c.speed - v) < 1e-6}">${l}</button>`).join('')}</div></div>
     ${prm({ id:'clip-speed', label:'Speed', min:0.25, max:8, step:0.05, def:1, unit:'×', get:() => C().speed, set:v => { const src = curSrc(); C().speed = v; ui.tl = srcToTl(src); } })}
     <p class="help">${d.toFixed(1)} s of recording plays in ${(d / c.speed).toFixed(1)} s. Sped-up audio keeps its pitch.</p>`)}
@@ -1488,11 +1494,12 @@ function packRows(items) {
   return { row, n: Math.max(1, ends.length) };
 }
 const EDGES = '<i class="th th-l" data-edge="l" aria-hidden="true"></i><i class="th th-r" data-edge="r" aria-hidden="true"></i>';
+const tScale = () => ui.scaleT || tlDur();
 function renderTimeline() {
   if (ui.empty) { tlInner.style.setProperty('--lane-w', '0px'); tlInner.innerHTML = '<div class="tl-empty">The recording\'s timeline appears here: clips, steps, blur, voice and music.</div>'; timecodeEl.innerHTML = '<span>No recording</span>'; return; }
-  const T = tlDur(), lw = laneW(), x = t => (t / T) * lw;
+  const T = tlDur(), TS = tScale(), lw = laneW(), x = t => (t / TS) * lw;
   tlInner.style.setProperty('--lane-w', lw + 'px');
-  const every = lw / T < 34 ? 2 : 1;
+  const every = lw / TS < 34 ? 2 : 1;
   let ticks = '';
   for (let t = 0; t <= T + 1e-6; t += every) {
     const major = Math.round(t) % 2 === 0;
@@ -1502,7 +1509,7 @@ function renderTimeline() {
   const fd = (a, b) => (a > 0 ? `<i class="fd fd-l" style="width:${x(a)}px"></i>` : '') + (b > 0 ? `<i class="fd fd-r" style="width:${x(b)}px"></i>` : '');
   const is = (k, id) => ui.sel && ui.sel.kind === k && (id == null || ui.sel.id === id || ui.sel.stepId === id) ? 'selected' : '';
   const selId = selStepId();
-  const clips = doc.clips.map((c, i) => { const a = srcToTl(c.in), b = srcToTl(c.out), o = clipOf(c); return `<button class="clip ${is('clip', c.id)}" data-clip="${c.id}" style="left:${x(a) + 1}px;width:${Math.max(4, x(b) - x(a) - 2)}px;${o.mute ? 'opacity:.6' : ''}" aria-label="Clip ${i + 1}, ${fmt(c.in)} to ${fmt(c.out)}, ${speedLabel(c.speed)}">${icon('film')}<span>Clip ${i + 1} · ${fmt(c.in)}–${fmt(c.out)}</span><b class="speed">${speedLabel(c.speed)}</b></button>`; }).join('');
+  const clips = doc.clips.map((c, i) => { const a = srcToTl(c.in), b = srcToTl(c.out), o = clipOf(c); return `<button class="clip ${is('clip', c.id)}" data-clip="${c.id}" style="left:${x(a) + 1}px;width:${Math.max(4, x(b) - x(a) - 2)}px;${o.mute ? 'opacity:.6' : ''}" aria-label="Clip ${i + 1}, ${fmt(c.in)} to ${fmt(c.out)}, ${speedLabel(c.speed)}">${icon('film')}<span>Clip ${i + 1} · ${fmt(c.in)}–${fmt(c.out)}</span><b class="speed">${speedLabel(c.speed)}</b>${EDGES}</button>`; }).join('');
   const pins = doc.steps.map((s, i) => `<button class="pin-marker ${s.id === selId ? 'selected' : ''}" data-step="${s.id}" style="left:${x(srcToTl(s.t))}px" aria-label="Step ${i + 1}: ${esc(s.title)}" data-tip="Step ${i + 1}: ${esc(s.title)}. Drag to move it.">${i + 1}</button>`).join('');
   const bp = packRows(doc.blurs.map(b => { const [a, e] = blurSpan(b); return { id:b.id, s:a, e }; }));
   const blurs = doc.blurs.map(raw => { const b = blurOf(raw), [a, e] = blurSpan(b); return `<button class="lane-bar blur-bar ${is('blur', b.id)}" data-blur="${b.id}" style="left:${x(a)}px;width:${Math.max(10, x(e) - x(a))}px;top:${5 + bp.row[b.id] * 26}px;bottom:auto;height:22px">${fd(srcToTl(b.from + b.fadeIn) - a, e - srcToTl(b.to - b.fadeOut))}${icon('blur')}<span>${esc(b.label)}</span>${EDGES}</button>`; }).join('');
@@ -1525,7 +1532,7 @@ function renderTimeline() {
 function updateSnapLine() {
   const el = $('#snap-line'); if (!el) return;
   if (ui.snapAt == null) { el.hidden = true; return; }
-  el.hidden = false; el.style.left = (84 + (ui.snapAt / tlDur()) * laneW()) + 'px';
+  el.hidden = false; el.style.left = (84 + (ui.snapAt / tScale()) * laneW()) + 'px';
 }
 /* snapping: candidate edges snap to the nearest edge on any layer within 8 px */
 const snapEnabled = invert => ui.snap !== !!invert;
@@ -1542,7 +1549,7 @@ function snapPoints(excl) {
   return pts;
 }
 function snapNear(cands, excl) {
-  const thr = (8 / laneW()) * tlDur(), pts = snapPoints(excl);
+  const thr = (8 / laneW()) * tScale(), pts = snapPoints(excl);
   let best = null;
   for (const c of cands) for (const p of pts) { const d = p - c; if (Math.abs(d) <= thr && (!best || Math.abs(d) < Math.abs(best.delta))) best = { delta:d, at:p }; }
   return best;
@@ -1550,7 +1557,7 @@ function snapNear(cands, excl) {
 function updatePlayhead() {
   if (ui.empty) return;
   const ph = $('#playhead'), T = tlDur();
-  if (ph) ph.style.left = (84 + (ui.tl / T) * laneW()) + 'px';
+  if (ph) ph.style.left = (84 + (ui.tl / tScale()) * laneW()) + 'px';
   timecodeEl.innerHTML = `${fmt(ui.tl)} <span>/ ${fmt(T)}</span>`;
 }
 
@@ -1922,7 +1929,11 @@ tlInner.addEventListener('pointerdown', e => {
   const stepB = T.closest('[data-step]'), clipB = T.closest('[data-clip]'), blurB = T.closest('[data-blur]'), voiceB = T.closest('[data-voice]'), musicB = T.closest('[data-music]'), actB = T.closest('[data-act]');
   const edgeEl = T.closest('[data-edge]'), mode = edgeEl ? edgeEl.dataset.edge : 'move';
   if (stepB) { selectStep(stepB.dataset.step); startTDrag(e, 'pin', stepB.dataset.step, 'move'); return; }
-  if (clipB) { ui.sel = { kind:'clip', id:clipB.dataset.clip }; ui.tab = 'selection'; renderInspector(); renderTimeline(); renderSteps(); return; }
+  if (clipB) {
+    ui.sel = { kind:'clip', id:clipB.dataset.clip }; ui.tab = 'selection'; renderInspector(); renderTimeline(); renderSteps();
+    if (edgeEl) { const c = doc.clips.find(x => x.id === clipB.dataset.clip); tdrag = { kind:'clip', id:c.id, mode:edgeEl.dataset.edge, x0:e.clientX, o:{ in:c.in, out:c.out }, srcPlay:curSrc(), T0:tlDur(), snap:clone(doc), moved:false, blocked:false }; tlInner.setPointerCapture(e.pointerId); }
+    return;
+  }
   if (blurB) {
     const b = doc.blurs.find(x => x.id === blurB.dataset.blur); ui.sel = { kind:'blur', id:b.id }; ui.tab = 'selection';
     if (curSrc() < b.from || curSrc() > b.to) ui.tl = srcToTl(b.from + 0.05);
@@ -1939,9 +1950,39 @@ tlInner.addEventListener('pointerdown', e => {
     renderAtTime(); renderInspector(); renderTimeline(); renderSteps();
   }
 });
-function scrubTo(e) { const r = tlInner.getBoundingClientRect(); const x = e.clientX - r.left - 84; setPlayhead((x / laneW()) * tlDur(), true, e.altKey); updateSnapLine(); }
+function scrubTo(e) { const r = tlInner.getBoundingClientRect(); const x = e.clientX - r.left - 84; setPlayhead((x / laneW()) * tScale(), true, e.altKey); updateSnapLine(); }
+/* Where a clip edge may go. Clips sit end to end, so an edge can't cross its neighbour's footage, can't leave less than 0.2 s,
+   and can't pass a pinned step (that would orphan it: move or delete the step first). */
+function clipLimits(c, mode, ref) {
+  ref = ref || c;
+  const i = doc.clips.indexOf(c), prev = doc.clips[i - 1], next = doc.clips[i + 1];
+  const pins = doc.steps.map(s => s.t).filter(t => t >= ref.in - 1e-6 && t <= ref.out + 1e-6);
+  if (mode === 'r') { const p = pins.length ? Math.max(...pins) : null; return { lo:Math.max(c.in + MIN_CLIP, p == null ? -Infinity : p), hi:next ? next.in : SRC_DUR, pin:p }; }
+  const p = pins.length ? Math.min(...pins) : null;
+  return { lo:prev ? prev.out : 0, hi:Math.min(c.out - MIN_CLIP, p == null ? Infinity : p), pin:p };
+}
+/* trims are snapped in source time (a pin's frame, a blur edge, another clip's edge, the playhead), which stays put while the clip ripples */
+function snapSrc(v, d, speed) {
+  const thr = (8 / laneW()) * tScale() * speed, pts = [0, SRC_DUR, d.srcPlay];
+  doc.steps.forEach(s => pts.push(s.t));
+  doc.blurs.forEach(b => pts.push(b.from, b.to));
+  doc.clips.forEach(c => { if (c.id !== d.id) pts.push(c.in, c.out); });
+  let best = null; for (const p of pts) if (Math.abs(p - v) <= thr && (best == null || Math.abs(p - v) < Math.abs(best - v))) best = p;
+  return best;
+}
+function clipTrim(d, dT, snapOn) {
+  const c = doc.clips.find(x => x.id === d.id); if (!c) return;
+  const lim = clipLimits(c, d.mode, d.o), right = d.mode === 'r';
+  let v = (right ? d.o.out : d.o.in) + dT * c.speed, hit = null;
+  if (snapOn) { const r = snapSrc(v, d, c.speed); if (r != null) { v = r; hit = r; } }
+  const hi = Math.max(lim.lo, lim.hi), nv = clamp(v, lim.lo, hi);
+  if (lim.pin != null && ((right && v < lim.lo - 1e-6 && lim.lo === lim.pin) || (!right && v > hi + 1e-6 && hi === lim.pin))) d.blocked = true;
+  if (right) c.out = nv; else c.in = nv;
+  ui.snapAt = hit != null && Math.abs(nv - hit) < 1e-6 ? srcToTl(nv) : null;
+}
 /* moves/trims one timeline item. `dT` is how far the pointer travelled, in timeline seconds. */
 function dragApply(d, dT, snapOn) {
+  if (d.kind === 'clip') { clipTrim(d, dT, snapOn); return; }
   const T = tlDur(), [s0, e0] = d.o, excl = { kind:d.kind, id:d.id }, minLen = d.kind === 'music' ? 0.5 : MIN_BAR;
   let s = s0, e = e0, hit = null;
   if (d.kind === 'pin') {
@@ -1982,15 +2023,16 @@ tlInner.addEventListener('pointermove', e => {
   if (scrub) { scrubTo(e); return; }
   const d = tdrag; if (!d) return;
   if (!d.moved && Math.abs(e.clientX - d.x0) < 3) return;
-  if (!d.moved) { d.moved = true; tlInner.classList.add(d.mode === 'move' ? 'dragging' : 'trimming'); }
-  dragApply(d, ((e.clientX - d.x0) / laneW()) * tlDur(), snapEnabled(e.altKey));
+  if (!d.moved) { d.moved = true; tlInner.classList.add(d.mode === 'move' ? 'dragging' : 'trimming'); if (d.kind === 'clip') ui.scaleT = d.T0; }
+  dragApply(d, ((e.clientX - d.x0) / laneW()) * tScale(), snapEnabled(e.altKey));
   renderTimeline(); renderAtTime(); renderInspector();
 });
 function endTL() {
   if (scrub) { scrub = null; ui.snapAt = null; updateSnapLine(); afterMove(); }
   if (tdrag) {
-    const d = tdrag; tdrag = null; tlInner.classList.remove('dragging', 'trimming'); ui.snapAt = null;
-    if (d.moved) { pushUndo(d.snap); renderAll(); } else updateSnapLine();
+    const d = tdrag; tdrag = null; tlInner.classList.remove('dragging', 'trimming'); ui.snapAt = null; ui.scaleT = null;
+    if (d.kind === 'clip') ui.tl = clamp(ui.tl, 0, tlDur());
+    if (d.moved) { pushUndo(d.snap); renderAll(); if (d.blocked) toast('A pinned step is at that frame. Move or delete the step to trim past it.'); } else updateSnapLine();
   }
 }
 tlInner.addEventListener('pointerup', endTL);
