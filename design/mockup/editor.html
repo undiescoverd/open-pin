@@ -403,6 +403,9 @@ input[type="range"]{width:100%; accent-color:var(--sel); margin:2px 0}
 .fd{position:absolute; top:0; bottom:0; pointer-events:none; z-index:0}
 .fd-l{left:0; background:linear-gradient(to bottom right, rgba(14,17,22,.2) 50%, transparent 50%)}
 .fd-r{right:0; background:linear-gradient(to bottom left, rgba(14,17,22,.2) 50%, transparent 50%)}
+.clip-gap{position:absolute; top:3px; bottom:3px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:6px; border:1px dashed var(--line-strong); background:repeating-linear-gradient(135deg, var(--hatch) 0 4px, transparent 4px 8px); color:var(--text-2); font-size:10.5px; font-variant-numeric:tabular-nums; overflow:hidden}
+.clip-gap:hover{border-color:var(--text-2)}
+.clip-gap.selected{border-style:solid; border-color:var(--sel); box-shadow:0 0 0 2px var(--sel)}
 .pin-marker{cursor:grab}
 .tl-inner.dragging,.tl-inner.dragging *{cursor:grabbing !important}
 .tl-inner.trimming,.tl-inner.trimming *{cursor:ew-resize !important}
@@ -552,6 +555,7 @@ details[open] summary{margin-bottom:8px}
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 21h4"/></symbol>
   <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></symbol>
   <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-ripple" viewBox="0 0 24 24"><rect x="3" y="7" width="8" height="10" rx="1.5"/><path d="M14.5 7v10M17.5 9.5l3 2.5-3 2.5"/></symbol>
   <symbol id="i-magnet" viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4z"/><path d="M6 8h4M14 8h4"/></symbol>
   <symbol id="i-replay" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5v4h4"/></symbol>
 </svg>
@@ -669,6 +673,7 @@ details[open] summary{margin-bottom:8px}
       </div>
       <div class="transport-end">
         <button class="icon-btn sm" id="btn-snap" aria-pressed="true" aria-label="Snapping" data-tip="Snapping on: edges snap to the nearest edge on any layer.  N, or hold Alt to flip it"><svg class="ic" aria-hidden="true"><use href="#i-magnet"/></svg></button>
+        <button class="icon-btn sm" id="btn-ripple" aria-pressed="true" aria-label="Ripple trim" data-tip="Ripple trim on: trimming a clip closes the gap.  ⇧R"><svg class="ic" aria-hidden="true"><use href="#i-ripple"/></svg></button>
         <button class="btn ghost sm" id="btn-split" data-tip="Split the clip at the playhead  ⌘B"><svg class="ic" aria-hidden="true"><use href="#i-scissors"/></svg>Split</button>
         <label class="mini" for="preview-speed">Preview
           <select id="preview-speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
@@ -857,13 +862,24 @@ let doc = {
   audio: { original:true },
   analytics: { on:false, url:'' },
 };
-const ui = { tl:0, playing:false, waiting:false, stopAt:null, view:'edit', tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false, snap:true, snapAt:null, scaleT:null, closed:{} };
+const ui = { tl:0, playing:false, waiting:false, stopAt:null, view:'edit', tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false, snap:true, snapAt:null, scaleT:null, ripple:true, closed:{} };
 const hist = { undo:[], redo:[] };
 
 /* ---------- time mapping (steps are anchored to source time) ---------- */
-const tlDur = () => doc.clips.reduce((s, c) => s + (c.out - c.in) / c.speed, 0);
-function srcToTl(t) { let acc = 0; for (const c of doc.clips) { if (t <= c.out + 1e-9) return acc + (Math.max(t, c.in) - c.in) / c.speed; acc += (c.out - c.in) / c.speed; } return acc; }
-function tlToSrc(x) { let acc = 0; for (const c of doc.clips) { const d = (c.out - c.in) / c.speed; if (x <= acc + d + 1e-9) return c.in + (x - acc) * c.speed; acc += d; } return doc.clips[doc.clips.length - 1].out; }
+/* clips play in order; `gap` is empty time before a clip (left by a trim with ripple off). In a gap the previous clip's last frame holds. */
+const tlDur = () => doc.clips.reduce((s, c) => s + (c.gap || 0) + (c.out - c.in) / c.speed, 0);
+function srcToTl(t) { let acc = 0; for (const c of doc.clips) { acc += c.gap || 0; if (t <= c.out + 1e-9) return acc + (Math.max(t, c.in) - c.in) / c.speed; acc += (c.out - c.in) / c.speed; } return acc; }
+function tlToSrc(x) {
+  let acc = 0;
+  for (let i = 0; i < doc.clips.length; i++) {
+    const c = doc.clips[i], g = c.gap || 0;
+    if (x < acc + g - 1e-9) return i ? doc.clips[i - 1].out : c.in;
+    acc += g; const d = (c.out - c.in) / c.speed;
+    if (x <= acc + d + 1e-9) return c.in + (x - acc) * c.speed;
+    acc += d;
+  }
+  return doc.clips[doc.clips.length - 1].out;
+}
 const curSrc = () => tlToSrc(ui.tl);
 const clipAtSrc = t => doc.clips.find(c => t >= c.in - 1e-9 && t <= c.out + 1e-9) || doc.clips[doc.clips.length - 1];
 const stepAtSrc = t => doc.steps.find(s => Math.abs(s.t - t) < 0.5 / FPS);
@@ -1089,6 +1105,7 @@ function fixSel() {
   if (s.kind === 'blur' && !doc.blurs.find(b => b.id === s.id)) ui.sel = null;
   if (s.kind === 'voice') { const st = stepById(s.stepId); ui.sel = !st ? null : narrDur(st) > 0 ? s : { kind:'step', id:st.id }; }
   if (s.kind === 'music' && !doc.music) ui.sel = null;
+  if (s.kind === 'gap') { const c = doc.clips.find(x => x.id === s.id); if (!c || !(c.gap > 0)) ui.sel = null; }
 }
 function undo() { if (!hist.undo.length) return; hist.redo.push(clone(doc)); doc = hist.undo.pop(); ui.tl = clamp(ui.tl, 0, tlDur()); fixSel(); renderAll(); }
 function redo() { if (!hist.redo.length) return; hist.undo.push(clone(doc)); doc = hist.redo.pop(); ui.tl = clamp(ui.tl, 0, tlDur()); fixSel(); renderAll(); }
@@ -1272,6 +1289,7 @@ function renderInspector() {
     else if (s && s.kind === 'blur') h = inspBlur(doc.blurs.find(b => b.id === s.id));
     else if (s && s.kind === 'voice') { const st = stepById(s.stepId); h = st && narrDur(st) > 0 ? inspVoice(st) : ''; }
     else if (s && s.kind === 'music') h = doc.music ? inspMusic() : '';
+    else if (s && s.kind === 'gap') { const c = doc.clips.find(x => x.id === s.id); h = c && c.gap > 0 ? inspGap(c) : ''; }
     if (!h) h = `<div class="nothing"><h3>Nothing selected</h3><p class="help">Click a step, an annotation on the frame, or anything on the timeline to edit it.</p><button class="btn secondary sm" data-act="open-guide" style="align-self:flex-start">${icon('sliders')}Guide settings</button></div>`;
   }
   const selKey = ui.tab + '|' + (ui.sel ? ui.sel.kind + (ui.sel.id || ui.sel.stepId || '') : '');
@@ -1360,11 +1378,11 @@ function inspClip(c) {
   return `
   <div class="insp-title"><span class="ann-ic">${icon('film')}</span><div><h3 class="insp-h">Clip ${i + 1}</h3><p class="insp-sub">${fmt(c.in)}–${fmt(c.out)} of the recording</p></div></div>
   ${grp('clip-trim', 'Trim', `<div class="tc-row">
-      ${tcCell({ id:'clip-in', label:'In', get:() => C().in, set:v => { const l = clipLimits(C(), 'l'); if (v < l.lo - 1e-6 || v > l.hi + 1e-6) return false; C().in = v; ui.tl = clamp(ui.tl, 0, tlDur()); } })}
-      ${tcCell({ id:'clip-out', label:'Out', get:() => C().out, set:v => { const l = clipLimits(C(), 'r'); if (v < l.lo - 1e-6 || v > l.hi + 1e-6) return false; C().out = v; ui.tl = clamp(ui.tl, 0, tlDur()); } })}
-      ${tcCell({ id:'clip-len', label:'Plays for', get:() => (C().out - C().in) / C().speed, set:v => { const l = clipLimits(C(), 'r'), o = C().in + v * C().speed; if (o < l.lo - 1e-6 || o > l.hi + 1e-6) return false; C().out = o; ui.tl = clamp(ui.tl, 0, tlDur()); } })}
+      ${tcCell({ id:'clip-in', label:'In', get:() => C().in, set:v => editClipEdge(C(), 'l', v) })}
+      ${tcCell({ id:'clip-out', label:'Out', get:() => C().out, set:v => editClipEdge(C(), 'r', v) })}
+      ${tcCell({ id:'clip-len', label:'Plays for', get:() => (C().out - C().in) / C().speed, set:v => editClipEdge(C(), 'r', C().in + v * C().speed) })}
     </div>
-    <p class="help">Drag the edges of the clip on the timeline, or type a time. Everything after it moves up to close the gap. Trimmed footage isn't lost: drag the edge back out to get it again. A pinned step stops the trim, so move or delete the step first.</p>`)}
+    <p class="help">Drag the edges of the clip on the timeline, or type a time. With ripple on (the button next to the magnet), everything after it moves up to close the gap; with ripple off, the trim leaves a gap and nothing else moves. Trimmed footage isn't lost: drag the edge back out to get it again. A pinned step stops the trim, so move or delete the step first.</p>`)}
   ${grp('clip-speed', 'Speed', `<div class="field"><span class="label" id="lbl-speed">Presets</span><div class="seg" role="group" aria-labelledby="lbl-speed">${SPEEDS.map(([v, l]) => `<button data-act="speed" data-v="${v}" aria-pressed="${Math.abs(c.speed - v) < 1e-6}">${l}</button>`).join('')}</div></div>
     ${prm({ id:'clip-speed', label:'Speed', min:0.25, max:8, step:0.05, def:1, unit:'×', get:() => C().speed, set:v => { const src = curSrc(); C().speed = v; ui.tl = srcToTl(src); } })}
     <p class="help">${d.toFixed(1)} s of recording plays in ${(d / c.speed).toFixed(1)} s. Sped-up audio keeps its pitch.</p>`)}
@@ -1422,6 +1440,15 @@ function inspVoice(st) {
   ${grp('voice-timing', 'Timing', timing)}
   ${grp('voice-audio', 'Audio', audio)}
   <button class="btn danger-ghost" data-act="del-voice">${icon('trash')}Remove narration</button>`;
+}
+function inspGap(c) {
+  const id = c.id, C = () => doc.clips.find(x => x.id === id), i = doc.clips.indexOf(c);
+  return `
+  <div class="insp-title"><span class="ann-ic">${icon('film')}</span><div><h3 class="insp-h">Gap</h3><p class="insp-sub">${c.gap.toFixed(2)} s before clip ${i + 1}</p></div></div>
+  ${prm({ id:'gap-len', label:'Length', min:0.05, max:30, step:0.05, unit:'s', get:() => C().gap, set:v => { C().gap = v; } })}
+  <p class="help">Empty time. Viewers see the last frame of the clip before it, held still.</p>
+  <button class="btn secondary sm" data-act="close-gap" style="align-self:flex-start">${icon('scissors')}Close gap</button>
+  <p class="help">Closing it moves everything after it up. You can also drag the neighbouring clip's edge back out to fill it.</p>`;
 }
 function inspMusic() {
   const m = musicOf(), [ms, me] = musicSpan();
@@ -1510,6 +1537,7 @@ function renderTimeline() {
   const is = (k, id) => ui.sel && ui.sel.kind === k && (id == null || ui.sel.id === id || ui.sel.stepId === id) ? 'selected' : '';
   const selId = selStepId();
   const clips = doc.clips.map((c, i) => { const a = srcToTl(c.in), b = srcToTl(c.out), o = clipOf(c); return `<button class="clip ${is('clip', c.id)}" data-clip="${c.id}" style="left:${x(a) + 1}px;width:${Math.max(4, x(b) - x(a) - 2)}px;${o.mute ? 'opacity:.6' : ''}" aria-label="Clip ${i + 1}, ${fmt(c.in)} to ${fmt(c.out)}, ${speedLabel(c.speed)}">${icon('film')}<span>Clip ${i + 1} · ${fmt(c.in)}–${fmt(c.out)}</span><b class="speed">${speedLabel(c.speed)}</b>${EDGES}</button>`; }).join('');
+  const gaps = doc.clips.filter(c => c.gap > 0.005).map(c => { const b = srcToTl(c.in), a = b - c.gap; return `<button class="clip-gap ${is('gap', c.id)}" data-gap="${c.id}" style="left:${x(a)}px;width:${Math.max(4, x(b) - x(a))}px" aria-label="Gap of ${c.gap.toFixed(2)} seconds" data-tip="Gap · ${c.gap.toFixed(2)} s. Select it to close it.">${x(b) - x(a) > 54 ? `<span>${c.gap.toFixed(2)} s</span>` : ''}</button>`; }).join('');
   const pins = doc.steps.map((s, i) => `<button class="pin-marker ${s.id === selId ? 'selected' : ''}" data-step="${s.id}" style="left:${x(srcToTl(s.t))}px" aria-label="Step ${i + 1}: ${esc(s.title)}" data-tip="Step ${i + 1}: ${esc(s.title)}. Drag to move it.">${i + 1}</button>`).join('');
   const bp = packRows(doc.blurs.map(b => { const [a, e] = blurSpan(b); return { id:b.id, s:a, e }; }));
   const blurs = doc.blurs.map(raw => { const b = blurOf(raw), [a, e] = blurSpan(b); return `<button class="lane-bar blur-bar ${is('blur', b.id)}" data-blur="${b.id}" style="left:${x(a)}px;width:${Math.max(10, x(e) - x(a))}px;top:${5 + bp.row[b.id] * 26}px;bottom:auto;height:22px">${fd(srcToTl(b.from + b.fadeIn) - a, e - srcToTl(b.to - b.fadeOut))}${icon('blur')}<span>${esc(b.label)}</span>${EDGES}</button>`; }).join('');
@@ -1521,7 +1549,7 @@ function renderTimeline() {
   else music = `<button class="lane-add" data-act="add-music">${icon('plus')}Add music</button>`;
   tlInner.innerHTML =
     `<div class="tl-row ruler"><div class="tl-label"></div><div class="tl-lane" data-scrub>${ticks}</div></div>` +
-    `<div class="tl-row"><div class="tl-label">${icon('film')}Video</div><div class="tl-lane track">${clips}</div></div>` +
+    `<div class="tl-row"><div class="tl-label">${icon('film')}Video</div><div class="tl-lane track">${gaps}${clips}</div></div>` +
     `<div class="tl-row"><div class="tl-label">${icon('pin')}Steps</div><div class="tl-lane track">${pins}</div></div>` +
     `<div class="tl-row" style="height:${bp.n * 26 + 6}px"><div class="tl-label">${icon('blur')}Blur</div><div class="tl-lane track">${blurs}</div></div>` +
     `<div class="tl-row" style="height:${vp.n * 26 + 6}px"><div class="tl-label">${icon('mic')}Voice</div><div class="tl-lane track">${voices}</div></div>` +
@@ -1539,7 +1567,7 @@ const snapEnabled = invert => ui.snap !== !!invert;
 function snapPoints(excl) {
   const pts = [0, tlDur()];
   if (!excl.playhead) pts.push(ui.tl);
-  doc.clips.forEach(c => pts.push(srcToTl(c.in), srcToTl(c.out)));
+  doc.clips.forEach(c => { if (!(excl.kind === 'clip' && excl.id === c.id)) pts.push(srcToTl(c.in), srcToTl(c.out)); });
   doc.steps.forEach(s => {
     if (!(excl.kind === 'pin' && excl.id === s.id)) pts.push(srcToTl(s.t));
     if (narrDur(s) > 0 && !((excl.kind === 'voice' || excl.kind === 'pin') && excl.id === s.id)) pts.push(...voiceSpan(s));
@@ -1619,6 +1647,7 @@ function deleteSelection() {
   else if (s.kind === 'blur') { commit(() => { doc.blurs = doc.blurs.filter(b => b.id !== s.id); ui.sel = null; }); toast('Deleted the blur. Undo with ⌘Z.'); }
   else if (s.kind === 'voice') { commit(() => { stepById(s.stepId).narration = 'none'; ui.sel = { kind:'step', id:s.stepId }; }); toast('Removed the narration. Undo with ⌘Z.'); }
   else if (s.kind === 'music') { commit(() => { doc.music = null; ui.sel = null; }); toast('Removed the music. Undo with ⌘Z.'); }
+  else if (s.kind === 'gap') { commit(() => { const c = doc.clips.find(x => x.id === s.id); if (c) c.gap = 0; ui.sel = { kind:'clip', id:s.id }; ui.tl = clamp(ui.tl, 0, tlDur()); }); toast('Closed the gap. Undo with ⌘Z.'); }
 }
 function splitAtPlayhead() {
   if (ui.empty) return;
@@ -1902,6 +1931,7 @@ inspBody.addEventListener('click', e => {
     case 'sel-voice': if (st) { ui.sel = { kind:'voice', stepId:st.id }; renderAtTime(); renderInspector(); renderTimeline(); renderSteps(); } break;
     case 'sel-music': ui.sel = { kind:'music' }; ui.tab = 'selection'; renderAtTime(); renderInspector(); renderTimeline(); renderSteps(); break;
     case 'del-voice': deleteSelection(); break;
+    case 'close-gap': deleteSelection(); break;
     case 'music-tail': commit(() => { doc.music.end = null; }); break;
   }
 });
@@ -1926,12 +1956,13 @@ function startTDrag(e, kind, id, mode) {
 tlInner.addEventListener('pointerdown', e => {
   if (e.button !== 0 || ui.empty) return;
   const T = e.target;
-  const stepB = T.closest('[data-step]'), clipB = T.closest('[data-clip]'), blurB = T.closest('[data-blur]'), voiceB = T.closest('[data-voice]'), musicB = T.closest('[data-music]'), actB = T.closest('[data-act]');
+  const gapB = T.closest('[data-gap]'), stepB = T.closest('[data-step]'), clipB = T.closest('[data-clip]'), blurB = T.closest('[data-blur]'), voiceB = T.closest('[data-voice]'), musicB = T.closest('[data-music]'), actB = T.closest('[data-act]');
   const edgeEl = T.closest('[data-edge]'), mode = edgeEl ? edgeEl.dataset.edge : 'move';
+  if (gapB) { ui.sel = { kind:'gap', id:gapB.dataset.gap }; ui.tab = 'selection'; renderInspector(); renderTimeline(); renderSteps(); return; }
   if (stepB) { selectStep(stepB.dataset.step); startTDrag(e, 'pin', stepB.dataset.step, 'move'); return; }
   if (clipB) {
     ui.sel = { kind:'clip', id:clipB.dataset.clip }; ui.tab = 'selection'; renderInspector(); renderTimeline(); renderSteps();
-    if (edgeEl) { const c = doc.clips.find(x => x.id === clipB.dataset.clip); tdrag = { kind:'clip', id:c.id, mode:edgeEl.dataset.edge, x0:e.clientX, o:{ in:c.in, out:c.out }, srcPlay:curSrc(), T0:tlDur(), snap:clone(doc), moved:false, blocked:false }; tlInner.setPointerCapture(e.pointerId); }
+    if (edgeEl) { const c = doc.clips.find(x => x.id === clipB.dataset.clip); tdrag = { kind:'clip', id:c.id, mode:edgeEl.dataset.edge, x0:e.clientX, o:clipSnapshot(c), ripple:ui.ripple, srcPlay:curSrc(), T0:tlDur(), snap:clone(doc), moved:false, blocked:false }; tlInner.setPointerCapture(e.pointerId); }
     return;
   }
   if (blurB) {
@@ -1970,15 +2001,37 @@ function snapSrc(v, d, speed) {
   let best = null; for (const p of pts) if (Math.abs(p - v) <= thr && (best == null || Math.abs(p - v) < Math.abs(best - v))) best = p;
   return best;
 }
+const clipSnapshot = c => { const nx = doc.clips[doc.clips.indexOf(c) + 1]; return { in:c.in, out:c.out, gap:c.gap || 0, nextGap:nx ? nx.gap || 0 : 0, tl0:srcToTl(c.in) }; };
+/* with ripple off the neighbours stay where they are, so the edge can only move into room that is already free (a gap) */
+function clipRange(c, mode, o, ripple) {
+  const lim = clipLimits(c, mode, o), nx = doc.clips[doc.clips.indexOf(c) + 1];
+  let lo = lim.lo, hi = Math.max(lim.lo, lim.hi);
+  if (!ripple) { if (mode === 'r' && nx) hi = Math.min(hi, o.out + o.nextGap * c.speed); if (mode === 'l') lo = Math.min(hi, Math.max(lo, o.in - o.gap * c.speed)); }
+  return { lo, hi:Math.max(lo, hi), pin:lim.pin };
+}
+function applyClipEdge(c, mode, nv, o, ripple) {
+  const nx = doc.clips[doc.clips.indexOf(c) + 1];
+  if (mode === 'r') { c.out = nv; if (!ripple && nx) nx.gap = Math.max(0, o.nextGap - (nv - o.out) / c.speed); }
+  else { c.in = nv; if (!ripple) c.gap = Math.max(0, o.gap + (nv - o.in) / c.speed); }
+}
+/* typed trims (Inspector): refused when the value isn't allowed */
+function editClipEdge(c, mode, v) {
+  const o = clipSnapshot(c), r = clipRange(c, mode, o, ui.ripple);
+  if (v < r.lo - 1e-6 || v > r.hi + 1e-6) return false;
+  applyClipEdge(c, mode, v, o, ui.ripple); ui.tl = clamp(ui.tl, 0, tlDur());
+}
 function clipTrim(d, dT, snapOn) {
   const c = doc.clips.find(x => x.id === d.id); if (!c) return;
-  const lim = clipLimits(c, d.mode, d.o), right = d.mode === 'r';
-  let v = (right ? d.o.out : d.o.in) + dT * c.speed, hit = null;
-  if (snapOn) { const r = snapSrc(v, d, c.speed); if (r != null) { v = r; hit = r; } }
-  const hi = Math.max(lim.lo, lim.hi), nv = clamp(v, lim.lo, hi);
-  if (lim.pin != null && ((right && v < lim.lo - 1e-6 && lim.lo === lim.pin) || (!right && v > hi + 1e-6 && hi === lim.pin))) d.blocked = true;
-  if (right) c.out = nv; else c.in = nv;
-  ui.snapAt = hit != null && Math.abs(nv - hit) < 1e-6 ? srcToTl(nv) : null;
+  const right = d.mode === 'r', o = d.o, ripple = d.ripple;
+  let v = (right ? o.out : o.in) + dT * c.speed, hit = null;
+  if (snapOn) {
+    if (ripple) { const r = snapSrc(v, d, c.speed); if (r != null) { v = r; hit = r; } }
+    else { const r = snapNear([o.tl0 + (v - o.in) / c.speed], { kind:'clip', id:c.id }); if (r) { v += r.delta * c.speed; hit = v; } }
+  }
+  const rg = clipRange(c, d.mode, o, ripple), nv = clamp(v, rg.lo, rg.hi);
+  if (rg.pin != null && ((right && v < rg.lo - 1e-6 && rg.lo === rg.pin) || (!right && v > rg.hi + 1e-6 && rg.hi === rg.pin))) d.blocked = true;
+  applyClipEdge(c, d.mode, nv, o, ripple);
+  ui.snapAt = hit != null && Math.abs(nv - hit) < 1e-6 ? (ripple ? srcToTl(nv) : o.tl0 + (nv - o.in) / c.speed) : null;
 }
 /* moves/trims one timeline item. `dT` is how far the pointer travelled, in timeline seconds. */
 function dragApply(d, dT, snapOn) {
@@ -2058,6 +2111,13 @@ function toggleSnap() {
   toast(ui.snap ? 'Snapping on' : 'Snapping off');
 }
 $('#btn-snap').addEventListener('click', toggleSnap);
+function toggleRipple() {
+  ui.ripple = !ui.ripple; const b = $('#btn-ripple');
+  b.setAttribute('aria-pressed', String(ui.ripple));
+  b.dataset.tip = ui.ripple ? 'Ripple trim on: trimming a clip closes the gap.  ⇧R' : 'Ripple trim off: trimming a clip leaves a gap and nothing else moves.  ⇧R';
+  toast(ui.ripple ? 'Ripple trim on. Trims close the gap.' : 'Ripple trim off. Trims leave a gap.');
+}
+$('#btn-ripple').addEventListener('click', toggleRipple);
 $('#preview-speed').addEventListener('change', e => { ui.previewSpeed = +e.target.value; });
 $('#tl-zoom').addEventListener('input', e => { ui.zoom = +e.target.value; renderTimeline(); const ph = $('#playhead'); if (ph) tlScroll.scrollLeft = Math.max(0, ph.offsetLeft - tlScroll.clientWidth / 2); });
 $('#btn-undo').addEventListener('click', undo);
@@ -2133,6 +2193,7 @@ function commands() {
     { label:'Export guide folder', run:() => exportItem('folder') },
     { label:'Split clip at playhead', key:'⌘B', run:splitAtPlayhead },
     { label:'Toggle snapping', key:'N', run:toggleSnap },
+    { label:'Toggle ripple trim', key:'⇧R', run:toggleRipple },
     { label:'Copy current frame', run:() => toast('Mockup only: the app copies the finished frame to your clipboard.') },
     ...TOOLS.map(t => ({ label:`Tool: ${t.label}`, key:t.key.toUpperCase(), run:() => setTool(t.id) })),
     ...doc.steps.map((s, i) => ({ label:`Go to step ${i + 1}: ${s.title}`, run:() => selectStep(s.id) })),
@@ -2284,6 +2345,7 @@ document.addEventListener('keydown', e => {
     case 'Escape': if (ui.tool !== 'select') setTool('select'); else if (ui.waiting) { ui.waiting = false; renderAtTime(); } else if (ui.view === 'viewer') setView('edit'); else if (ui.sel && (ui.sel.kind === 'ann' || ui.sel.kind === 'zoom')) { ui.sel = { kind:'step', id:ui.sel.stepId }; renderAtTime(); renderInspector(); } return;
     case 'Backspace': case 'Delete': if (onButton && !e.target.closest('.step-card')) return; e.preventDefault(); deleteSelection(); return;
     case 'P': if (e.shiftKey) { e.preventDefault(); pinStep(null); } return;
+    case 'R': if (e.shiftKey) { e.preventDefault(); toggleRipple(); } return;
   }
   if (e.altKey || e.shiftKey) return;
   if (k === 'n') { e.preventDefault(); toggleSnap(); return; }
