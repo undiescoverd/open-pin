@@ -9,3 +9,7 @@ export { KeyCap, type KeyCapProps } from './KeyCap';
 export { detectPlatform, formatShortcut, type FormattedShortcut, type Platform } from './keys';
 export { Surface, type SurfaceProps, type SurfaceVariant } from './Surface';
 export { Tooltip, TooltipProvider, type TooltipProps } from './Tooltip';
+export { Dialog, type DialogProps } from './Dialog';
+export { ColorSwatchPicker, Field, InspectorSection, ParamRow, SelectField, TextArea, TextField, TimecodeField } from './Fields';
+export type { FieldProps, InspectorSectionProps, ParamRowProps, SelectFieldProps, SwatchProps, TimecodeFieldProps } from './Fields';
+export { Menu, MenuItem, MenuLabel, MenuSeparator, type MenuItemProps, type MenuProps } from './Menu';

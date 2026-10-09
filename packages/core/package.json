@@ -10,5 +10,9 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "immer": "^11.1.21",
+    "zod": "^4.6.5"
   }
 }

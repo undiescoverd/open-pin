@@ -12,11 +12,21 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@fontsource/figtree": "^5.3.0",
     "@waypost/core": "workspace:*",
+    "@waypost/export": "workspace:*",
+    "@waypost/media": "workspace:*",
+    "@waypost/render": "workspace:*",
     "@waypost/ui": "workspace:*",
+    "comlink": "^4.4.2",
+    "fflate": "^0.8.3",
+    "immer": "^11.1.21",
     "lucide-react": "^1.54.0",
+    "mediabunny": "^1.61.3",
+    "pdf-lib": "^1.17.1",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

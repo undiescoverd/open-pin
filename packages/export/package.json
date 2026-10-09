@@ -8,6 +8,14 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@waypost/core": "workspace:*",
+    "@waypost/render": "workspace:*",
+    "fflate": "^0.8.3",
+    "pdf-lib": "^1.17.1"
   }
 }

@@ -1,54 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { openFile, restoreLastProject, startAutosave } from '../state/project';
 import { Inspector } from './Inspector';
-import { isTyping } from './keyboard';
+import { ProjectsDialog } from './ProjectsDialog';
 import { Stage } from './Stage';
 import { StepRail } from './StepRail';
 import { Timeline } from './Timeline';
-import { TOOLS, type ToolId } from './tools';
 import { TopBar } from './TopBar';
+import { useShortcuts } from './shortcuts';
 
-/* Steps rail | canvas | inspector, over a full-width timeline (docs/03-design-system.md, "Editor layout").
-   Phase 0 draws the panes empty; only tools, snapping, ripple and the theme respond. */
+/* Steps rail | canvas | inspector, over a full-width timeline (docs/03-design-system.md, "Editor layout"). */
 export function EditorShell() {
-  const [tool, setTool] = useState<ToolId>('select');
-  const [snap, setSnap] = useState(true);
-  const [ripple, setRipple] = useState(true);
+  useShortcuts();
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || document.querySelector('dialog[open]')) return;
-      const key = e.key.toLowerCase(); /* by lowercase key, so shortcuts also work with Caps Lock on */
-      if (e.shiftKey) {
-        if (key === 'r') {
-          e.preventDefault();
-          setRipple(r => !r);
-        }
-        return;
-      }
-      if (key === 'n') {
-        e.preventDefault();
-        setSnap(s => !s);
-        return;
-      }
-      const t = TOOLS.find(x => x.key === key);
-      if (t) {
-        e.preventDefault();
-        setTool(t.id);
-      }
+    const stop = startAutosave();
+    void restoreLastProject();
+    return stop;
+  }, []);
+
+  /* a recording or .waypost file dropped anywhere opens a new project */
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+    const over = (e: DragEvent) => hasFiles(e) && e.preventDefault();
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      const file = e.dataTransfer?.files[0];
+      if (file) void openFile(file);
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    window.addEventListener('dragover', over);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('drop', drop);
+    };
   }, []);
 
   return (
-    <div
-      className="grid h-full min-h-[640px] min-w-[960px] gap-3 px-4 py-3 [grid-template-areas:'top_top_top'_'steps_stage_insp'_'tl_tl_tl'] grid-cols-[264px_minmax(0,1fr)_304px] grid-rows-[auto_minmax(0,1fr)_auto]"
-    >
+    <div className="grid h-full min-h-[640px] min-w-[960px] gap-3 px-4 py-3 [grid-template-areas:'top_top_top'_'steps_stage_insp'_'tl_tl_tl'] grid-cols-[264px_minmax(0,1fr)_304px] grid-rows-[auto_minmax(0,1fr)_auto]">
       <TopBar />
       <StepRail />
-      <Stage tool={tool} onTool={setTool} />
+      <Stage />
       <Inspector />
-      <Timeline snap={snap} ripple={ripple} onToggleSnap={() => setSnap(s => !s)} onToggleRipple={() => setRipple(r => !r)} />
+      <Timeline />
+      <ProjectsDialog />
     </div>
   );
 }
