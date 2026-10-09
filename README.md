@@ -2,7 +2,7 @@
 
 A web app that turns screen recordings into interactive, click-through product guides, with MP4, PDF and screenshot exports too. It's an alternative to [FramePin](https://framepin.com/) that you buy once instead of subscribing to.
 
-**Status:** research and design. No app code yet.
+**Status:** Phase 0 of the [roadmap](docs/04-roadmap.md): the app scaffold. The editor shell, its components and CI are in place with empty panels; the full designed behaviour lives in the [clickable mockup](design/mockup/editor.html).
 
 ## What it will do
 
@@ -21,6 +21,36 @@ Everything runs in your browser. It's a one-off purchase with no subscription an
 - Web app (React + TypeScript). Installable as a desktop app from Chrome, with no code signing or notarization needed.
 - **Editor:** current Chrome, Edge, Brave or Arc on any Mac that runs them, including macOS 27 Golden Gate and older releases.
 - **Published guides:** play in every modern browser, including Safari on iPhone and iPad.
+
+## Developing
+
+Needs Node 22 and pnpm 10 (`corepack enable` gives you the pinned pnpm).
+
+```sh
+pnpm install
+pnpm dev          # the editor at http://localhost:5173 (the component gallery is at /kit)
+pnpm check        # tokens, lint, typecheck, unit tests and a production build: what CI runs
+pnpm test:e2e     # browser tests against the production build (first run: pnpm --filter @waypost/editor exec playwright install chromium)
+pnpm tokens       # regenerate the CSS after editing design/tokens.json
+```
+
+| Path | What's there |
+|---|---|
+| `apps/editor` | The editor web app (Vite, React 19, Tailwind 4) and its Playwright tests |
+| `packages/ui` | PinKit: generated token CSS plus `Button`, `IconButton`, `Tooltip`, `KeyCap`, `Surface`, `Icon` |
+| `packages/core` | The project model; for now the timecode helpers |
+| `packages/render`, `media`, `export`, `player`, `tts` | Empty until their roadmap phase |
+| `design/tokens.json` | Colours, type, radii and motion for both themes; `scripts/build-tokens.mjs` turns it into CSS |
+
+## Deploying
+
+CI deploys to Cloudflare Pages once two repository secrets exist; until then the deploy step is skipped and everything else still runs.
+
+1. In Cloudflare, create an API token with the **Cloudflare Pages: Edit** permission, and note your account ID.
+2. Create the Pages project once: `pnpm dlx wrangler pages project create waypost --production-branch=claude/gracious-keller-073zo2` (use whichever branch is the repository's default).
+3. In GitHub, add the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (Settings → Secrets and variables → Actions).
+
+Pushes to the default branch then go to production, and every pull request branch gets its own preview URL.
 
 ## Docs
 

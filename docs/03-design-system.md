@@ -148,7 +148,7 @@ Four gradient backgrounds built from the palette, plus solid colors and custom i
 
 ## PinKit components (`packages/ui`)
 
-React components built on Radix primitives (for keyboard, focus and screen-reader behavior), styled with Tailwind classes that only reference our tokens. Every component documents its states (default, hover, pressed, focus-visible, disabled, selected) and has a light/dark story in a component gallery page (`/kit` in dev builds).
+React components built on Radix primitives (for keyboard, focus and screen-reader behavior), styled with Tailwind classes that only reference our tokens. Every component documents its states (default, hover, pressed, focus-visible, disabled, selected) and has a light/dark story in a component gallery page (`/kit`, not linked from the editor).
 
 ### Foundations
 - `tokens.css`: generated custom properties, light and dark sets.

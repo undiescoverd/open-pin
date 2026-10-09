@@ -1,0 +1,13 @@
+{
+  "name": "@waypost/render",
+  "description": "Canvas compositor shared by the editor, the player and every export.",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

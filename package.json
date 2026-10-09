@@ -1,0 +1,33 @@
+{
+  "name": "waypost",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @waypost/editor dev",
+    "build": "pnpm --filter @waypost/editor build",
+    "preview": "pnpm --filter @waypost/editor preview",
+    "tokens": "node scripts/build-tokens.mjs",
+    "tokens:check": "node scripts/build-tokens.mjs --check",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "test": "vitest run",
+    "test:e2e": "pnpm --filter @waypost/editor test:e2e",
+    "check": "pnpm tokens:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.19.0",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  }
+}

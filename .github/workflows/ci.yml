@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    # the repository's default branch
+    branches: [main, claude/gracious-keller-073zo2]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Design tokens are regenerated
+        run: pnpm tokens:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: editor-dist
+          path: apps/editor/dist
+          retention-days: 7
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @waypost/editor exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/editor/playwright-report
+          retention-days: 7
+
+  # Publishes the build to Cloudflare Pages: the default branch goes to production, every other branch to its own
+  # preview URL. Skipped until the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets exist (see README).
+  deploy:
+    name: Deploy to Cloudflare Pages
+    needs: [checks, e2e]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check for Cloudflare credentials
+        id: creds
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Skipping the deploy: add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets to turn it on."
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          name: editor-dist
+          path: dist
+      - uses: cloudflare/wrangler-action@v3
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=waypost --branch=${{ github.head_ref || github.ref_name }}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Turn screen recordings into interactive, click-through guides." />
+    <title>Waypost</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      /* apply a saved light/dark choice before the first paint, so the page never flashes the wrong theme */
+      try {
+        const theme = localStorage.getItem('waypost.theme');
+        if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

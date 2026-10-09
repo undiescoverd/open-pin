@@ -237,7 +237,7 @@ Embed:
 
 ## Development environment
 
-Node 22 + pnpm. `pnpm dev` runs the editor locally; `pnpm test` runs everything. The whole project builds and runs on any OS, including the Linux cloud environment these docs were written in (Chromium for Playwright is pre-installed there).
+Node 22 + pnpm. `pnpm dev` runs the editor locally; `pnpm check` runs what CI runs (tokens, lint, typecheck, unit tests, build) and `pnpm test:e2e` the browser tests. The whole project builds and runs on any OS, including the Linux cloud environment these docs were written in (Chromium for Playwright is pre-installed there).
 
 ## License and sales
 
