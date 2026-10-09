@@ -674,7 +674,7 @@ details[open] summary{margin-bottom:8px}
       <div class="transport-end">
         <button class="icon-btn sm" id="btn-snap" aria-pressed="true" aria-label="Snapping" data-tip="Snapping on: edges snap to the nearest edge on any layer.  N, or hold Alt to flip it"><svg class="ic" aria-hidden="true"><use href="#i-magnet"/></svg></button>
         <button class="icon-btn sm" id="btn-ripple" aria-pressed="true" aria-label="Ripple trim" data-tip="Ripple trim on: trimming a clip closes the gap.  ⇧R"><svg class="ic" aria-hidden="true"><use href="#i-ripple"/></svg></button>
-        <button class="btn ghost sm" id="btn-split" data-tip="Split the clip at the playhead  ⌘B"><svg class="ic" aria-hidden="true"><use href="#i-scissors"/></svg>Split</button>
+        <button class="btn ghost sm" id="btn-split" data-tip="Split the clip at the playhead  R"><svg class="ic" aria-hidden="true"><use href="#i-scissors"/></svg>Split</button>
         <label class="mini" for="preview-speed">Preview
           <select id="preview-speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
         </label>
@@ -809,9 +809,9 @@ const TOOLS = [
   { id:'callout', label:'Callout', key:'c', icon:'callout', hint:'click where the note should point' },
   { id:'arrow', label:'Arrow', key:'a', icon:'arrow', hint:'drag from the start of the arrow to its tip' },
   { id:'spotlight', label:'Spotlight', key:'s', icon:'spot', hint:'drag over the area that should stay bright' },
-  { id:'box', label:'Box', key:'r', icon:'box', hint:'drag to outline an area' },
+  { id:'box', label:'Box', key:'b', icon:'box', hint:'drag to outline an area' },
   { id:'zoom', label:'Zoom', key:'z', icon:'zoom', hint:'drag a box over the area viewers should zoom into' },
-  { id:'blur', label:'Blur', key:'b', icon:'blur', hint:'drag over anything private; it stays blurred from here on' },
+  { id:'blur', label:'Blur', key:'x', icon:'blur', hint:'drag over anything private; it stays blurred from here on' },
 ];
 const TYPE_LABEL = { callout:'Callout', arrow:'Arrow', spotlight:'Spotlight', box:'Box', click:'Click marker' };
 const TYPE_ICON = { callout:'callout', arrow:'arrow', spotlight:'spot', box:'box', click:'target' };
@@ -1390,7 +1390,7 @@ function inspClip(c) {
   ${grp('clip-audio', 'Audio', `${prm({ id:'clip-vol', label:'Volume', min:0, max:150, step:1, def:100, unit:'%', get:() => clipOf(C()).vol, set:v => { C().vol = v; } })}
     ${sw({ id:'clip-mute', label:'Mute this clip', get:() => clipOf(C()).mute, set:v => { C().mute = v; } })}
     <p class="help">${doc.audio.original ? 'The recording\'s own audio plays under the narration.' : 'Original audio is off for the whole guide (Guide tab), so this only matters if you turn it back on.'}</p>`)}
-  <button class="btn secondary sm" data-act="split" style="align-self:flex-start">${icon('scissors')}Split at playhead <span class="kbd">⌘B</span></button>
+  <button class="btn secondary sm" data-act="split" style="align-self:flex-start">${icon('scissors')}Split at playhead <span class="kbd">R</span></button>
   <p class="help">Steps stay pinned to their exact frame when you change speed or split.</p>`;
 }
 function inspBlur(b) {
@@ -2232,7 +2232,7 @@ function commands() {
     { label:'Export PDF guide', run:() => exportItem('pdf') },
     { label:'Export screenshots', run:() => exportItem('png') },
     { label:'Export guide folder', run:() => exportItem('folder') },
-    { label:'Split clip at playhead', key:'⌘B', run:splitAtPlayhead },
+    { label:'Split clip at playhead', key:'R', run:splitAtPlayhead },
     { label:'Toggle snapping', key:'N', run:toggleSnap },
     { label:'Toggle ripple trim', key:'⇧R', run:toggleRipple },
     { label:'Copy current frame', run:() => toast('Mockup only: the app copies the finished frame to your clipboard.') },
@@ -2400,7 +2400,6 @@ document.addEventListener('keydown', e => {
   const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase(), typing = isTyping(e.target);
   if (mod && k === 'k') { e.preventDefault(); openPalette(); return; }
   if (mod && k === 'z' && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
-  if (mod && k === 'b' && !typing) { e.preventDefault(); splitAtPlayhead(); return; }
   if (mod && k === 'e') { e.preventDefault(); openExportMenu(); return; }
   if (mod && e.key === 'Enter') { e.preventDefault(); openPreview(); return; }
   if (mod && !typing && (e.key === ',' || e.key === '.')) { e.preventDefault(); if (e.key === ',') goStart(); else goEnd(); return; }
@@ -2418,6 +2417,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.altKey || e.shiftKey) return;
   if (k === 'n') { e.preventDefault(); toggleSnap(); return; }
+  if (k === 'r') { e.preventDefault(); splitAtPlayhead(); return; }
   const t = TOOLS.find(x => x.key === k); if (t) { e.preventDefault(); setTool(t.id); }
 });
 
