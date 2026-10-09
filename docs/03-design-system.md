@@ -195,15 +195,25 @@ Chosen to avoid the browser shortcuts a web page can't override (⌘T, ⌘W, ⌘
 
 | Action | Shortcut |
 |---|---|
-| Play/pause | Space |
+| Play/pause | Space or K |
+| Play forward (press again for 2×, then 4×) | L |
+| Play backward (press again for 2×, then 4×) | J |
 | Previous/next frame | ← / → |
 | Jump 1 s | ⇧← / ⇧→ |
 | Previous/next step | ⌥← / ⌥→ |
+| Previous/next edit (any cut, pin, or start or end of a blur, voice or music bar) | ⇧J / ⇧L |
+| Play from the very start / jump to the very end | ⌘, / ⌘. |
+| Zoom the timeline in / out | = / - |
+| Select the layer below / above | ⇧K / ⇧I |
 | Pin step at playhead | ⇧P |
 | Tools: select, pin, callout, arrow, spotlight, box, zoom, blur | V, P, C, A, S, B, Z, X |
 | Split clip at playhead | R |
+| Snapping on/off (hold Alt to flip it for one drag) | N |
+| Ripple trim on/off | ⇧R |
 | Delete selection | ⌫ |
 | Undo / redo | ⌘Z / ⇧⌘Z |
 | Command palette | ⌘K |
 | Preview guide | ⌘↩ |
 | Export menu | ⌘E |
+
+L, J and K follow DaVinci Resolve and, like Space, stop at every pinned step. On Windows and Linux use Ctrl in place of ⌘. Some browsers keep ⌘, for their own settings; if yours does, use the command palette's "Play from the very start".
