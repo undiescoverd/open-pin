@@ -174,10 +174,14 @@ button{cursor:pointer}
 .ann-layer svg{position:absolute; left:0; top:0; overflow:visible}
 .editing .ann, .editing .hit, .editing .callout, .editing .blur{pointer-events:auto}
 .editing .ann, .editing .callout, .editing .blur{cursor:move}
-.editing .zoom-box, .editing .zh{pointer-events:auto}
+.editing .zoom-box, .editing .zh, .editing .zoom-body, .editing .ah{pointer-events:auto}
+.editing .zoom-body, .editing .hit{cursor:move}
 .editing .zoom-box{cursor:move}
-.zh-tl,.zh-br{cursor:nwse-resize}
-.zh-tr,.zh-bl{cursor:nesw-resize}
+.zh-tl,.zh-br,.ah-nw,.ah-se{cursor:nwse-resize}
+.zh-tr,.zh-bl,.ah-ne,.ah-sw{cursor:nesw-resize}
+.zh-n,.zh-s,.ah-n,.ah-s{cursor:ns-resize}
+.zh-e,.zh-w,.ah-e,.ah-w{cursor:ew-resize}
+.ah-pt{cursor:grab}
 .pulse{transform-box:fill-box; transform-origin:center; animation:pulse 1.6s ease-out infinite}
 @keyframes pulse{from{transform:scale(1); opacity:.9} to{transform:scale(2.4); opacity:0}}
 .callout{position:absolute; padding:12px 17px; border-radius:14px; font:600 20px/27px var(--font-brand); box-shadow:0 10px 28px rgba(0,0,0,.28); pointer-events:none}
@@ -879,6 +883,14 @@ function zoomTransform(r) {
   return `translate(${clamp(W / 2 - cx * f, W - W * f, 0)}px,${clamp(H / 2 - cy * f, H - H * f, 0)}px) scale(${f})`;
 }
 function resizeZoom(o, corner, p) {
+  if (corner.length === 1) {   /* edge handle: the opposite edge stays put and the box stays centred on the other axis */
+    const horiz = corner === 'e' || corner === 'w', grow = corner === 'e' || corner === 's' ? 1 : -1;
+    const fixed = corner === 'e' ? o[0] : corner === 'w' ? o[0] + o[2] : corner === 's' ? o[1] : o[1] + o[3];
+    const room = Math.min(grow > 0 ? 1 - fixed : fixed, ZMAX);
+    const z = clamp(((horiz ? p[0] : p[1]) - fixed) * grow, ZMIN, Math.max(ZMIN, room));
+    const mid = horiz ? o[1] + o[3] / 2 : o[0] + o[2] / 2, along = clamp(mid - z / 2, 0, 1 - z), edge = grow > 0 ? fixed : fixed - z;
+    return horiz ? [edge, along, z, z] : [along, edge, z, z];
+  }
   const left = corner.includes('l'), top = corner.includes('t');
   const ox = left ? o[0] + o[2] : o[0], oy = top ? o[1] + o[3] : o[1];
   const room = Math.min(left ? ox : 1 - ox, top ? oy : 1 - oy, ZMAX);
@@ -991,6 +1003,7 @@ function annHTML(step, o) {
   const fresh = a => (o.animateGroup && a.reveal === o.animateGroup ? ' reveal-in' : '');
   const spots = anns.filter(a => a.type === 'spotlight');
   let s = `<svg width="1280" height="800" viewBox="0 0 1280 800" aria-hidden="true">`;
+  if (o.editing && o.zoomSel && step.zoom) s += `<rect class="zoom-body" data-zoom="1" x="${step.zoom[0] * W}" y="${step.zoom[1] * H}" width="${step.zoom[2] * W}" height="${step.zoom[3] * H}" fill="transparent"/>`;   /* drag anywhere inside the selected box to move it; annotations above it still win */
   if (spots.length) {
     const m = o.prefix + '-mask', f = o.prefix + '-feather';
     s += `<defs><filter id="${f}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter><mask id="${m}"><rect width="1280" height="800" fill="#FFFFFF"/>` +
@@ -1016,15 +1029,17 @@ function annHTML(step, o) {
     if (o.zoomSel) s += `<path d="M0 0H1280V800H0Z M${zx} ${zy}h${zw}v${zh}h${-zw}Z" fill="#0E1116" fill-opacity=".38" fill-rule="evenodd" pointer-events="none"/>`;
     s += `<g class="zoom-box" data-zoom="1"><rect x="${zx}" y="${zy}" width="${zw}" height="${zh}" rx="8" fill="none" stroke="transparent" stroke-width="20"/><rect x="${zx}" y="${zy}" width="${zw}" height="${zh}" rx="8" fill="none" stroke="#13B8A6" stroke-width="3" stroke-dasharray="12 8"/>` +
          `<rect x="${zx}" y="${ly}" width="${lw}" height="26" rx="6" fill="#13B8A6"/><text x="${zx + 10}" y="${ly + 18}" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, system-ui, sans-serif" font-size="15" font-weight="700" fill="#0E1116">${label}</text></g>`;
-    if (o.zoomSel) s += [['tl', zx, zy], ['tr', zx + zw, zy], ['bl', zx, zy + zh], ['br', zx + zw, zy + zh]].map(([c, hx, hy]) => `<rect class="zh zh-${c}" data-zoom-handle="${c}" x="${hx - 10}" y="${hy - 10}" width="20" height="20" rx="4" fill="#FFFFFF" stroke="#13B8A6" stroke-width="3"/>`).join('');
+    if (o.zoomSel) s += [['tl', zx, zy], ['tr', zx + zw, zy], ['bl', zx, zy + zh], ['br', zx + zw, zy + zh], ['n', zx + zw / 2, zy], ['s', zx + zw / 2, zy + zh], ['w', zx, zy + zh / 2], ['e', zx + zw, zy + zh / 2]].map(([c, hx, hy]) => `<rect class="zh zh-${c}" data-zoom-handle="${c}" x="${clamp(hx, 10, W - 10) - 10}" y="${clamp(hy, 10, H - 10) - 10}" width="20" height="20" rx="4" fill="#FFFFFF" stroke="#13B8A6" stroke-width="3"/>`).join('');
   }
   if (o.editing && o.selId) {
     const a = anns.find(x => x.id === o.selId);
     const b = a && annBox(a);
     if (b) {
-      const [x, y, w, h] = [b[0] - 6, b[1] - 6, b[2] + 12, b[3] + 12];
-      s += `<g pointer-events="none"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="#13B8A6" stroke-width="3" stroke-dasharray="9 6"/>` +
-           [[x, y],[x + w, y],[x, y + h],[x + w, y + h]].map(([hx, hy]) => `<rect x="${hx - 6}" y="${hy - 6}" width="12" height="12" rx="2" fill="#FFFFFF" stroke="#13B8A6" stroke-width="3"/>`).join('') + '</g>';
+      const pad = a.rect ? 0 : 6, [x, y, w, h] = [b[0] - pad, b[1] - pad, b[2] + 2 * pad, b[3] + 2 * pad];
+      s += `<rect pointer-events="none" x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="#13B8A6" stroke-width="3" stroke-dasharray="9 6"/>`;
+      if (a.rect) s += [['nw', x, y], ['n', x + w / 2, y], ['ne', x + w, y], ['e', x + w, y + h / 2], ['se', x + w, y + h], ['s', x + w / 2, y + h], ['sw', x, y + h], ['w', x, y + h / 2]]
+        .map(([c, hx, hy]) => `<rect class="ah ah-${c}" data-ann-handle="${c}" x="${clamp(hx, 8, W - 8) - 8}" y="${clamp(hy, 8, H - 8) - 8}" width="16" height="16" rx="3" fill="#FFFFFF" stroke="#13B8A6" stroke-width="3"/>`).join('');
+      else if (a.type === 'arrow') s += [['from', a.from], ['to', a.to]].map(([k, q]) => `<circle class="ah ah-pt" data-ann-handle="${k}" cx="${clamp(q[0] * W, 10, W - 10)}" cy="${clamp(q[1] * H, 10, H - 10)}" r="10" fill="#FFFFFF" stroke="#13B8A6" stroke-width="3"/>`).join('');
     }
   }
   s += '</svg>';
@@ -1279,7 +1294,7 @@ function inspStep(s) {
   <div class="row switch-row"><label for="f-zoom">Zoom into an area</label><input id="f-zoom" class="switch" type="checkbox" role="switch" data-field="zoom" ${s.zoom ? 'checked' : ''}></div>
   ${s.zoom ? `<div class="field"><div class="row"><label for="f-zamt">Zoom amount</label><output id="o-zamt" for="f-zamt">${zoomFactor(s.zoom).toFixed(1)}×</output></div><input id="f-zamt" type="range" min="1.25" max="4" step="0.05" value="${zoomFactor(s.zoom).toFixed(2)}" data-field="zoom-amount"></div>
   <div class="row" style="justify-content:flex-start; flex-wrap:wrap; gap:6px"><button class="btn secondary sm" data-act="zoom-center">${icon('target')}Center on the click</button><button class="btn secondary sm" data-act="zoom-view">${icon('eye')}See it zoomed</button></div>
-  <p class="help">The dashed box on the frame is exactly what viewers see. Drag its edge to move it, or a corner to resize it.</p>${zoomWarning(s)}` : ''}
+  <p class="help">The dashed box on the frame is exactly what viewers see. Drag inside it to move it, or drag a corner or an edge to resize it. It always keeps the frame's shape.</p>${zoomWarning(s)}` : ''}
   <section class="section"><h3>Annotations <span class="h-note">· appear in this order</span></h3>
     ${anns.length ? `<ul class="ann-list">${anns.map(a => `<li class="ann-row"><button class="ann-pick" data-act="sel-ann" data-id="${a.id}">${icon(TYPE_ICON[a.type])}<span>${esc(annName(a))}</span></button><label class="sr-only" for="rv-${a.id}">When ${esc(annName(a))} appears</label><select id="rv-${a.id}" data-field="reveal" data-id="${a.id}">${[1, 2, 3].map(g => `<option value="${g}" ${a.reveal === g ? 'selected' : ''}>${ordinal(g)}</option>`).join('')}</select><button class="icon-btn sm" data-act="del-ann" data-id="${a.id}" aria-label="Delete ${esc(annName(a))}">${icon('trash')}</button></li>`).join('')}</ul><p class="help">Items marked First appear together, then Second, then Third.</p>`
       : `<p class="help">No annotations yet. Pick Callout (<span class="kbd">C</span>), Arrow (<span class="kbd">A</span>) or Spotlight (<span class="kbd">S</span>) and use it on the frame.</p>`}
@@ -1322,7 +1337,7 @@ function inspZoom(st) {
   <div class="insp-title"><span class="ann-ic">${icon('zoom')}</span><div><h3 class="insp-h">Zoom</h3><p class="insp-sub">Viewers see only the area inside the box.</p></div></div>
   <div class="field"><div class="row"><label for="f-zamt">Zoom amount</label><output id="o-zamt" for="f-zamt">${zoomFactor(st.zoom).toFixed(1)}×</output></div><input id="f-zamt" type="range" min="1.25" max="4" step="0.05" value="${zoomFactor(st.zoom).toFixed(2)}" data-field="zoom-amount"></div>
   <div class="row" style="justify-content:flex-start; flex-wrap:wrap; gap:6px"><button class="btn secondary sm" data-act="zoom-center">${icon('target')}Center on the click</button><button class="btn secondary sm" data-act="zoom-view">${icon('eye')}See it zoomed</button></div>
-  <p class="help">The dashed box on the frame is exactly what viewers see. Drag its edge to move it, or a corner to resize it.</p>${zoomWarning(st)}
+  <p class="help">The dashed box on the frame is exactly what viewers see. Drag inside it to move it, or drag a corner or an edge to resize it. It always keeps the frame's shape.</p>${zoomWarning(st)}
   <button class="btn danger-ghost" data-act="zoom-remove">${icon('trash')}Remove zoom</button>`;
 }
 function annGeom(st, a) {
@@ -1659,6 +1674,15 @@ function syncZoomField() {
   const st = stepById(selStepId()), f = $('#f-zamt'), o = $('#o-zamt');
   if (st && st.zoom && f && o) { const a = zoomFactor(st.zoom); f.value = a.toFixed(2); o.textContent = a.toFixed(1) + '×'; }
 }
+/* drags one edge or corner of a rectangle (normalised coordinates), never below 8 px */
+function resizeRect(o, ed, dx, dy) {
+  const mw = 8 / W, mh = 8 / H; let [x, y, w, h] = o;
+  if (ed.includes('w')) { x = clamp(o[0] + dx, 0, o[0] + o[2] - mw); w = o[0] + o[2] - x; }
+  if (ed.includes('e')) w = clamp(o[2] + dx, mw, 1 - o[0]);
+  if (ed.includes('n')) { y = clamp(o[1] + dy, 0, o[1] + o[3] - mh); h = o[1] + o[3] - y; }
+  if (ed.includes('s')) h = clamp(o[3] + dy, mh, 1 - o[1]);
+  return [x, y, w, h];
+}
 const rectFrom = (a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])];
 function moveAnn(a, o, dx, dy) {
   const mv = p => [clamp(p[0] + dx, 0, 1), clamp(p[1] + dy, 0, 1)];
@@ -1673,12 +1697,15 @@ frameEl.addEventListener('pointerdown', e => {
   if (viewerish()) { play(); return; }
   const p = toFrame(e), st = currentStep();
   const annTarget = e.target.closest('[data-ann]'), blurTarget = e.target.closest('[data-blur]');
-  const zHandle = e.target.closest('[data-zoom-handle]'), zBox = e.target.closest('[data-zoom]');
+  const zHandle = e.target.closest('[data-zoom-handle]'), zBox = e.target.closest('[data-zoom]'), aHandle = e.target.closest('[data-ann-handle]');
   if (ui.tool === 'pin') { pinStep(p); return; }
   if (ui.tool === 'select') {
     if (st && st.zoom && (zHandle || zBox)) {
       ui.sel = { kind:'zoom', stepId:st.id }; ui.tab = 'selection'; renderSteps(); renderAtTime(); renderInspector(); renderTimeline();
       drag = { kind: zHandle ? 'resize-zoom' : 'move-zoom', corner: zHandle ? zHandle.dataset.zoomHandle : null, step:st, orig:st.zoom.slice(), start:p, snap:clone(doc), moved:false };
+    } else if (aHandle && st && ui.sel && ui.sel.kind === 'ann') {
+      const a = st.annotations.find(x => x.id === ui.sel.id); if (!a) return;
+      drag = { kind:'resize-ann', step:st, ann:a, edge:aHandle.dataset.annHandle, orig:clone(a), start:p, snap:clone(doc), moved:false };
     } else if (annTarget && st) {
       const a = st.annotations.find(x => x.id === annTarget.dataset.ann); if (!a) return;
       selectAnn(st, a.id);
@@ -1712,15 +1739,14 @@ frameEl.addEventListener('pointermove', e => {
     drag.step.zoom = drag.kind === 'move-zoom' ? [clamp(o[0] + dx, 0, 1 - o[2]), clamp(o[1] + dy, 0, 1 - o[3]), o[2], o[3]] : resizeZoom(o, drag.corner, p);
     last.annKey = null; renderAtTime(); syncZoomField();
   }
+  else if (drag.kind === 'resize-ann') {
+    if (Math.abs(dx) + Math.abs(dy) > 0.002) drag.moved = true;
+    if (drag.edge === 'from' || drag.edge === 'to') drag.ann[drag.edge] = p; else drag.ann.rect = resizeRect(drag.orig.rect, drag.edge, dx, dy);
+    last.annKey = null; renderAtTime();
+  }
   else if (drag.kind === 'resize-blur') {
     if (Math.abs(dx) + Math.abs(dy) > 0.002) drag.moved = true;
-    const [ox, oy, ow, oh] = drag.orig.rect, ed = drag.edge, mw = 8 / W, mh = 8 / H;
-    let [x, y, w, h] = [ox, oy, ow, oh];
-    if (ed.includes('w')) { x = clamp(ox + dx, 0, ox + ow - mw); w = ox + ow - x; }
-    if (ed.includes('e')) w = clamp(ow + dx, mw, 1 - ox);
-    if (ed.includes('n')) { y = clamp(oy + dy, 0, oy + oh - mh); h = oy + oh - y; }
-    if (ed.includes('s')) h = clamp(oh + dy, mh, 1 - oy);
-    drag.blur.rect = [x, y, w, h]; renderAtTime();
+    drag.blur.rect = resizeRect(drag.orig.rect, drag.edge, dx, dy); renderAtTime();
   }
   else if (drag.kind === 'move-blur') { if (Math.abs(dx) + Math.abs(dy) > 0.002) drag.moved = true; const r = drag.orig.rect; drag.blur.rect = [clamp(r[0] + dx, 0, 1 - r[2]), clamp(r[1] + dy, 0, 1 - r[3]), r[2], r[3]]; renderAtTime(); }
   else { drag.cur = p; drawDraft(); }
@@ -1729,7 +1755,7 @@ frameEl.addEventListener('pointerleave', () => { if (!drag && ui.tool === 'pin')
 function endDrag() {
   if (!drag) return;
   const d = drag; drag = null; draftEl.innerHTML = '';
-  if (d.kind === 'move-ann' || d.kind === 'move-blur' || d.kind === 'resize-blur') { if (d.moved) { pushUndo(d.snap); renderSteps(); renderTimeline(); } renderInspector(); return; }
+  if (d.kind === 'move-ann' || d.kind === 'resize-ann' || d.kind === 'move-blur' || d.kind === 'resize-blur') { if (d.moved) { pushUndo(d.snap); renderSteps(); renderTimeline(); } renderInspector(); return; }
   if (d.kind === 'move-zoom' || d.kind === 'resize-zoom') { if (d.moved) pushUndo(d.snap); renderInspector(); return; }
   const small = Math.abs(d.cur[0] - d.start[0]) < 0.015 && Math.abs(d.cur[1] - d.start[1]) < 0.015;
   let r = rectFrom(d.start, d.cur);
