@@ -54,8 +54,8 @@ From the editor screenshot (described in [01-feature-analysis.md](01-feature-ana
 - **Top bar:** app mark, back to Projects, editable project name, undo/redo, then Preview, an Export menu (MP4, PDF, Screenshots, Guide folder) and the primary **Share** button (publishes the guide and copies the embed snippet).
 - **Step rail (left):** numbered step cards with thumbnail and title; drag to reorder in time; selecting a card jumps the playhead there. A small warning badge marks orphaned steps.
 - **Canvas (centre):** a floating tool palette on top, with an **Edit / Viewer** switch beside it. *Edit* shows every annotation at once with handles and the dashed zoom box. *Viewer* shows the step exactly as the published guide does: the zoom eases in and annotations appear in their reveal order. Playback always uses the viewer rendering and stops on every pin until you click Continue, press Space or click the frame. The Pin tool (P) pins the current frame and drops a click marker where you click.
-- **Inspector (right):** context-driven. It shows Step, Annotation, Blur region or Clip properties for the selection. With nothing selected it shows the **Guide** panel: Frame (background, padding, corners, shadow, aspect), Logo, Player (mode, controls, accent, CTA), Audio (original, voice, music) and Analytics.
-- **Timeline (bottom):** transport and timecode on one row; ruler; labelled lanes for Video, Steps, Blur, Voice and Music. Teal playhead. Split at playhead with ⌘B. The lanes are resizable, and the timeline fits to width until you zoom.
+- **Inspector (right):** context-driven, in the style of DaVinci Resolve's inspector. The first tab is **Inspector** and shows collapsible groups for whatever is selected: Step, Annotation, Blur region, Narration, Music or Clip. Every value is a slider with a number box and a reset button (double-click a name to reset it), and times are typed as timecodes. Blur has Timing (start, end, length, fades), Position and size in pixels, and Effect (style, amount, fill, opacity); Narration and Music have Timing, fades, volume, mute and ducking. The second tab, **Guide**, holds the project-wide options: Frame (background, padding, corners, shadow, aspect), Logo, Player (mode, controls, accent, CTA), Audio (original, voice, music) and Analytics.
+- **Timeline (bottom):** transport and timecode on one row; ruler; labelled lanes for Video, Steps, Blur, Voice and Music. Teal playhead, which only the **ruler** moves; clicking in a lane never scrubs. Pins, blur bars, voice bars and the music bar drag to move, and the edges of blur, voice and music bars drag to trim (stretching a voice bar changes its speaking speed). The edges of a clip on the Video lane drag to trim it: with **ripple trim** on (the default, ⇧R toggles it) the clips ripple and everything after moves up; with it off, the trim leaves a hatched **gap** and nothing else moves (select a gap to resize or close it, and the last frame of the previous clip holds through it). Trimmed footage can be dragged back out, and a trim stops at any pinned step. A **magnet** button (N) turns on snapping: edges snap to the nearest edge on any lane, the playhead and the ends of the guide (clip trims snap to a pin's frame, a blur edge, another clip's edge or the playhead), with an amber guide line; holding Alt flips it for one drag. Split at playhead with R. Transport keys follow DaVinci Resolve's J K L: **L** plays forward (press again for 2×, then 4×), **J** plays backward the same way, **K** plays or pauses (like Space), and all of them stop at every pinned step. **⇧L** / **⇧J** jump to the next / previous edit (any cut, pin, or start or end of a blur, voice or music bar), **⌘,** plays from the very start, **⌘.** jumps to the very end, and **=** / **-** zoom the timeline in and out (1× to 8×, following the playhead). The lanes are resizable, and the timeline fits to width until you zoom.
 - **Empty project:** the canvas becomes a drop zone ("Drop a screen recording: MP4, MOV, WebM, MKV", Browse…, Record screen) with a three-step hint: *1. Pin the moments that matter (P) · 2. Point things out · 3. Share*.
 
 ## Identity: "Coral & Graphite"
@@ -195,15 +195,25 @@ Chosen to avoid the browser shortcuts a web page can't override (⌘T, ⌘W, ⌘
 
 | Action | Shortcut |
 |---|---|
-| Play/pause | Space |
+| Play/pause | Space or K |
+| Play forward (press again for 2×, then 4×) | L |
+| Play backward (press again for 2×, then 4×) | J |
 | Previous/next frame | ← / → |
 | Jump 1 s | ⇧← / ⇧→ |
 | Previous/next step | ⌥← / ⌥→ |
+| Previous/next edit (any cut, pin, or start or end of a blur, voice or music bar) | ⇧J / ⇧L |
+| Play from the very start / jump to the very end | ⌘, / ⌘. |
+| Zoom the timeline in / out | = / - |
+| Select the layer below / above | ⇧K / ⇧I |
 | Pin step at playhead | ⇧P |
-| Tools: select, pin, callout, arrow, spotlight, box, zoom, blur | V, P, C, A, S, R, Z, B |
-| Split clip at playhead | ⌘B |
+| Tools: select, pin, callout, arrow, spotlight, box, zoom, blur | V, P, C, A, S, B, Z, X |
+| Split clip at playhead | R |
+| Snapping on/off (hold Alt to flip it for one drag) | N |
+| Ripple trim on/off | ⇧R |
 | Delete selection | ⌫ |
 | Undo / redo | ⌘Z / ⇧⌘Z |
 | Command palette | ⌘K |
 | Preview guide | ⌘↩ |
 | Export menu | ⌘E |
+
+L, J and K follow DaVinci Resolve and, like Space, stop at every pinned step. On Windows and Linux use Ctrl in place of ⌘. Some browsers keep ⌘, for their own settings; if yours does, use the command palette's "Play from the very start".

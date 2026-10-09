@@ -26,7 +26,7 @@ Build order for the OpenPin web app. Each phase ends with something usable, and 
 
 ## Phase 2 — Edit and polish
 
-- F2 timeline editing: trim, split (⌘B), delete range, per-clip speed (⅓×–5×), with source-time anchoring and orphaned-step warnings. Fit-to-width timeline with zoom.
+- F2 timeline editing: trim, split (R), delete range, per-clip speed (⅓×–5×), with source-time anchoring and orphaned-step warnings. Fit-to-width timeline with zoom.
 - F7 blur regions with keyframes (gaussian, pixelate, solid) and a Blur lane.
 - F5 zoom/focus per step; F6 reveal-order groups.
 - F18 background framing and presets; F19 logo.
