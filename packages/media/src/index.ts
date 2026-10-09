@@ -1,3 +1,4 @@
-/* @waypost/media: import, frame index, thumbnails and frame reads in a worker.
-   Empty until Phase 1 (see docs/04-roadmap.md). */
-export {};
+/* @waypost/media: reads recordings in a worker: what they contain, the time of every frame, exact frame reads. */
+export { createMediaClient, MediaUnsupportedError, type MediaClient, type MediaHandle } from './client';
+export { FrameIndex } from './frame-index';
+export type { MediaInfo } from './reader';

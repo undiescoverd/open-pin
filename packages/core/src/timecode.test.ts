@@ -44,3 +44,11 @@ describe('parseTimecode', () => {
     for (const s of [0, 0.01, 2.1, 59.99, 60, 61.5, 600.75]) expect(parseTimecode(formatTimecode(s))).toBeCloseTo(s, 9);
   });
 });
+
+describe('formatTimecode with milliseconds', () => {
+  it('shows three digits', () => {
+    expect(formatTimecode(5.8, 3)).toBe('0:05.800');
+    expect(formatTimecode(75.2504, 3)).toBe('1:15.250');
+    expect(formatTimecode(59.9996, 3)).toBe('1:00.000');
+  });
+});

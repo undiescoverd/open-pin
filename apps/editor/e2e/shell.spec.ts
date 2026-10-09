@@ -1,14 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-
-/* Fails the test on any console error or uncaught exception. */
-function watchErrors(page: Page) {
-  const errors: string[] = [];
-  page.on('pageerror', e => errors.push(e.message));
-  page.on('console', m => {
-    if (m.type() === 'error') errors.push(m.text());
-  });
-  return errors;
-}
+import { openRecording, watchErrors } from './helpers';
 
 test.describe('editor shell', () => {
   test('shows the empty editor with every pane', async ({ page }) => {
@@ -23,7 +14,7 @@ test.describe('editor shell', () => {
     await expect(page.getByRole('heading', { name: 'Drop a screen recording' })).toBeVisible();
     await expect(page.getByRole('toolbar', { name: 'Tools' }).getByRole('button')).toHaveCount(8);
     for (const lane of ['Video', 'Steps', 'Blur', 'Voice', 'Music']) await expect(page.getByLabel(`${lane} lane, empty`)).toBeVisible();
-    await expect(page.getByText('0:00.00 / 0:00.00')).toBeVisible();
+    await expect(page.getByText('0:00.000 / 0:00.000')).toBeVisible();
     expect(errors).toEqual([]);
   });
 
@@ -34,26 +25,42 @@ test.describe('editor shell', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('tool keys pick tools, but not while typing', async ({ page }) => {
+  test('tools wait for a recording, then keys pick them, but not while typing', async ({ page }) => {
     await page.goto('/');
     const tools = page.getByRole('toolbar', { name: 'Tools' });
+    await expect(tools.getByRole('button', { name: 'Pin' })).toBeDisabled();
+    await page.keyboard.press('p');
     await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
+
+    await openRecording(page);
     await page.keyboard.press('p');
     await expect(tools.getByRole('button', { name: 'Pin' })).toHaveAttribute('aria-pressed', 'true');
     await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'false');
     await page.keyboard.press('Shift+X'); /* Shift isn't a tool chord, so nothing changes */
     await expect(tools.getByRole('button', { name: 'Pin' })).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('x');
-    await expect(tools.getByRole('button', { name: 'Blur' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('b');
+    await expect(tools.getByRole('button', { name: 'Box' })).toHaveAttribute('aria-pressed', 'true');
 
     const name = page.getByRole('textbox', { name: 'Guide name' });
     await name.fill('');
     await name.pressSequentially('vpc');
     await expect(name).toHaveValue('vpc');
-    await expect(tools.getByRole('button', { name: 'Blur' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(tools.getByRole('button', { name: 'Box' })).toHaveAttribute('aria-pressed', 'true');
 
-    await tools.getByRole('button', { name: 'Zoom' }).click();
-    await expect(tools.getByRole('button', { name: 'Zoom' })).toHaveAttribute('aria-pressed', 'true');
+    await tools.getByRole('button', { name: 'Callout' }).click();
+    await expect(tools.getByRole('button', { name: 'Callout' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Escape');
+    await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('Zoom and Blur say they are coming rather than doing nothing', async ({ page }) => {
+    await openRecording(page);
+    const tools = page.getByRole('toolbar', { name: 'Tools' });
+    await expect(tools.getByRole('button', { name: 'Zoom' })).toBeDisabled();
+    await expect(tools.getByRole('button', { name: 'Blur' })).toBeDisabled();
+    await page.keyboard.press('x');
+    await expect(page.getByRole('status').filter({ hasText: 'Blur: blur arrives' })).toBeVisible();
+    await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('N toggles snapping and Shift+R toggles ripple trim', async ({ page }) => {
@@ -65,11 +72,10 @@ test.describe('editor shell', () => {
     await expect(snap).toHaveAttribute('aria-pressed', 'false');
     await page.keyboard.press('Shift+R');
     await expect(ripple).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.getByRole('toolbar', { name: 'Tools' }).getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('icon buttons show their tooltip and shortcut on keyboard focus', async ({ page }) => {
-    await page.goto('/');
+    await openRecording(page);
     await page.getByRole('toolbar', { name: 'Tools' }).getByRole('button', { name: 'Callout' }).focus();
     await expect(page.getByRole('tooltip')).toHaveText(/^Callout/);
     /* the visible tooltip carries the key cap */

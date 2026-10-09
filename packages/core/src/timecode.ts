@@ -1,11 +1,15 @@
 /* Timecodes as the editor shows and accepts them: m:ss.cc (minutes, seconds, hundredths), e.g. 0:05.80 or 12:03.25. */
 
-/** Formats seconds as m:ss.cc. Rounds to the hundredth first, so 59.996 reads 1:00.00 rather than 0:60.00. Negative values clamp to 0. */
-export function formatTimecode(seconds: number): string {
-  const t = Math.round(Math.max(0, seconds) * 100) / 100;
+/**
+ * Formats seconds as m:ss.cc, or m:ss.mmm with `digits` 3 (the transport readout). Rounds to the last digit first, so 59.996 reads
+ * 1:00.00 rather than 0:60.00. Negative values clamp to 0.
+ */
+export function formatTimecode(seconds: number, digits: 2 | 3 = 2): string {
+  const scale = 10 ** digits;
+  const t = Math.round(Math.max(0, seconds) * scale) / scale;
   const minutes = Math.floor(t / 60);
   const rest = t - minutes * 60;
-  return `${minutes}:${rest.toFixed(2).padStart(5, '0')}`;
+  return `${minutes}:${rest.toFixed(digits).padStart(digits + 3, '0')}`;
 }
 
 /**

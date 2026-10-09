@@ -14,6 +14,8 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 
 ## Phase 1 — MVP: pin, annotate, export stills
 
+**Status: built.** The acceptance test is `apps/editor/e2e/phase1.spec.ts`. Differences from the plan are listed under [Phase 1 as built](#phase-1-as-built) below.
+
 - F1 import (drag-drop/browse; MP4, MOV, WebM, MKV) into OPFS; frame index and thumbnails in the media worker.
 - Canvas preview, transport, exact frame stepping, millisecond timecode.
 - F3 Pin tool (click on the frame → step + click marker) and "+ Pin step"; step rail; Steps lane on the timeline.
@@ -23,6 +25,15 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 - F14 PDF export (A4/Letter, 16:9) and F15 PNG/WebP export (zip). F21 copy/save frame.
 
 **Done when** you can drop in a QuickTime recording, pin 5 steps, annotate them, reload the page without losing anything, and export a PDF and PNGs that match the canvas (screenshot tests pass).
+
+### Phase 1 as built
+
+- **Export runs on the main thread**, not in an export worker. It yields between steps, the frames come from the media worker, and nothing else moves while the busy overlay shows. Moving it to a worker is a Phase 2 task, since MP4 needs one anyway. There is no cancel button yet for the same reason.
+- **Recordings the browser can't decode** (for example ProRes) are refused with a message. The one-time H.264 editing proxy from the architecture doc isn't built.
+- **Zoom and Blur tools** are in the palette but disabled; their keys say they're coming. The Ripple trim button is a placeholder until clip trimming.
+- **Pause (`minHold`)** is stored and editable per step, but nothing uses it until the guide and MP4 exports.
+- **The PDF** is checked for page count, size, title and an embedded image per page, and the PNG export is compared pixel for pixel with the canvas. The PDF's pages are not rasterised and compared, so its layout is checked by eye.
+- **Annotation snapshots** (`apps/editor/e2e/*-snapshots`) are Linux Chromium renders. Update them with `--update-snapshots` after an intended drawing change.
 
 ## Phase 2 — Edit and polish
 
