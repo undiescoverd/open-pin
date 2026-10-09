@@ -52,7 +52,7 @@ Defaults and ranges are the tested ones. Units: s = seconds, % = percent, px = p
 | | fade in / out | 0 s | 0–10 s |
 | | lower under narration | on, to 35% | 0–100% |
 
-Narration length in the mockup is an estimate (TTS: 0.6 s + 0.38 s per word of the title; recorded: 2.4 s), divided by speaking speed. The real app uses the real audio length. A step's effective pause is `max(hold, voice offset (if > 0) + voice length + 0.4 s)`.
+Narration length is the clip's real length for a recording or an imported file. Generated voice starts as an estimate (0.6 s + 0.38 s per word of the script, or of the title when the script is empty) and takes the measured length the first time it plays. Either is divided by speaking speed. A step whose source is a recording or a file but has no clip yet shows a dashed placeholder bar and adds nothing to the pause. A step's effective pause is `max(hold, voice offset (if > 0) + voice length + 0.4 s)`.
 
 ## 3. Selection
 
@@ -161,6 +161,7 @@ An unselected zoom box is selected by its dashed outline only, so it never block
 - **Ends:** forward at the end restarts from 0:00; backward at 0:00 does nothing; reaching either end pauses.
 - **Jumps:** `⌥←` / `⌥→` previous / next **step**. `⇧J` / `⇧L` previous / next **edit**: the nearest of every snap target listed in 4.4 (pins, cuts, gap edges, voice, blur and music starts and ends, the ends). `⌘,` plays from the very start; `⌘.` pauses at the very end. `←` / `→` step one frame; `⇧←` / `⇧→` jump one second.
 - The status chip reads "Playing 2×" or "Rewinding 4×" while shuttling.
+- **Narration plays while playing forward**, from wherever the playhead enters a voice bar. Recorded and imported clips follow the playhead, the playback speed (pitch kept), volume and fades. Generated voice can't seek or fade, so it only starts within 0.35 s of the bar's start and ignores fades. Pausing, stopping at a step, scrubbing or playing backward silences it. `M` turns sound off; the guide preview uses the same setting.
 
 ## 7. Inspector
 
@@ -186,7 +187,7 @@ Every numeric value is one row: **label, reset button, slider, number box with i
 | Clip | **Trim** (In, Out, Plays for), **Speed** (presets and a number), **Audio** (volume, mute), split at playhead |
 | Gap | Length, close gap |
 | Blur | Name, **Timing** (start, end, length, start/end at playhead, fades), **Position and size**, **Effect** (style, amount, fill, opacity) |
-| Narration | Voice, **Timing** (start, offset, speaking speed, fades), **Audio** (volume, mute) |
+| Narration | **Source** (generated voice, recorded voice, audio file, original audio, none) and its controls: voice, script and Preview; Record with a level meter and a 2-minute cap; choose, replace or remove a file. **Timing** (start, offset, speaking speed, fades), **Audio** (volume, mute) |
 | Music | **Timing** (start, end, length, start/end at playhead, play to the end, fades), **Audio** (volume, mute, lower under narration and by how much) |
 
 ## 8. Undo and redo
@@ -212,6 +213,7 @@ No shortcut fires while a dialog is open. Typing in a text, number or text-area 
 | `R` | Split the clip at the playhead |
 | `N` | Snapping on or off (hold `Alt` to flip it for one drag) |
 | `⇧R` | Ripple trim on or off |
+| `M` | Sound on or off |
 | `Delete` | Delete the selection |
 | `Esc` | See section 3 |
 | `⌘Z` `⇧⌘Z` | Undo, redo |
@@ -242,10 +244,12 @@ Written so each can become an automated test in the real editor. The sample proj
 16. Typing 3 into a blur's Start field and pressing Enter sets 0:03.00; ⌘Z reverts it; typing a start after the end is refused and the field reverts.
 17. Editing a number, then immediately clicking a segmented button, applies both.
 18. `R` splits at the playhead; `⌘B` does nothing; `B` selects Box and `X` selects Blur.
+19. Importing a 1.5 s audio file as a step's narration makes its voice bar 1.5 s long with a waveform; playing from that pin plays it; ⌘Z removes the clip again and ⇧⌘Z brings it back.
+20. Playing from a pin with generated voice speaks the step's script; pausing stops the speech; with sound off (`M`) nothing is spoken.
 
 ## Gaps the mockup does not cover
 
-- **No audio.** Volume, fades, mute and ducking are stored and shown but not played, and narration length is an estimate.
+- **Only narration makes sound.** Music, the clip audio and ducking are stored and shown but not played. Generated voice is the browser's speech engine (Kokoro in the app), so it varies by device and can't seek or fade. Recording needs microphone access, which an embedded or published copy of the mockup may not get.
 - **The preview player ignores gaps.** It steps between pinned steps rather than playing the timeline, so gaps and speed changes don't show there yet; exports must honour them.
 - **Blur is approximated** with a CSS backdrop filter. It must be a true, irreversible redaction in the renderer and in every export, and blur regions should get keyframes (F7).
 - **No clip reordering**, no ripple delete of a range, and no keyboard nudging of timeline items (the Inspector's typed fields are the keyboard route).
