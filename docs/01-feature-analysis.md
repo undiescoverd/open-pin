@@ -128,7 +128,7 @@ Phases are defined in [04-roadmap.md](04-roadmap.md). Libraries named below are 
 
 **One renderer everywhere.** `@openpin/render` draws annotations onto a canvas. The editor preview, the published player and every export (PNG, WebP, PDF, MP4) call the *same function*, so what you see is exactly what you export and what viewers get. In the native plan this needed two renderers plus parity tests; going web removes that. Annotation text uses a bundled font (Figtree) so output looks identical on every machine.
 
-**Zoom.** The compositor applies an eased scale and translate before drawing annotations. In the player, the step still is full resolution, so zoom stays sharp.
+**Zoom.** The zoom box always keeps the frame's shape, so the box *is* what viewers will see. Its size and the zoom amount are one setting (1.25× to 4×): drag a corner of the box or move the Zoom amount slider. Drag the box's edge to move it, or center it on the step's click marker. The compositor applies an eased scale and translate before drawing annotations. In the player, the step still is full resolution, so zoom stays sharp.
 
 ## F6 — Annotation reveal order
 
