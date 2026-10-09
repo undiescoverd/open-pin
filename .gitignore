@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+playwright-report/
+test-results/
+blob-report/
+.wrangler/
+.DS_Store
+.env
+.env.*

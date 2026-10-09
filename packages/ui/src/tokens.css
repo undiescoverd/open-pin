@@ -1,0 +1,149 @@
+/* Generated from design/tokens.json by scripts/build-tokens.mjs. Do not edit; run `pnpm tokens`. */
+
+:root {
+  --wp-ann-coral: #FF5A4E;
+  --wp-ann-marigold: #FFB020;
+  --wp-ann-lagoon: #13B8A6;
+  --wp-ann-iris: #6E6BFF;
+  --wp-ann-snow: #FFFFFF;
+  --wp-ann-ink: #0E1116;
+  --wp-font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --wp-font-brand: "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --wp-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --wp-text-xs: 11px;
+  --wp-text-sm: 12px;
+  --wp-text-base: 13px;
+  --wp-text-md: 15px;
+  --wp-text-lg: 18px;
+  --wp-text-xl: 22px;
+  --wp-text-2xl: 28px;
+  --wp-radius-sm: 6px;
+  --wp-radius-md: 10px;
+  --wp-radius-lg: 14px;
+  --wp-radius-pill: 999px;
+  --wp-motion-ui: 160ms;
+  --wp-motion-zoom: 450ms;
+  --wp-motion-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --wp-motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* light is the default; [data-theme] on any element forces a theme for that subtree */
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --wp-app: #ECEFF3;
+  --wp-panel: #FFFFFF;
+  --wp-raised: #F6F7F9;
+  --wp-line: #D9DDE4;
+  --wp-line-strong: #B7BEC9;
+  --wp-fg: #0E1116;
+  --wp-fg-muted: #5A6372;
+  --wp-fg-disabled: #B7BEC9;
+  --wp-pin: #D13A30;
+  --wp-on-pin: #FFFFFF;
+  --wp-pin-tint: #FFE3E0;
+  --wp-pin-line: #F2A59E;
+  --wp-primary: #D13A30;
+  --wp-primary-hover: #B9322A;
+  --wp-on-primary: #FFFFFF;
+  --wp-sel: #0E8F81;
+  --wp-sel-strong: #0B7568;
+  --wp-sel-tint: rgba(14, 143, 129, 0.12);
+  --wp-danger: #B4261C;
+  --wp-danger-tint: rgba(180, 38, 28, 0.08);
+  --wp-snap: #FFB020;
+  --wp-switch-off: #8A93A3;
+  --wp-clip: #DDE3EB;
+  --wp-clip-line: #AEB7C4;
+  --wp-voice: #E7E6FF;
+  --wp-voice-line: #7B78F0;
+  --wp-music: #FFF1D6;
+  --wp-music-line: #D99A16;
+  --wp-hatch: rgba(90, 99, 114, 0.16);
+  --wp-scrim: rgba(14, 17, 22, 0.5);
+  --wp-glass: rgba(255, 255, 255, 0.86);
+  --wp-inverse: #0E1116;
+  --wp-on-inverse: #FFFFFF;
+  --wp-shadow-panel: 0 1px 2px rgba(14, 17, 22, 0.05), 0 6px 20px rgba(14, 17, 22, 0.06);
+  --wp-shadow-pop: 0 18px 60px rgba(14, 17, 22, 0.22);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --wp-app: #0E1116;
+    --wp-panel: #161A21;
+    --wp-raised: #1F242D;
+    --wp-line: #2B313C;
+    --wp-line-strong: #3B4250;
+    --wp-fg: #ECEFF3;
+    --wp-fg-muted: #8A93A3;
+    --wp-fg-disabled: #3B4250;
+    --wp-pin: #FF5A4E;
+    --wp-on-pin: #0E1116;
+    --wp-pin-tint: rgba(255, 90, 78, 0.14);
+    --wp-pin-line: rgba(255, 90, 78, 0.45);
+    --wp-primary: #D13A30;
+    --wp-primary-hover: #B9322A;
+    --wp-on-primary: #FFFFFF;
+    --wp-sel: #13B8A6;
+    --wp-sel-strong: #3FD1C0;
+    --wp-sel-tint: rgba(19, 184, 166, 0.16);
+    --wp-danger: #FF7B71;
+    --wp-danger-tint: rgba(255, 123, 113, 0.12);
+    --wp-snap: #FFB020;
+    --wp-switch-off: #6B7484;
+    --wp-clip: #283040;
+    --wp-clip-line: #46505F;
+    --wp-voice: rgba(110, 107, 255, 0.2);
+    --wp-voice-line: #8F8CFF;
+    --wp-music: rgba(255, 176, 32, 0.14);
+    --wp-music-line: #E5A11F;
+    --wp-hatch: rgba(138, 147, 163, 0.18);
+    --wp-scrim: rgba(5, 7, 10, 0.66);
+    --wp-glass: rgba(22, 26, 33, 0.86);
+    --wp-inverse: #ECEFF3;
+    --wp-on-inverse: #0E1116;
+    --wp-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --wp-shadow-pop: 0 18px 60px rgba(0, 0, 0, 0.55);
+  }
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --wp-app: #0E1116;
+  --wp-panel: #161A21;
+  --wp-raised: #1F242D;
+  --wp-line: #2B313C;
+  --wp-line-strong: #3B4250;
+  --wp-fg: #ECEFF3;
+  --wp-fg-muted: #8A93A3;
+  --wp-fg-disabled: #3B4250;
+  --wp-pin: #FF5A4E;
+  --wp-on-pin: #0E1116;
+  --wp-pin-tint: rgba(255, 90, 78, 0.14);
+  --wp-pin-line: rgba(255, 90, 78, 0.45);
+  --wp-primary: #D13A30;
+  --wp-primary-hover: #B9322A;
+  --wp-on-primary: #FFFFFF;
+  --wp-sel: #13B8A6;
+  --wp-sel-strong: #3FD1C0;
+  --wp-sel-tint: rgba(19, 184, 166, 0.16);
+  --wp-danger: #FF7B71;
+  --wp-danger-tint: rgba(255, 123, 113, 0.12);
+  --wp-snap: #FFB020;
+  --wp-switch-off: #6B7484;
+  --wp-clip: #283040;
+  --wp-clip-line: #46505F;
+  --wp-voice: rgba(110, 107, 255, 0.2);
+  --wp-voice-line: #8F8CFF;
+  --wp-music: rgba(255, 176, 32, 0.14);
+  --wp-music-line: #E5A11F;
+  --wp-hatch: rgba(138, 147, 163, 0.18);
+  --wp-scrim: rgba(5, 7, 10, 0.66);
+  --wp-glass: rgba(22, 26, 33, 0.86);
+  --wp-inverse: #ECEFF3;
+  --wp-on-inverse: #0E1116;
+  --wp-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --wp-shadow-pop: 0 18px 60px rgba(0, 0, 0, 0.55);
+}

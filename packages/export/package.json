@@ -1,0 +1,13 @@
+{
+  "name": "@waypost/export",
+  "description": "PNG/WebP, PDF and MP4 export jobs, the guide bundle writer and zip.",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

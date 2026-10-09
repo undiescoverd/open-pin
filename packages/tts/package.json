@@ -1,0 +1,13 @@
+{
+  "name": "@waypost/tts",
+  "description": "On-device text-to-speech: Kokoro worker wrapper and voice list.",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

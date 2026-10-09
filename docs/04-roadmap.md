@@ -1,6 +1,6 @@
 # 04 — Roadmap
 
-Build order for the OpenPin web app. Each phase ends with something usable, and later phases never block earlier ones. Feature IDs (F1–F22) refer to [01-feature-analysis.md](01-feature-analysis.md).
+Build order for the Waypost web app. Each phase ends with something usable, and later phases never block earlier ones. Feature IDs (F1–F22) refer to [01-feature-analysis.md](01-feature-analysis.md).
 
 ## Phase 0 — Scaffold
 
@@ -18,8 +18,8 @@ Build order for the OpenPin web app. Each phase ends with something usable, and 
 - Canvas preview, transport, exact frame stepping, millisecond timecode.
 - F3 Pin tool (click on the frame → step + click marker) and "+ Pin step"; step rail; Steps lane on the timeline.
 - F4 titles and notes.
-- F5 annotations: callout, arrow, spotlight, box, click marker, all drawn by `@openpin/render`.
-- F22 undo/redo; autosave; project list; save/open `.openpin` files.
+- F5 annotations: callout, arrow, spotlight, box, click marker, all drawn by `@waypost/render`.
+- F22 undo/redo; autosave; project list; save/open `.waypost` files.
 - F14 PDF export (A4/Letter, 16:9) and F15 PNG/WebP export (zip). F21 copy/save frame.
 
 **Done when** you can drop in a QuickTime recording, pin 5 steps, annotate them, reload the page without losing anything, and export a PDF and PNGs that match the canvas (screenshot tests pass).
@@ -36,7 +36,7 @@ Build order for the OpenPin web app. Each phase ends with something usable, and 
 
 ## Phase 3 — Interactive guide
 
-- `@openpin/player`: state machine, segment/still swap, annotations via `@openpin/render`, controls, keyboard, `aria-live`, reduced motion, Shadow DOM, `[data-openpin]` auto-mount, lazy loading.
+- `@waypost/player`: state machine, segment/still swap, annotations via `@waypost/render`, controls, keyboard, `aria-live`, reduced motion, Shadow DOM, `[data-waypost]` auto-mount, lazy loading.
 - F9 branding and playback modes; F10 CTA.
 - Guide bundle export (folder via the File System Access API, or zip): segments, stills, `guide.json`, `index.html`, compressed `guide.pdf`.
 - F11 embed snippet sheet (script and iframe variants).
@@ -58,6 +58,7 @@ Build order for the OpenPin web app. Each phase ends with something usable, and 
 - "Share" publishing adapters: GitHub Pages (via a GitHub token you provide, kept in the browser), then S3-compatible storage (AWS S3, Cloudflare R2, Backblaze B2).
 - Stable per-step URLs for hosted WebP and PDF copies.
 - F12: player beacons (opt-in per guide), the reference Cloudflare Worker + D1 collector with daily-salt visitor hashing, and a per-step reach funnel in the editor.
+- Purchase and licence-key unlock (see the open questions below).
 
 **Done when** "Share" produces a working public link and embed snippet, and the stats view shows drop-off for a test guide.
 
@@ -68,10 +69,14 @@ Build order for the OpenPin web app. Each phase ends with something usable, and 
 - Auto-redaction suggestions (OCR + patterns) and a blur tracking assist.
 - Auto step titles from OCR, with an optional LLM polish using your own API key.
 - Markdown/HTML SOP export.
-- PWA polish: offline, open `.openpin` files from Finder, "Install OpenPin".
+- PWA polish: offline, open `.waypost` files from Finder, "Install Waypost".
 
 ## Open questions for the owner
 
-1. **License:** MIT recommended.
-2. **Name and logo:** "OpenPin" is distinct from "FramePin"; confirm before designing the app mark.
-3. **Hosting the editor:** Cloudflare Pages (recommended, free, supports custom headers) or GitHub Pages.
+Decided: **Waypost** is the name, it's a **paid one-off purchase** (proprietary code), and the editor is hosted on **Cloudflare Pages**.
+
+Still open:
+1. **Name checks:** trademark, domain and app-store searches for "Waypost" before designing the app mark.
+2. **Selling:** payment provider (Lemon Squeezy or Paddle issue licence keys and handle VAT; Stripe is cheaper per sale but leaves keys and tax to us), the price, and whether there's a free trial or a free tier.
+3. **Unlocking:** a licence key checked online once and then cached, so the editor keeps working offline. Needs a decision on what a locked copy can still do (for example, edit and preview but not export).
+4. **Repository visibility:** the repo is public; a paid product would normally make it private.

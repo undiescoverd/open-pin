@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+@import '@waypost/ui/tokens.css';
+@import '@waypost/ui/theme.css';
+
+/* the kit's components live in another package; tell Tailwind to read their class names too */
+@source '../../../packages/ui/src';
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--wp-app);
+    color: var(--wp-fg);
+    font: 13px/1.45 var(--wp-font-ui);
+    -webkit-font-smoothing: antialiased;
+  }
+}

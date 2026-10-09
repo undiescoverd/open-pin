@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>OpenPin Editor</title>
+<title>Waypost Editor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700&display=swap">
@@ -577,7 +577,7 @@ details[open] summary{margin-bottom:8px}
   <header class="topbar">
     <div class="brand">
       <svg class="mark" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" style="fill:var(--primary)"/><path d="M14 22.5s-6-4.9-6-9.6a6 6 0 0 1 12 0c0 4.7-6 9.6-6 9.6z" fill="#FFFFFF"/><circle cx="14" cy="12.8" r="2.2" style="fill:var(--primary)"/></svg>
-      <span class="wordmark">OpenPin</span>
+      <span class="wordmark">Waypost</span>
     </div>
     <button class="btn ghost sm" id="btn-projects" data-tip="All projects">
       <svg class="ic" aria-hidden="true"><use href="#i-chev-left"/></svg>Projects
@@ -2471,7 +2471,7 @@ function shareBase() {
 function renderShare() {
   const base = shareBase();
   $('#share-url').value = base;
-  $('#share-code').value = `<div data-openpin="${base}guide.json"></div>\n<script src="${base}player.js" async><\/script>`;
+  $('#share-code').value = `<div data-waypost="${base}guide.json"></div>\n<script src="${base}player.js" async><\/script>`;
   $('#share-iframe').value = `<iframe src="${base}" width="960" height="640" style="border:0" allow="fullscreen" title="${esc(doc.name)}"></iframe>`;
 }
 function openShare() { pause(); renderShare(); shareDlg.showModal(); }

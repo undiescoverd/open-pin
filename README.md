@@ -1,8 +1,8 @@
-# OpenPin
+# Waypost
 
-A free, open-source web app that turns screen recordings into interactive, click-through product guides, with MP4, PDF and screenshot exports too. It's a self-hosted alternative to [FramePin](https://framepin.com/).
+A web app that turns screen recordings into interactive, click-through product guides, with MP4, PDF and screenshot exports too. It's an alternative to [FramePin](https://framepin.com/) that you buy once instead of subscribing to.
 
-**Status:** research and design. No app code yet.
+**Status:** Phase 0 of the [roadmap](docs/04-roadmap.md): the app scaffold. The editor shell, its components and CI are in place with empty panels; the full designed behaviour lives in the [clickable mockup](design/mockup/editor.html).
 
 ## What it will do
 
@@ -14,7 +14,7 @@ A free, open-source web app that turns screen recordings into interactive, click
 6. Add narration (keep the original audio, record your voice, or generate a free voiceover that runs in your browser) and background music.
 7. Export an interactive guide as a static folder you can host anywhere and embed with two lines of HTML, or export MP4 (up to 4K), PDF or PNG/WebP.
 
-Everything runs in your browser. There's no account, no subscription and no server; you host guides on GitHub Pages, Cloudflare Pages, S3 or any static host.
+Everything runs in your browser. It's a one-off purchase with no subscription and no server; you host guides on GitHub Pages, Cloudflare Pages, S3 or any static host.
 
 ## Platform
 
@@ -22,15 +22,45 @@ Everything runs in your browser. There's no account, no subscription and no serv
 - **Editor:** current Chrome, Edge, Brave or Arc on any Mac that runs them, including macOS 27 Golden Gate and older releases.
 - **Published guides:** play in every modern browser, including Safari on iPhone and iPad.
 
+## Developing
+
+Needs Node 22 and pnpm 10 (`corepack enable` gives you the pinned pnpm).
+
+```sh
+pnpm install
+pnpm dev          # the editor at http://localhost:5173 (the component gallery is at /kit)
+pnpm check        # tokens, lint, typecheck, unit tests and a production build: what CI runs
+pnpm test:e2e     # browser tests against the production build (first run: pnpm --filter @waypost/editor exec playwright install chromium)
+pnpm tokens       # regenerate the CSS after editing design/tokens.json
+```
+
+| Path | What's there |
+|---|---|
+| `apps/editor` | The editor web app (Vite, React 19, Tailwind 4) and its Playwright tests |
+| `packages/ui` | PinKit: generated token CSS plus `Button`, `IconButton`, `Tooltip`, `KeyCap`, `Surface`, `Icon` |
+| `packages/core` | The project model; for now the timecode helpers |
+| `packages/render`, `media`, `export`, `player`, `tts` | Empty until their roadmap phase |
+| `design/tokens.json` | Colours, type, radii and motion for both themes; `scripts/build-tokens.mjs` turns it into CSS |
+
+## Deploying
+
+CI deploys to Cloudflare Pages once two repository secrets exist; until then the deploy step is skipped and everything else still runs.
+
+1. In Cloudflare, create an API token with the **Cloudflare Pages: Edit** permission, and note your account ID.
+2. Create the Pages project once: `pnpm dlx wrangler pages project create waypost --production-branch=claude/gracious-keller-073zo2` (use whichever branch is the repository's default).
+3. In GitHub, add the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (Settings → Secrets and variables → Actions).
+
+Pushes to the default branch then go to production, and every pull request branch gets its own preview URL.
+
 ## Docs
 
 | Doc | Contents |
 |---|---|
-| [01 — Feature analysis](docs/01-feature-analysis.md) | Every FramePin feature (including ones visible in its editor), how it likely works, how OpenPin builds it |
+| [01 — Feature analysis](docs/01-feature-analysis.md) | Every FramePin feature (including ones visible in its editor), how it likely works, how Waypost builds it |
 | [02 — Architecture](docs/02-architecture.md) | Browser targets, tech stack, repo layout, data model, threads, rendering pipeline, storage, guide format |
 | [03 — Design system and editor UI](docs/03-design-system.md) | What's wrong with FramePin's editor, our layout, "Coral & Graphite" tokens, PinKit components |
 | [04 — Roadmap](docs/04-roadmap.md) | Phased build plan with acceptance criteria |
 | [05 — Editor interactions](docs/05-editor-interactions.md) | Exact timeline, canvas, Inspector and keyboard behaviour proven in the mockup: time model, trimming and ripple, snapping, playback, undo, acceptance checks |
 | [Editor mockup](design/mockup/editor.html) | Clickable single-file mockup of the editor and guide preview (open in Chrome) |
 
-OpenPin is an independent clean-room project built from FramePin's public product descriptions. It isn't affiliated with FramePin and uses none of its code or assets.
+Waypost is an independent clean-room project built from FramePin's public product descriptions. It isn't affiliated with FramePin and uses none of its code or assets.
