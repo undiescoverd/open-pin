@@ -1,0 +1,1696 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OpenPin Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700&display=swap">
+<style>
+/* Layout: steps rail | canvas | context inspector, over a full-width timeline, inside a 16px gutter.
+   Tokens follow docs/03-design-system.md ("Coral & Graphite"): coral = steps + primary action, teal = where you are. */
+:root{
+  --app:#ECEFF3; --panel:#FFFFFF; --raised:#F6F7F9; --line:#D9DDE4; --line-strong:#B7BEC9;
+  --text:#0E1116; --text-2:#5A6372; --switch-off:#8A93A3;
+  --pin:#D13A30; --on-pin:#FFFFFF; --pin-tint:#FFE3E0; --pin-line:#F2A59E;
+  --primary:#D13A30; --primary-hover:#B9322A; --on-primary:#FFFFFF;
+  --sel:#0E8F81; --sel-strong:#0B7568; --sel-tint:rgba(14,143,129,.12);
+  --danger:#B4261C;
+  --clip:#DDE3EB; --clip-line:#AEB7C4; --voice:#E7E6FF; --voice-line:#7B78F0;
+  --music:#FFF1D6; --music-line:#D99A16; --hatch:rgba(90,99,114,.16);
+  --shadow:0 1px 2px rgba(14,17,22,.05), 0 6px 20px rgba(14,17,22,.06);
+  --shadow-pop:0 18px 60px rgba(14,17,22,.22);
+  --scrim:rgba(14,17,22,.5); --glass:rgba(255,255,255,.86);
+  --inverse:#0E1116; --on-inverse:#FFFFFF;
+  --font-ui:-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-brand:"Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r-sm:6px; --r-md:10px; --r-lg:14px;
+  --label-w:84px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --app:#0E1116; --panel:#161A21; --raised:#1F242D; --line:#2B313C; --line-strong:#3B4250;
+    --text:#ECEFF3; --text-2:#8A93A3; --switch-off:#6B7484;
+    --pin:#FF5A4E; --on-pin:#0E1116; --pin-tint:rgba(255,90,78,.14); --pin-line:rgba(255,90,78,.45);
+    --primary:#D13A30; --primary-hover:#B9322A; --on-primary:#FFFFFF;
+    --sel:#13B8A6; --sel-strong:#3FD1C0; --sel-tint:rgba(19,184,166,.16);
+    --danger:#FF7B71;
+    --clip:#283040; --clip-line:#46505F; --voice:rgba(110,107,255,.2); --voice-line:#8F8CFF;
+    --music:rgba(255,176,32,.14); --music-line:#E5A11F; --hatch:rgba(138,147,163,.18);
+    --shadow:0 1px 2px rgba(0,0,0,.3); --shadow-pop:0 18px 60px rgba(0,0,0,.55);
+    --scrim:rgba(5,7,10,.66); --glass:rgba(22,26,33,.86);
+    --inverse:#ECEFF3; --on-inverse:#0E1116;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --app:#0E1116; --panel:#161A21; --raised:#1F242D; --line:#2B313C; --line-strong:#3B4250;
+  --text:#ECEFF3; --text-2:#8A93A3; --switch-off:#6B7484;
+  --pin:#FF5A4E; --on-pin:#0E1116; --pin-tint:rgba(255,90,78,.14); --pin-line:rgba(255,90,78,.45);
+  --primary:#D13A30; --primary-hover:#B9322A; --on-primary:#FFFFFF;
+  --sel:#13B8A6; --sel-strong:#3FD1C0; --sel-tint:rgba(19,184,166,.16);
+  --danger:#FF7B71;
+  --clip:#283040; --clip-line:#46505F; --voice:rgba(110,107,255,.2); --voice-line:#8F8CFF;
+  --music:rgba(255,176,32,.14); --music-line:#E5A11F; --hatch:rgba(138,147,163,.18);
+  --shadow:0 1px 2px rgba(0,0,0,.3); --shadow-pop:0 18px 60px rgba(0,0,0,.55);
+  --scrim:rgba(5,7,10,.66); --glass:rgba(22,26,33,.86);
+  --inverse:#ECEFF3; --on-inverse:#0E1116;
+  color-scheme:dark;
+}
+
+html,body{height:100%}
+body{margin:0; background:var(--app); color:var(--text); font:13px/1.45 var(--font-ui); -webkit-font-smoothing:antialiased}
+*,*::before,*::after{box-sizing:border-box}
+button,input,select,textarea{font:inherit; color:inherit}
+button{cursor:pointer}
+[hidden]{display:none !important}
+:focus-visible{outline:2px solid var(--sel); outline-offset:2px}
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+.ic{width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none}
+.ic.fill{fill:currentColor; stroke:none}
+.kbd{display:inline-block; min-width:18px; padding:0 5px; border-radius:4px; border:1px solid var(--line); background:var(--raised); color:var(--text-2); font:500 11px/16px var(--font-ui); text-align:center}
+
+/* ---------- shell ---------- */
+.app{height:100%; min-height:640px; padding-block:12px; padding-inline:16px; display:grid; gap:12px;
+  grid-template-columns:264px minmax(0,1fr) 304px; grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:"top top top" "steps stage insp" "tl tl tl"}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow); min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; height:32px; padding:0 12px; border-radius:var(--r-md); border:1px solid transparent; background:transparent; color:var(--text); font-weight:500; white-space:nowrap; text-decoration:none}
+.btn:hover{background:var(--raised)}
+.btn.primary{background:var(--primary); color:var(--on-primary)}
+.btn.primary:hover{background:var(--primary-hover)}
+.btn.secondary{background:var(--panel); border-color:var(--line)}
+.btn.secondary:hover{background:var(--raised)}
+.btn.danger-ghost{color:var(--danger); align-self:flex-start; padding:0 8px; margin-left:-8px}
+.btn.sm{height:28px; padding:0 10px; font-size:12px}
+.btn[disabled]{opacity:.45; cursor:default}
+.icon-btn{width:32px; height:32px; display:inline-grid; place-items:center; flex:none; border-radius:var(--r-md); border:1px solid transparent; background:transparent; color:var(--text)}
+.icon-btn:hover{background:var(--raised)}
+.icon-btn.sm{width:28px; height:28px}
+.icon-btn[disabled]{opacity:.4; cursor:default}
+.icon-btn[disabled]:hover{background:transparent}
+
+/* ---------- top bar ---------- */
+.topbar{grid-area:top; display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0}
+.brand{display:flex; align-items:center; gap:8px; padding-right:4px}
+.mark{width:28px; height:28px; flex:none}
+.wordmark{font:700 17px/1 var(--font-brand); letter-spacing:-.01em}
+.divider{width:1px; height:20px; background:var(--line); flex:none}
+.topbar .project-name{height:32px; min-width:0; width:clamp(140px,22vw,260px); padding:0 10px; border-radius:var(--r-md); border:1px solid transparent; background:transparent; font-weight:600; font-size:14px}
+.topbar .project-name:hover{border-color:var(--line)}
+.topbar .project-name:focus{border-color:var(--sel); background:var(--panel); outline:none; box-shadow:none}
+.badge{display:inline-flex; align-items:center; height:22px; padding:0 8px; border-radius:999px; background:var(--raised); border:1px solid var(--line); color:var(--text-2); font-size:11.5px; font-weight:500; white-space:nowrap}
+.spacer{flex:1}
+.group{display:flex; gap:2px}
+.menu-wrap{position:relative}
+.menu{position:absolute; right:0; top:calc(100% + 6px); z-index:50; min-width:240px; padding:6px; border-radius:12px; background:var(--panel); border:1px solid var(--line); box-shadow:var(--shadow-pop); display:flex; flex-direction:column}
+.menu button{display:grid; grid-template-columns:20px 1fr; gap:10px; align-items:center; text-align:left; padding:8px 10px; border:0; border-radius:8px; background:transparent}
+.menu button:hover,.menu button:focus-visible{background:var(--raised)}
+.menu small{display:block; color:var(--text-2); font-size:11.5px}
+
+/* ---------- steps rail ---------- */
+.steps{grid-area:steps}
+.panel-head{display:flex; align-items:center; gap:8px; padding:12px 12px 8px}
+.panel-head h2{margin:0; font-size:11.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-2)}
+.count{font-size:11.5px; color:var(--text-2); font-variant-numeric:tabular-nums}
+.panel-head .btn{margin-left:auto}
+.btn.pin-btn{background:var(--pin-tint); color:var(--text); border-color:var(--pin-line)}
+.btn.pin-btn:hover{background:var(--pin-tint); border-color:var(--pin)}
+.btn.pin-btn .ic{color:var(--pin)}
+.step-list{list-style:none; margin:0; padding:2px 8px 8px; overflow:auto; display:flex; flex-direction:column; gap:4px; flex:1; min-height:0}
+.step-card{display:grid; grid-template-columns:22px 80px minmax(0,1fr); gap:10px; align-items:center; width:100%; padding:8px; border-radius:var(--r-md); border:1px solid transparent; background:transparent; text-align:left}
+.step-card:hover{background:var(--raised)}
+.step-card.selected{background:var(--pin-tint); border-color:var(--pin-line)}
+.step-num{width:22px; height:22px; border-radius:999px; background:var(--pin); color:var(--on-pin); display:grid; place-items:center; font:700 12px/1 var(--font-ui); font-variant-numeric:tabular-nums; flex:none}
+.thumb{position:relative; width:80px; height:50px; border-radius:6px; overflow:hidden; border:1px solid var(--line); background:#FFFFFF}
+.thumb-inner{position:absolute; left:0; top:0; width:1280px; height:800px; transform-origin:0 0; transform:scale(var(--thumb-s, .0625)); pointer-events:none}
+.thumb-dot{position:absolute; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%; background:#FF5A4E; box-shadow:0 0 0 2px #FFFFFF}
+.step-meta{display:flex; flex-direction:column; gap:2px; min-width:0}
+.step-title{font-weight:600; font-size:13px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.step-time{font-size:11.5px; color:var(--text-2); font-variant-numeric:tabular-nums}
+.rail-hint{margin:0; padding:10px 12px 12px; border-top:1px solid var(--line); color:var(--text-2); font-size:12px; line-height:1.5}
+.empty-steps{padding:16px 12px; color:var(--text-2); font-size:12.5px; line-height:1.5}
+
+/* ---------- canvas ---------- */
+.stage-area{grid-area:stage; display:flex; flex-direction:column; align-items:center; gap:10px; min-width:0; min-height:0}
+.tool-palette{display:flex; gap:2px; padding:4px; max-width:100%; overflow-x:auto; background:var(--glass); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); flex:none}
+.tool{display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px; border-radius:8px; border:1px solid transparent; background:transparent; font-size:12.5px; font-weight:500; white-space:nowrap}
+.tool:hover{background:var(--raised)}
+.tool[aria-pressed="true"]{background:var(--sel-tint); border-color:var(--sel); color:var(--sel-strong); font-weight:600}
+.tool[data-tool="pin"] .ic{color:var(--pin)}
+.tool .kbd{min-width:16px; padding:0 3px; font-size:10.5px; line-height:14px}
+.tool-sep{width:1px; margin:6px 2px; background:var(--line); flex:none}
+.stage-wrap{position:relative; flex:1; min-height:0; width:100%; display:grid; place-items:center}
+.framebox{display:grid; place-items:center; transition:background .2s}
+.frame-holder{position:relative; overflow:hidden; background:#FFFFFF}
+.frame{position:absolute; left:0; top:0; width:1280px; height:800px; transform-origin:0 0; touch-action:none}
+.frame.t-select{cursor:default}
+.frame.t-draw{cursor:crosshair}
+.zoomer{position:absolute; inset:0; transform-origin:0 0; transition:transform .45s cubic-bezier(.4,0,.2,1)}
+.rec,.blur-layer,.ann-layer,.draft,.logo-layer,.cursor{position:absolute; left:0; top:0}
+.rec{width:1280px; height:800px; pointer-events:none}
+.blur-layer,.ann-layer,.logo-layer{width:1280px; height:800px; pointer-events:none}
+.draft{pointer-events:none; overflow:visible}
+.cursor{pointer-events:none; margin:-2px 0 0 -3px; will-change:transform}
+.stage-status{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center; max-width:100%; padding:5px 12px; border-radius:999px; background:var(--panel); border:1px solid var(--line); color:var(--text-2); font-size:12px; flex:none}
+.stage-status b{color:var(--text); font-weight:600}
+.stage-status .dot{width:8px; height:8px; border-radius:50%; background:var(--pin); flex:none}
+.stage-status .dot.off{background:var(--line-strong)}
+
+/* annotations (content colors: drawn on the recording, identical in both themes) */
+.ann-layer svg{position:absolute; left:0; top:0; overflow:visible}
+.editing .ann, .editing .hit, .editing .callout, .editing .blur{pointer-events:auto}
+.editing .ann, .editing .callout, .editing .blur{cursor:move}
+.pulse{transform-box:fill-box; transform-origin:center; animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{from{transform:scale(1); opacity:.9} to{transform:scale(2.4); opacity:0}}
+.callout{position:absolute; padding:12px 17px; border-radius:14px; font:600 20px/27px var(--font-brand); box-shadow:0 10px 28px rgba(0,0,0,.28); pointer-events:none}
+.callout::after{content:""; position:absolute; width:16px; height:16px; background:var(--cb); transform:rotate(45deg); border-radius:3px}
+.callout.snow{box-shadow:0 0 0 1px rgba(14,17,22,.12), 0 10px 28px rgba(0,0,0,.2)}
+.tip-bottom::after{top:-7px; left:calc(var(--tip) - 8px)}
+.tip-top::after{bottom:-7px; left:calc(var(--tip) - 8px)}
+.tip-right::after{left:-7px; top:calc(var(--tip) - 8px)}
+.tip-left::after{right:-7px; top:calc(var(--tip) - 8px)}
+.callout.selected{outline:3px dashed #13B8A6; outline-offset:6px}
+.callout.reveal-in{animation:revealIn .32s ease-out both}
+.ann.reveal-in{animation:fadeIn .32s ease-out both}
+@keyframes fadeIn{from{opacity:0} to{opacity:1}}
+@keyframes revealIn{from{opacity:0; transform:scale(.96)} to{opacity:1; transform:none}}
+.blur{position:absolute; border-radius:4px; -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); background:rgba(255,255,255,.06)}
+.blur.pixelate{-webkit-backdrop-filter:blur(5px) saturate(.6); backdrop-filter:blur(5px) saturate(.6);
+  background-image:repeating-linear-gradient(0deg, rgba(0,0,0,.07) 0 1px, transparent 1px 9px), repeating-linear-gradient(90deg, rgba(0,0,0,.07) 0 1px, transparent 1px 9px)}
+.blur.solid{-webkit-backdrop-filter:none; backdrop-filter:none; background:#1D2420}
+.blur.selected{outline:3px dashed #13B8A6; outline-offset:4px}
+.logo-img{position:absolute; height:44px; max-width:220px; object-fit:contain}
+.c-tl{left:28px; top:24px} .c-tr{right:28px; top:24px} .c-bl{left:28px; bottom:24px} .c-br{right:28px; bottom:24px}
+
+/* ---------- sample recording: a fictional app called Tallybook (fixed content colors) ---------- */
+.tb{position:absolute; inset:0; width:1280px; height:800px; background:#FFFFFF; color:#1D2420; font:15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; overflow:hidden; text-align:left}
+.tb .ic{width:18px; height:18px}
+.tb-side{position:absolute; left:0; top:0; width:224px; height:800px; background:#F3F5F1; border-right:1px solid #E1E5DE}
+.tb-logo{position:absolute; left:24px; top:22px; display:flex; align-items:center; gap:10px; font-weight:700; font-size:20px; letter-spacing:-.01em}
+.tb-logo-mark{width:30px; height:30px; border-radius:8px; background:#1F7A4D; color:#FFFFFF; display:grid; place-items:center; font-size:17px}
+.tb-nav{position:absolute; left:12px; width:200px; height:36px; border-radius:8px; display:flex; align-items:center; gap:10px; padding-left:12px; color:#3B4540}
+.tb-nav.on{background:#E3EFE7; color:#17633F; font-weight:600}
+.tb-top{position:absolute; left:224px; right:0; top:0; height:64px; border-bottom:1px solid #E1E5DE}
+.tb-search{position:absolute; left:32px; top:14px; width:360px; height:36px; border:1px solid #D5DAD2; border-radius:18px; display:flex; align-items:center; gap:8px; padding-left:14px; color:#5E6862; font-size:14px}
+.tb-bell{position:absolute; left:776px; top:22px; color:#3B4540}
+.tb-email{position:absolute; left:816px; top:21px; font-size:14px; color:#3B4540}
+.tb-avatar{position:absolute; left:980px; top:14px; width:36px; height:36px; border-radius:50%; background:#2F7D59; color:#FFFFFF; display:grid; place-items:center; font-size:13px; font-weight:700}
+.tb-h1{position:absolute; left:264px; top:92px; font-size:28px; font-weight:700; letter-spacing:-.015em}
+.tb-sub{position:absolute; left:264px; top:134px; color:#5E6862}
+.tb-card{position:absolute; top:176px; width:296px; height:104px; border:1px solid #E1E5DE; border-radius:12px; padding:18px 20px}
+.tb-card-l{color:#5E6862; font-size:14px}
+.tb-card-v{font-size:26px; font-weight:700; margin-top:8px; letter-spacing:-.01em}
+.tb-table{position:absolute; left:264px; top:316px; width:976px; border:1px solid #E1E5DE; border-radius:12px; overflow:hidden}
+.tb-tr{display:grid; grid-template-columns:140px 1fr 160px 120px; height:44px; align-items:center; padding:0 20px; border-top:1px solid #EEF1EC; font-size:14px}
+.tb-tr.th{border-top:0; height:40px; color:#5E6862; font-size:13px; background:#F8FAF7}
+.tb-pill{justify-self:start; padding:2px 10px; border-radius:999px; font-size:12.5px; font-weight:600}
+.tb-paid{background:#E3EFE7; color:#17633F} .tb-sent{background:#E6EEFB; color:#2852A3} .tb-over{background:#FCE8E6; color:#A3261C} .tb-draft{background:#EEF0EE; color:#5E6862}
+.tb-tabs-line{position:absolute; left:264px; top:207px; width:976px; height:1px; background:#E1E5DE}
+.tb-tab{position:absolute; top:168px; height:40px; display:grid; place-items:center; color:#5E6862}
+.tb-tab.on{color:#17633F; font-weight:600; box-shadow:inset 0 -2px 0 #1F7A4D}
+.tb-label{position:absolute; left:264px; font-size:13px; font-weight:600; color:#3B4540}
+.tb-input{position:absolute; left:264px; width:440px; height:40px; border:1px solid #D5DAD2; border-radius:8px; padding:0 12px; display:flex; align-items:center}
+.tb-section{position:absolute; left:264px; top:234px; font-size:12.5px; font-weight:600; color:#5E6862; text-transform:uppercase; letter-spacing:.06em}
+.tb-row{position:absolute; left:264px; width:976px; height:64px; border:1px solid #E1E5DE; border-radius:12px; padding:0 20px; display:flex; flex-direction:column; justify-content:center}
+.tb-row b{font-weight:600}
+.tb-row span{font-size:13.5px; color:#5E6862}
+.tb-toggle{position:absolute; left:900px; top:20px; width:44px; height:24px; border-radius:12px; background:#C9CFC6}
+.tb-toggle::after{content:""; position:absolute; left:3px; top:3px; width:18px; height:18px; border-radius:50%; background:#FFFFFF; box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.tb-toggle.on{background:#1F7A4D}
+.tb-toggle.on::after{left:23px}
+.tb-btn{position:absolute; top:580px; height:44px; border-radius:10px; display:grid; place-items:center; font-weight:600}
+.tb-save{left:1100px; width:140px; background:#E6EAE4; color:#8A938D}
+.tb-save.on{background:#1F7A4D; color:#FFFFFF}
+.tb-cancel{left:1000px; width:88px; border:1px solid #D5DAD2; color:#3B4540}
+.tb-toast{position:absolute; left:610px; top:716px; width:280px; height:48px; border-radius:12px; background:#1D2420; color:#FFFFFF; display:flex; align-items:center; gap:10px; padding:0 16px; font-weight:500; box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.tb-toast .ic{color:#7FD3A6}
+
+/* ---------- empty project ---------- */
+.empty{max-width:560px; margin:auto; padding:32px 28px; border-radius:var(--r-lg); background:var(--panel); border:1px solid var(--line); box-shadow:var(--shadow); text-align:center; display:flex; flex-direction:column; gap:14px; align-items:center}
+.empty-icon{width:48px; height:48px; border-radius:14px; background:var(--pin-tint); color:var(--pin); display:grid; place-items:center}
+.empty-icon .ic{width:24px; height:24px}
+.empty h2{margin:0; font:700 22px/1.2 var(--font-brand); text-wrap:balance}
+.empty p{margin:0; color:var(--text-2); max-width:44ch}
+.empty-actions{display:flex; gap:8px; flex-wrap:wrap; justify-content:center}
+.how{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; width:100%; margin-top:6px; padding:0; list-style:none; counter-reset:how}
+.how li{padding:10px; border-radius:10px; background:var(--raised); font-size:12.5px; text-align:left; line-height:1.4}
+.how b{display:block; margin-bottom:2px}
+.is-empty .tool-palette,.is-empty .stage-status,.is-empty #framebox{display:none}
+
+/* ---------- inspector ---------- */
+.inspector{grid-area:insp}
+.tabs{display:flex; gap:4px; padding:8px; border-bottom:1px solid var(--line); flex:none}
+.tab{flex:1; height:30px; border-radius:8px; border:0; background:transparent; color:var(--text-2); font-weight:500}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{background:var(--raised); color:var(--text); font-weight:600}
+.insp-body{overflow:auto; padding:14px 14px 18px; display:flex; flex-direction:column; gap:16px; flex:1; min-height:0}
+.insp-title{display:flex; align-items:center; gap:10px}
+.insp-title > div{min-width:0; flex:1}
+.insp-h{margin:0; font-size:14px; font-weight:600}
+.insp-sub{margin:0; font-size:12px; color:var(--text-2); font-variant-numeric:tabular-nums}
+.ann-ic{width:28px; height:28px; border-radius:8px; background:var(--raised); display:grid; place-items:center}
+.back{display:inline-flex; align-items:center; gap:4px; align-self:flex-start; max-width:100%; padding:2px 6px 2px 2px; margin-left:-2px; border:0; border-radius:6px; background:transparent; color:var(--text-2); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.back:hover{color:var(--text); background:var(--raised)}
+.section{display:flex; flex-direction:column; gap:10px; padding-top:14px; border-top:1px solid var(--line)}
+.section h3{margin:0; font-size:11.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-2)}
+.h-note{text-transform:none; letter-spacing:0; font-weight:500}
+.field{display:flex; flex-direction:column; gap:6px; min-width:0}
+.field label,.label{font-weight:500; font-size:12.5px}
+.opt{color:var(--text-2); font-weight:400}
+.row{display:flex; align-items:center; justify-content:space-between; gap:8px}
+output{font-size:12px; color:var(--text-2); font-variant-numeric:tabular-nums}
+.help{margin:0; font-size:12px; color:var(--text-2); line-height:1.45}
+input[type="text"],input[type="url"],textarea,select{width:100%; padding:7px 9px; border-radius:8px; border:1px solid var(--line); background:var(--raised); font-size:13px}
+input[type="text"]:focus,input[type="url"]:focus,textarea:focus,select:focus{border-color:var(--sel); outline:none; box-shadow:0 0 0 3px var(--sel-tint)}
+textarea{resize:vertical; line-height:1.4}
+input[type="range"]{width:100%; accent-color:var(--sel); margin:2px 0}
+.switch{appearance:none; -webkit-appearance:none; width:34px; height:20px; border-radius:999px; background:var(--switch-off); position:relative; margin:0; flex:none; transition:background .15s}
+.switch::before{content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#FFFFFF; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:left .15s}
+.switch:checked{background:var(--sel)}
+.switch:checked::before{left:16px}
+.switch-row label{font-weight:500; font-size:12.5px}
+.seg{display:flex; padding:2px; gap:2px; border-radius:9px; background:var(--raised); border:1px solid var(--line)}
+.seg button{flex:1; height:26px; padding:0 6px; border:0; border-radius:7px; background:transparent; color:var(--text-2); font-size:12px; font-weight:500; white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--panel); color:var(--text); font-weight:600; box-shadow:0 1px 2px rgba(14,17,22,.12), 0 0 0 1px var(--line)}
+.swatches{display:flex; gap:8px; flex-wrap:wrap}
+.swatch{width:26px; height:26px; border-radius:999px; border:2px solid var(--panel); background:var(--sw); box-shadow:0 0 0 1px var(--line-strong); padding:0}
+.swatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--sel)}
+.bg-grid{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px}
+.bg-tile{display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 2px; border:1px solid transparent; border-radius:8px; background:transparent; font-size:11px; color:var(--text-2)}
+.bg-tile[aria-pressed="true"]{border-color:var(--sel); color:var(--text); background:var(--sel-tint)}
+.bg-swatch{width:100%; height:28px; border-radius:6px; border:1px solid var(--line)}
+.bg-swatch.none{background:repeating-linear-gradient(135deg, var(--raised) 0 6px, var(--panel) 6px 12px) !important}
+.ann-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px}
+.ann-row{display:grid; grid-template-columns:minmax(0,1fr) 86px 28px; gap:6px; align-items:center; padding:3px 3px 3px 4px; border-radius:8px; background:var(--raised)}
+.ann-pick{display:flex; align-items:center; gap:8px; min-width:0; height:28px; padding:0 6px; border:0; border-radius:6px; background:transparent; text-align:left}
+.ann-pick span{overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+.ann-pick:hover{background:var(--panel)}
+.ann-row select{padding:4px 6px; font-size:12px; background:var(--panel)}
+.checks{border:0; margin:0; padding:0; display:flex; flex-direction:column; gap:6px}
+.checks legend{padding:0; margin-bottom:6px}
+.check{display:flex; align-items:center; gap:8px; font-size:12.5px}
+.check input{accent-color:var(--sel); width:15px; height:15px; margin:0}
+.logo-row{display:flex; align-items:center; gap:10px}
+.logo-row img{height:36px; max-width:140px; object-fit:contain; padding:4px; border-radius:6px; background:var(--raised); border:1px solid var(--line)}
+.file-btn{align-self:flex-start; cursor:pointer}
+.nothing{display:flex; flex-direction:column; gap:10px; color:var(--text-2)}
+.nothing h3{margin:0; color:var(--text); font-size:14px}
+
+/* ---------- timeline ---------- */
+.timeline{grid-area:tl}
+.transport{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 12px; border-bottom:1px solid var(--line)}
+.timecode{min-width:150px; font-size:13px; font-weight:600; font-variant-numeric:tabular-nums}
+.timecode span{color:var(--text-2); font-weight:500}
+.transport-mid{display:flex; align-items:center; gap:2px; margin-inline:auto}
+.play{width:36px; height:36px; border-radius:999px; border:0; background:var(--inverse); color:var(--on-inverse); display:grid; place-items:center; margin:0 4px}
+.play:hover{opacity:.88}
+.transport-end{display:flex; align-items:center; gap:10px}
+.mini{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2)}
+.mini select{width:auto; padding:3px 6px; font-size:12px}
+.mini input[type="range"]{width:90px}
+.tl-scroll{overflow-x:auto; overflow-y:hidden; padding:4px 0 8px}
+.tl-inner{position:relative; width:calc(var(--label-w) + var(--lane-w, 600px))}
+.tl-row{display:flex; height:30px}
+.tl-row.ruler{height:24px}
+.tl-label{position:sticky; left:0; z-index:5; width:var(--label-w); flex:none; display:flex; align-items:center; gap:7px; padding-left:12px; background:var(--panel); color:var(--text-2); font-size:11.5px; font-weight:500}
+.tl-lane{position:relative; flex:none; width:var(--lane-w, 600px); margin-right:12px}
+.tl-lane.track::before{content:""; position:absolute; left:0; right:0; top:3px; bottom:3px; border-radius:6px; background:var(--raised)}
+.ruler .tl-lane{cursor:ew-resize}
+.tick{position:absolute; bottom:2px; width:1px; height:5px; background:var(--line-strong)}
+.tick.major{height:9px}
+.tick-label{position:absolute; top:1px; font-size:10.5px; color:var(--text-2); font-variant-numeric:tabular-nums; transform:translateX(-50%); white-space:nowrap}
+.tick-label.first{transform:none}
+.clip{position:absolute; top:3px; bottom:3px; display:flex; align-items:center; gap:6px; padding:0 8px; border-radius:6px; border:1px solid var(--clip-line); background:var(--clip); color:var(--text); font-size:11.5px; white-space:nowrap; overflow:hidden; text-align:left}
+.clip.selected{box-shadow:0 0 0 2px var(--sel); border-color:var(--sel)}
+.clip .ic{color:var(--text-2); width:14px; height:14px}
+.clip span{min-width:0; overflow:hidden; text-overflow:ellipsis}
+.speed{flex:none; padding:0 5px; border-radius:4px; background:var(--panel); font-weight:700; font-size:10.5px; line-height:16px}
+.pin-marker{position:absolute; top:50%; width:24px; height:24px; margin:-12px 0 0 -12px; border-radius:999px; border:2px solid var(--panel); background:var(--pin); color:var(--on-pin); font:700 11.5px/1 var(--font-ui); display:grid; place-items:center; padding:0; z-index:2}
+.pin-marker.selected{box-shadow:0 0 0 2px var(--sel)}
+.lane-bar{position:absolute; top:5px; bottom:5px; display:flex; align-items:center; gap:5px; padding:0 7px; border-radius:5px; font-size:11px; white-space:nowrap; overflow:hidden; color:var(--text); text-align:left; border:1px solid}
+.lane-bar .ic{width:13px; height:13px; flex:none}
+.lane-bar span{min-width:0; overflow:hidden; text-overflow:ellipsis}
+.voice-bar{background:var(--voice); border-color:var(--voice-line)}
+.blur-bar{background:repeating-linear-gradient(135deg, var(--hatch) 0 5px, transparent 5px 10px), var(--raised); border-color:var(--line-strong)}
+.blur-bar.selected{box-shadow:0 0 0 2px var(--sel); border-color:var(--sel)}
+.music-bar{background:var(--music); border-color:var(--music-line)}
+.lane-add{position:absolute; left:6px; top:4px; bottom:4px; display:inline-flex; align-items:center; gap:5px; padding:0 9px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--text-2); font-size:11.5px; font-weight:500}
+.lane-add:hover{color:var(--text); border-color:var(--line-strong)}
+.playhead{position:absolute; top:0; bottom:8px; width:2px; margin-left:-1px; background:var(--sel); z-index:4; pointer-events:none}
+.playhead::before{content:""; position:absolute; top:0; left:50%; width:12px; height:14px; transform:translateX(-50%); border-radius:3px 3px 7px 7px; background:var(--sel)}
+.tl-empty{padding:28px 16px; text-align:center; color:var(--text-2)}
+
+/* ---------- tooltip, toasts ---------- */
+#tip{position:fixed; z-index:1000; pointer-events:none; max-width:280px; padding:5px 8px; border-radius:6px; background:var(--inverse); color:var(--on-inverse); font-size:12px; font-weight:500; line-height:1.35}
+#toasts{position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); z-index:900; display:flex; flex-direction:column; align-items:center; gap:8px; width:max-content; max-width:calc(100vw - 32px); pointer-events:none}
+.toast{padding:10px 14px; border-radius:10px; background:var(--inverse); color:var(--on-inverse); box-shadow:var(--shadow-pop); font-size:13px; line-height:1.4; animation:revealIn .2s ease-out}
+
+/* ---------- dialogs ---------- */
+dialog{padding:0; border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--text); box-shadow:var(--shadow-pop); max-width:calc(100vw - 32px); max-height:calc(100vh - 32px)}
+dialog::backdrop{background:var(--scrim)}
+.dlg-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:16px 18px 12px}
+.dlg-head h2{margin:0; font:700 18px/1.25 var(--font-brand)}
+.dlg-head p{margin:2px 0 0; color:var(--text-2); font-size:12.5px}
+.dlg-body{padding:0 18px 16px; display:flex; flex-direction:column; gap:14px}
+.dlg-foot{display:flex; justify-content:flex-end; gap:8px; padding:12px 18px 16px; border-top:1px solid var(--line)}
+.dlg-share{width:min(580px, calc(100vw - 32px))}
+.hosts{border:0; margin:0; padding:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px}
+.hosts legend{padding:0; margin-bottom:8px; font-weight:500; font-size:12.5px}
+.host{display:flex; gap:10px; align-items:flex-start; padding:10px; border-radius:10px; border:1px solid var(--line); cursor:pointer}
+.host:has(input:checked){border-color:var(--sel); background:var(--sel-tint)}
+.host input{margin:2px 0 0; accent-color:var(--sel)}
+.host b{display:block; font-size:13px}
+.host small{color:var(--text-2); font-size:12px}
+.code{font:12px/1.55 var(--font-mono); background:var(--raised); white-space:pre; overflow-x:auto}
+details summary{cursor:pointer; color:var(--text-2); font-size:12.5px}
+details[open] summary{margin-bottom:8px}
+.dlg-palette{width:min(560px, calc(100vw - 32px)); margin-top:12vh}
+.pal-input{display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line)}
+.pal-input input{border:0; background:transparent; padding:4px 0; font-size:15px; box-shadow:none !important}
+.pal-list{list-style:none; margin:0; padding:6px; max-height:min(52vh, 420px); overflow:auto}
+.pal-list li{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px; border-radius:8px; cursor:pointer}
+.pal-list li[aria-selected="true"]{background:var(--sel-tint)}
+.pal-foot{padding:8px 14px; border-top:1px solid var(--line); color:var(--text-2); font-size:11.5px}
+
+/* ---------- preview player ---------- */
+.dlg-preview{width:min(1080px, calc(100vw - 32px))}
+.player{--acc:#D13A30; --acc-text:#FFFFFF; display:flex; flex-direction:column; background:var(--panel); border-top:1px solid var(--line)}
+.player:fullscreen{justify-content:center; background:var(--app)}
+.pl-stage{position:relative; display:grid; place-items:center; background:var(--app); overflow:hidden}
+.pl-stage .frame{cursor:default}
+.pl-overlay{position:absolute; inset:0; display:grid; place-items:center; background:linear-gradient(180deg, rgba(14,17,22,.15), rgba(14,17,22,.55)); padding:16px}
+.pl-card{display:flex; flex-direction:column; align-items:center; gap:10px; padding:22px 26px; border-radius:16px; background:var(--panel); box-shadow:var(--shadow-pop); text-align:center; max-width:420px}
+.pl-card h3{margin:0; font:700 20px/1.25 var(--font-brand); text-wrap:balance}
+.pl-card p{margin:0; color:var(--text-2); font-size:13px}
+.pl-acc{background:var(--acc); color:var(--acc-text)}
+.pl-acc:hover{background:var(--acc); filter:brightness(.94)}
+.pl-bar{display:flex; flex-direction:column; gap:8px; padding:10px 14px 14px}
+.pl-caption{margin:0; min-height:22px; font:600 15px/1.45 var(--font-brand)}
+.pl-controls{display:flex; align-items:center; gap:10px}
+.pl-counter{font-size:12.5px; color:var(--text-2); font-variant-numeric:tabular-nums; min-width:44px; text-align:center}
+.pl-progress{position:relative; flex:1; height:6px; border-radius:999px; background:var(--raised); border:1px solid var(--line)}
+.pl-fill{position:absolute; left:0; top:0; bottom:0; border-radius:999px; background:var(--acc); transition:width .3s}
+.pl-tick{position:absolute; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%; border:2px solid var(--panel); background:var(--line-strong); padding:0}
+.pl-tick.done{background:var(--acc)}
+.pl-mode{font-size:12px; color:var(--text-2)}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){
+  .app{grid-template-columns:220px minmax(0,1fr) 280px}
+  .step-card{grid-template-columns:22px minmax(0,1fr); grid-template-rows:auto auto; align-items:start; gap:8px}
+  .thumb{grid-column:1 / -1; grid-row:1; width:100%; height:auto; aspect-ratio:16/10}
+  .step-num{grid-row:2}
+  .step-meta{grid-row:2}
+  .tool .lbl{display:none}
+  .badge{display:none}
+}
+@media (max-width:900px){
+  .app{height:auto; min-height:0; grid-template-columns:minmax(0,1fr); grid-template-rows:auto;
+    grid-template-areas:"top" "stage" "steps" "tl" "insp"}
+  .steps{max-height:none}
+  .step-list{flex-direction:row; overflow-x:auto; padding-bottom:10px}
+  .step-list li{flex:none; width:180px}
+  .rail-hint{display:none}
+  .divider{display:none}
+  .insp-body{overflow:visible}
+  .topbar .project-name{order:5; width:100%; flex-basis:100%}
+}
+@media (max-width:560px){
+  .btn .lbl{display:none}
+  .btn.has-lbl{width:32px; padding:0}
+  .timecode{min-width:0}
+  .transport-mid{margin-inline:0}
+  .transport-end{width:100%; justify-content:space-between}
+  .how{grid-template-columns:minmax(0,1fr)}
+  .hosts{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion: reduce){
+  .pulse{animation:none; opacity:0}
+  .zoomer,.pl-fill,.framebox,.switch,.switch::before{transition:none}
+  .reveal-in,.toast{animation:none}
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-pointer" viewBox="0 0 24 24"><path d="M5 3.5l13.5 6.2-5.7 1.9-1.9 5.7z"/><path d="M12.8 11.6l5.2 5.2"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></symbol>
+  <symbol id="i-callout" viewBox="0 0 24 24"><path d="M4 5h16v11H10l-4.5 3.5V16H4z"/><path d="M8 9.5h8M8 12.5h5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M6 18L18 6M9.5 6H18v8.5"/></symbol>
+  <symbol id="i-spot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2.5"/></symbol>
+  <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8M10.5 7.5v6M7.5 10.5h6"/></symbol>
+  <symbol id="i-blur" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 9.3h16M4 14.7h16M9.3 4v16M14.7 4v16"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></symbol>
+  <symbol id="i-skip-back" viewBox="0 0 24 24"><path d="M18 6v12l-8.5-6z"/><path d="M6 6v12"/></symbol>
+  <symbol id="i-skip-fwd" viewBox="0 0 24 24"><path d="M6 6v12l8.5-6z"/><path d="M18 6v12"/></symbol>
+  <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14.5L4 9.5l5-5"/><path d="M4 9.5h10a5.5 5.5 0 0 1 0 11h-3"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14.5l5-5-5-5"/><path d="M20 9.5H10a5.5 5.5 0 0 0 0 11h3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 13.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-5.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l.8 12.5h9.4L17.5 7M9.5 7V4.5h5V7"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="6.5" cy="17.5" r="2.5"/><path d="M8.6 8l11 10M8.6 16l11-10"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7.5 4.5v15M16.5 4.5v15M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H17.5A2.5 2.5 0 1 0 15 6.5v11a2.5 2.5 0 1 0 2.5-2.5h-11A2.5 2.5 0 1 0 9 17.5z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 16l-5-5-9 8.5"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3.5H6.5v17h11V7z"/><path d="M14 3.5V7h3.5M9 12h6M9 15.5h6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 6.5h6l2 2h9v10h-17z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20h-5.5v-6h-5v6H4z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0M16 5a3.5 3.5 0 0 1 0 7M21 20a6 6 0 0 0-3.5-5.5"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20V11M11 20V5M17 20v-7M3 20h18"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 21h4"/></symbol>
+  <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-replay" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5v4h4"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" style="fill:var(--primary)"/><path d="M14 22.5s-6-4.9-6-9.6a6 6 0 0 1 12 0c0 4.7-6 9.6-6 9.6z" fill="#FFFFFF"/><circle cx="14" cy="12.8" r="2.2" style="fill:var(--primary)"/></svg>
+      <span class="wordmark">OpenPin</span>
+    </div>
+    <button class="btn ghost sm" id="btn-projects" data-tip="All projects">
+      <svg class="ic" aria-hidden="true"><use href="#i-chev-left"/></svg>Projects
+    </button>
+    <span class="divider" aria-hidden="true"></span>
+    <label class="sr-only" for="project-name">Project name</label>
+    <input id="project-name" class="project-name" type="text" value="Weekly summary emails" autocomplete="off">
+    <span class="badge">Mockup · sample project</span>
+    <span class="spacer"></span>
+    <div class="group">
+      <button class="icon-btn" id="btn-undo" aria-label="Undo" data-tip="Undo  ⌘Z"><svg class="ic" aria-hidden="true"><use href="#i-undo"/></svg></button>
+      <button class="icon-btn" id="btn-redo" aria-label="Redo" data-tip="Redo  ⇧⌘Z"><svg class="ic" aria-hidden="true"><use href="#i-redo"/></svg></button>
+    </div>
+    <button class="icon-btn" id="btn-theme" aria-label="Switch theme" data-tip="Switch light or dark"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg></button>
+    <button class="icon-btn" id="btn-palette" aria-label="Search actions" data-tip="Search every action  ⌘K"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></button>
+    <button class="btn secondary has-lbl" id="btn-preview" aria-label="Preview guide" data-tip="See what viewers see  ⌘↩">
+      <svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg><span class="lbl">Preview</span>
+    </button>
+    <div class="menu-wrap">
+      <button class="btn secondary has-lbl" id="btn-export" aria-label="Export" aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu">
+        <svg class="ic" aria-hidden="true"><use href="#i-download"/></svg><span class="lbl">Export</span><svg class="ic" aria-hidden="true"><use href="#i-chev-down"/></svg>
+      </button>
+      <div class="menu" id="export-menu" role="menu" hidden>
+        <button role="menuitem" data-export="mp4"><svg class="ic" aria-hidden="true"><use href="#i-film"/></svg><span>Video (MP4)<small>Up to 4K, with holds and narration</small></span></button>
+        <button role="menuitem" data-export="pdf"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg><span>PDF guide<small>One page per step</small></span></button>
+        <button role="menuitem" data-export="png"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg><span>Screenshots<small>PNG or WebP, annotated</small></span></button>
+        <button role="menuitem" data-export="folder"><svg class="ic" aria-hidden="true"><use href="#i-folder"/></svg><span>Guide folder<small>Host it anywhere yourself</small></span></button>
+      </div>
+    </div>
+    <button class="btn primary has-lbl" id="btn-share" aria-label="Share guide" data-tip="Publish and get the embed code">
+      <svg class="ic" aria-hidden="true"><use href="#i-share"/></svg><span class="lbl">Share</span>
+    </button>
+  </header>
+
+  <aside class="panel steps" aria-labelledby="steps-h">
+    <div class="panel-head">
+      <h2 id="steps-h">Steps</h2><span class="count" id="step-count"></span>
+      <button class="btn sm pin-btn" id="btn-add-step" data-tip="Pin the current frame  ⇧P"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Pin step</button>
+    </div>
+    <ol class="step-list" id="step-list"></ol>
+    <p class="rail-hint">Pick the <b>Pin</b> tool (<span class="kbd">P</span>) and click the frame where the viewer should click. That spot gets a click marker.</p>
+  </aside>
+
+  <main class="stage-area" id="stage-area" aria-label="Canvas">
+    <div class="tool-palette" role="toolbar" aria-label="Tools" id="tools"></div>
+    <div class="stage-wrap" id="stage-wrap">
+      <div class="framebox" id="framebox">
+        <div class="frame-holder" id="holder">
+          <div class="frame editing t-select" id="frame">
+            <div class="rec" id="rec"></div>
+            <div class="blur-layer" id="blur-layer"></div>
+            <div class="cursor" id="cursor" aria-hidden="true"><svg width="30" height="36" viewBox="0 0 20 24"><path d="M2 1.5v18.2l4.8-4.6 3.1 7 3.2-1.4-3.1-6.9h6.6z" fill="#111111" stroke="#FFFFFF" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
+            <div class="ann-layer" id="ann-layer"></div>
+            <div class="logo-layer" id="logo-layer"></div>
+            <svg class="draft" id="draft" width="1280" height="800" viewBox="0 0 1280 800" aria-hidden="true"></svg>
+          </div>
+        </div>
+      </div>
+      <div class="empty" id="empty" hidden>
+        <div class="empty-icon"><svg class="ic" aria-hidden="true"><use href="#i-film"/></svg></div>
+        <h2>Drop a screen recording to start</h2>
+        <p>MP4, MOV, WebM or MKV from QuickTime, Loom, ScreenStudio, OBS or Zoom. It stays on this computer.</p>
+        <div class="empty-actions">
+          <label class="btn primary file-btn" for="file-rec">Choose a recording…</label>
+          <input class="sr-only" id="file-rec" type="file" accept="video/*,.mkv">
+          <button class="btn secondary" id="btn-record"><svg class="ic" aria-hidden="true"><use href="#i-record"/></svg>Record screen</button>
+          <button class="btn ghost" id="btn-sample">Open the sample project</button>
+        </div>
+        <ol class="how">
+          <li><b>1. Pin the moments that matter</b>Press <span class="kbd">P</span> and click the frame.</li>
+          <li><b>2. Point things out</b>Callouts, arrows, spotlights and zoom.</li>
+          <li><b>3. Share</b>A link, two lines of embed code, or MP4 and PDF.</li>
+        </ol>
+      </div>
+    </div>
+    <div class="stage-status" id="stage-status"></div>
+  </main>
+
+  <aside class="panel inspector" aria-label="Inspector">
+    <div class="tabs" role="tablist" aria-label="Inspector view">
+      <button class="tab" role="tab" id="tab-selection" aria-selected="true" aria-controls="insp-body">Selection</button>
+      <button class="tab" role="tab" id="tab-guide" aria-selected="false" aria-controls="insp-body">Guide</button>
+    </div>
+    <div class="insp-body" id="insp-body" role="tabpanel"></div>
+  </aside>
+
+  <section class="panel timeline" aria-label="Timeline">
+    <div class="transport">
+      <div class="timecode" id="timecode" aria-live="off"></div>
+      <div class="transport-mid">
+        <button class="icon-btn" id="btn-prev-step" aria-label="Previous step" data-tip="Previous step  ⌥←"><svg class="ic" aria-hidden="true"><use href="#i-skip-back"/></svg></button>
+        <button class="icon-btn" id="btn-prev-frame" aria-label="Previous frame" data-tip="Previous frame  ←"><svg class="ic" aria-hidden="true"><use href="#i-chev-left"/></svg></button>
+        <button class="play" id="btn-play" aria-label="Play" data-tip="Play or pause  Space"><svg class="ic fill" aria-hidden="true"><use href="#i-play"/></svg></button>
+        <button class="icon-btn" id="btn-next-frame" aria-label="Next frame" data-tip="Next frame  →"><svg class="ic" aria-hidden="true"><use href="#i-chev-right"/></svg></button>
+        <button class="icon-btn" id="btn-next-step" aria-label="Next step" data-tip="Next step  ⌥→"><svg class="ic" aria-hidden="true"><use href="#i-skip-fwd"/></svg></button>
+      </div>
+      <div class="transport-end">
+        <button class="btn ghost sm" id="btn-split" data-tip="Split the clip at the playhead  ⌘B"><svg class="ic" aria-hidden="true"><use href="#i-scissors"/></svg>Split</button>
+        <label class="mini" for="preview-speed">Preview
+          <select id="preview-speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+        </label>
+        <label class="mini" for="tl-zoom">Zoom<input id="tl-zoom" type="range" min="1" max="4" step="0.25" value="1"></label>
+      </div>
+    </div>
+    <div class="tl-scroll" id="tl-scroll">
+      <div class="tl-inner" id="tl-inner"></div>
+    </div>
+  </section>
+</div>
+
+<dialog class="dlg-preview" id="dlg-preview" aria-labelledby="pv-title">
+  <div class="dlg-head">
+    <div><h2 id="pv-title">Preview</h2><p id="pv-sub">What viewers see when the guide is on your site.</p></div>
+    <button class="icon-btn" data-close aria-label="Close preview"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="player" id="player">
+    <div class="pl-stage" id="pl-stage">
+      <div class="framebox" id="pl-box">
+        <div class="frame-holder" id="pl-holder">
+          <div class="frame" id="pl-frame">
+            <div class="zoomer" id="pl-zoomer">
+              <div class="rec" id="pl-rec"></div>
+              <div class="blur-layer" id="pl-blur"></div>
+              <div class="cursor" id="pl-cursor" aria-hidden="true"><svg width="30" height="36" viewBox="0 0 20 24"><path d="M2 1.5v18.2l4.8-4.6 3.1 7 3.2-1.4-3.1-6.9h6.6z" fill="#111111" stroke="#FFFFFF" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
+              <div class="ann-layer" id="pl-ann"></div>
+            </div>
+            <div class="logo-layer" id="pl-logo"></div>
+          </div>
+        </div>
+      </div>
+      <div class="pl-overlay" id="pl-start">
+        <div class="pl-card">
+          <h3 id="pl-start-title"></h3>
+          <p id="pl-start-meta"></p>
+          <button class="btn pl-acc" id="pl-start-btn"><svg class="ic fill" aria-hidden="true"><use href="#i-play"/></svg>Start guide</button>
+        </div>
+      </div>
+      <div class="pl-overlay" id="pl-end" hidden>
+        <div class="pl-card">
+          <h3>That's the whole guide</h3>
+          <p>Ready to try it yourself?</p>
+          <a class="btn pl-acc" id="pl-cta" href="https://example.com/signup" target="_blank" rel="noopener"></a>
+          <button class="btn ghost sm" id="pl-replay"><svg class="ic" aria-hidden="true"><use href="#i-replay"/></svg>Replay</button>
+        </div>
+      </div>
+    </div>
+    <div class="pl-bar">
+      <p class="pl-caption" id="pl-caption" aria-live="polite"></p>
+      <div class="pl-controls">
+        <button class="icon-btn" id="pl-prev" aria-label="Previous step"><svg class="ic" aria-hidden="true"><use href="#i-chev-left"/></svg></button>
+        <span class="pl-counter" id="pl-counter"></span>
+        <div class="pl-progress" id="pl-progress"><div class="pl-fill" id="pl-fill"></div></div>
+        <button class="btn pl-acc sm" id="pl-next">Next<svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+        <button class="icon-btn" id="pl-full" aria-label="Fullscreen"><svg class="ic" aria-hidden="true"><use href="#i-max"/></svg></button>
+      </div>
+      <p class="pl-mode" id="pl-mode"></p>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dlg-share" id="dlg-share" aria-labelledby="share-title">
+  <div class="dlg-head">
+    <div><h2 id="share-title">Share guide</h2><p>Publish the guide as static files, then paste two lines into any page.</p></div>
+    <button class="icon-btn" data-close aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="dlg-body">
+    <fieldset class="hosts">
+      <legend>Where should it live?</legend>
+      <label class="host"><input type="radio" name="host" value="github" checked><span><b>GitHub Pages</b><small>Free. Uses a repository you own.</small></span></label>
+      <label class="host"><input type="radio" name="host" value="cloudflare"><span><b>Cloudflare Pages</b><small>Free and fast worldwide.</small></span></label>
+      <label class="host"><input type="radio" name="host" value="s3"><span><b>S3-compatible storage</b><small>AWS S3, Cloudflare R2, Backblaze B2.</small></span></label>
+      <label class="host"><input type="radio" name="host" value="folder"><span><b>Download a folder</b><small>Upload it to any web host yourself.</small></span></label>
+    </fieldset>
+    <div class="field"><label for="share-url">Guide address</label><input id="share-url" type="text" readonly></div>
+    <div class="field">
+      <div class="row"><label for="share-code">Embed code</label><button class="btn ghost sm" id="btn-copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+      <textarea id="share-code" class="code" rows="3" readonly></textarea>
+    </div>
+    <details><summary>Use an iframe instead (for sites that strip scripts)</summary><textarea id="share-iframe" class="code" rows="3" readonly></textarea></details>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn secondary" data-close>Cancel</button>
+    <button class="btn primary" id="btn-publish"><svg class="ic" aria-hidden="true"><use href="#i-share"/></svg>Publish</button>
+  </div>
+</dialog>
+
+<dialog class="dlg-palette" id="dlg-palette" aria-label="Search actions">
+  <div class="pal-input">
+    <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+    <label class="sr-only" for="pal-input">Search actions</label>
+    <input id="pal-input" type="text" placeholder="Search actions and steps…" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="pal-list">
+    <span class="kbd">esc</span>
+  </div>
+  <ul class="pal-list" id="pal-list" role="listbox" aria-label="Actions"></ul>
+  <div class="pal-foot">↑ ↓ to move · Enter to run · Every shortcut is listed next to its action</div>
+</dialog>
+
+<div id="tip" role="tooltip" hidden></div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+const FPS = 30, W = 1280, H = 800, SRC_DUR = 18.2;
+const $ = (s, el = document) => el.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const icon = (n, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const uid = p => p + Math.random().toString(36).slice(2, 8);
+const clone = o => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function fmt(t) { t = Math.max(0, t); const m = Math.floor(t / 60); const s = t - m * 60; return m + ':' + s.toFixed(2).padStart(5, '0'); }
+
+/* ---------- content colors and presets ---------- */
+const ANN = {
+  coral:    { stroke:'#FF5A4E', fill:'#D13A30', text:'#FFFFFF', halo:'#FFFFFF', name:'Coral' },
+  marigold: { stroke:'#FFB020', fill:'#FFB020', text:'#0E1116', halo:'#0E1116', name:'Marigold' },
+  lagoon:   { stroke:'#13B8A6', fill:'#0B7568', text:'#FFFFFF', halo:'#FFFFFF', name:'Lagoon' },
+  iris:     { stroke:'#6E6BFF', fill:'#4F4BD6', text:'#FFFFFF', halo:'#FFFFFF', name:'Iris' },
+  snow:     { stroke:'#FFFFFF', fill:'#FFFFFF', text:'#0E1116', halo:'#0E1116', name:'Snow' },
+  ink:      { stroke:'#0E1116', fill:'#0E1116', text:'#FFFFFF', halo:'#FFFFFF', name:'Ink' },
+};
+const ACCENTS = { coral:{fill:'#D13A30', text:'#FFFFFF'}, lagoon:{fill:'#0B7568', text:'#FFFFFF'}, iris:{fill:'#4F4BD6', text:'#FFFFFF'}, marigold:{fill:'#FFB020', text:'#0E1116'} };
+const BG = { none:'transparent', reef:'linear-gradient(135deg,#0E8F81 0%,#1F242D 100%)', dusk:'linear-gradient(135deg,#161A21 0%,#6E6BFF 100%)', ember:'linear-gradient(135deg,#D13A30 0%,#FFB020 100%)', paper:'linear-gradient(135deg,#F6F7F9 0%,#D9DDE4 100%)' };
+const BG_NAMES = { none:'None', reef:'Reef', dusk:'Dusk', ember:'Ember', paper:'Paper' };
+const TOOLS = [
+  { id:'select', label:'Select', key:'v', icon:'pointer', hint:'click an annotation to edit it, or drag it to move it' },
+  { id:'pin', label:'Pin', key:'p', icon:'pin', hint:'click the frame where the viewer should click' },
+  { id:'callout', label:'Callout', key:'c', icon:'callout', hint:'click where the note should point' },
+  { id:'arrow', label:'Arrow', key:'a', icon:'arrow', hint:'drag from the start of the arrow to its tip' },
+  { id:'spotlight', label:'Spotlight', key:'s', icon:'spot', hint:'drag over the area that should stay bright' },
+  { id:'box', label:'Box', key:'r', icon:'box', hint:'drag to outline an area' },
+  { id:'zoom', label:'Zoom', key:'z', icon:'zoom', hint:'drag over the area to zoom into on this step' },
+  { id:'blur', label:'Blur', key:'b', icon:'blur', hint:'drag over anything private; it stays blurred from here on' },
+];
+const TYPE_LABEL = { callout:'Callout', arrow:'Arrow', spotlight:'Spotlight', box:'Box', click:'Click marker' };
+const TYPE_ICON = { callout:'callout', arrow:'arrow', spotlight:'spot', box:'box', click:'target' };
+const VOICES = [['none','No narration'],['tts-heart','Generated voice · Heart (US)'],['tts-lewis','Generated voice · Lewis (UK)'],['record','My recorded voice'],['original','Original audio only']];
+const PLACE = { auto:'Auto', top:'Above', bottom:'Below', left:'Left', right:'Right' };
+const MODE_HELP = { guided:'Stops at every step until the viewer clicks Next.', auto:'Pauses on each step for its pause time, then continues.', video:'Plays straight through, with step markers on the progress bar.' };
+const SPEEDS = [[1/3,'⅓×'],[0.5,'½×'],[1,'1×'],[2,'2×'],[5,'5×']];
+const speedLabel = v => (SPEEDS.find(s => Math.abs(s[0] - v) < 1e-6) || [v, v + '×'])[1];
+
+/* ---------- the sample project ---------- */
+let doc = {
+  name: 'Weekly summary emails',
+  clips: [ { id:'c1', in:0, out:2.6, speed:2 }, { id:'c2', in:2.6, out:SRC_DUR, speed:1 } ],
+  steps: [
+    { id:'s1', t:3.4, title:'Open Settings', note:'Settings sits at the bottom of the sidebar.', hold:2.5, narration:'tts-heart', zoom:null, annotations:[
+      { id:'a1', type:'spotlight', rect:[0.00625,0.9025,0.1625,0.06], color:'coral', reveal:1 },
+      { id:'a2', type:'click', at:[0.0875,0.9325], color:'coral', reveal:1 },
+      { id:'a3', type:'callout', at:[0.1766,0.9325], text:'Open Settings at the bottom of the sidebar', placement:'right', color:'ink', reveal:2 } ] },
+    { id:'s2', t:7.1, title:'Go to Notifications', note:'', hold:2.5, narration:'tts-heart', zoom:null, annotations:[
+      { id:'a4', type:'click', at:[0.3219,0.235], color:'coral', reveal:1 },
+      { id:'a5', type:'arrow', from:[0.47,0.43], to:[0.338,0.262], curve:0.22, color:'coral', reveal:1 },
+      { id:'a6', type:'callout', at:[0.47,0.445], text:'Email settings live under Notifications', placement:'bottom', color:'ink', reveal:2 } ] },
+    { id:'s3', t:11.6, title:'Turn on the weekly summary', note:'Viewers can turn it off again from the same screen.', hold:3, narration:'tts-heart', zoom:[0.40,0.33,0.59,0.42], annotations:[
+      { id:'a7', type:'spotlight', rect:[0.2,0.505,0.775,0.1], color:'coral', reveal:1 },
+      { id:'a8', type:'click', at:[0.9266,0.555], color:'coral', reveal:1 },
+      { id:'a9', type:'callout', at:[0.9266,0.6], text:"Every Monday you'll get last week's totals and what's due", placement:'bottom', color:'ink', reveal:2 } ] },
+    { id:'s4', t:15.2, title:'Save your changes', note:'', hold:2.5, narration:'tts-heart', zoom:null, annotations:[
+      { id:'a10', type:'box', rect:[0.8531,0.715,0.1219,0.075], color:'coral', reveal:1 },
+      { id:'a11', type:'click', at:[0.9141,0.7525], color:'coral', reveal:1 },
+      { id:'a12', type:'callout', at:[0.848,0.7525], text:'Save to start getting the summary', placement:'left', color:'ink', reveal:2 } ] },
+  ],
+  blurs: [
+    { id:'b1', label:'Email in the header', rect:[0.8078,0.0175,0.1219,0.045], from:0, to:SRC_DUR, style:'pixelate' },
+    { id:'b2', label:'Email field', rect:[0.20625,0.435,0.34375,0.05], from:3.55, to:7.25, style:'pixelate' },
+  ],
+  music: null,
+  frame: { preset:'reef', padding:6, radius:14, shadow:true },
+  logo: { src:null, corner:'br' },
+  player: { mode:'guided', accent:'coral', counter:true, progress:true, fullscreen:true },
+  cta: { label:'Start your free trial', url:'https://example.com/signup' },
+  audio: { original:true },
+  analytics: { on:false, url:'' },
+};
+const ui = { tl:0, playing:false, tool:'select', sel:{ kind:'step', id:'s3' }, tab:'selection', previewSpeed:1, zoom:1, empty:false };
+const hist = { undo:[], redo:[] };
+
+/* ---------- time mapping (steps are anchored to source time) ---------- */
+const tlDur = () => doc.clips.reduce((s, c) => s + (c.out - c.in) / c.speed, 0);
+function srcToTl(t) { let acc = 0; for (const c of doc.clips) { if (t <= c.out + 1e-9) return acc + (Math.max(t, c.in) - c.in) / c.speed; acc += (c.out - c.in) / c.speed; } return acc; }
+function tlToSrc(x) { let acc = 0; for (const c of doc.clips) { const d = (c.out - c.in) / c.speed; if (x <= acc + d + 1e-9) return c.in + (x - acc) * c.speed; acc += d; } return doc.clips[doc.clips.length - 1].out; }
+const curSrc = () => tlToSrc(ui.tl);
+const clipAtSrc = t => doc.clips.find(c => t >= c.in - 1e-9 && t <= c.out + 1e-9) || doc.clips[doc.clips.length - 1];
+const stepAtSrc = t => doc.steps.find(s => Math.abs(s.t - t) < 0.5 / FPS);
+const currentStep = () => stepAtSrc(curSrc());
+const stepById = id => doc.steps.find(s => s.id === id);
+const stepIndex = s => doc.steps.indexOf(s);
+const words = s => (s.trim().match(/\S+/g) || []).length;
+const narrDur = s => s.narration.startsWith('tts') ? 0.6 + words(s.title) * 0.38 : s.narration === 'record' ? 2.4 : 0;
+const effHold = s => Math.max(s.hold, narrDur(s) + 0.4);
+const maxReveal = s => s.annotations.reduce((m, a) => Math.max(m, a.reveal), 0);
+const zoomFactor = r => clamp(Math.min(1 / r[2], 1 / r[3]), 1, 3);
+
+/* ---------- sample recording (Tallybook) ---------- */
+function screenAt(src) { if (src < 3.55) return 'dash'; if (src < 7.25) return 'profile'; if (src < 11.75) return 'notif'; if (src < 15.35) return 'notif-on'; return 'saved'; }
+const CURSOR = [[0,700,420],[3.15,112,746],[3.6,112,746],[6.85,412,188],[7.35,412,188],[11.35,1186,444],[11.8,1186,444],[14.95,1170,602],[99,1170,602]];
+function cursorAt(t) {
+  for (let i = 0; i < CURSOR.length - 1; i++) {
+    const [t0, x0, y0] = CURSOR[i], [t1, x1, y1] = CURSOR[i + 1];
+    if (t <= t1) { const k = t1 === t0 ? 1 : clamp((t - t0) / (t1 - t0), 0, 1); const e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; return [x0 + (x1 - x0) * e, y0 + (y1 - y0) * e]; }
+  }
+  return [1170, 602];
+}
+function recHTML(key) {
+  const settings = key !== 'dash';
+  const nav = [['home','Dashboard'],['file','Invoices'],['users','Clients'],['chart','Reports']];
+  let h = '<div class="tb"><div class="tb-side"><div class="tb-logo"><span class="tb-logo-mark">T</span>Tallybook</div>';
+  nav.forEach(([ic, l], i) => { h += `<div class="tb-nav ${!settings && i === 0 ? 'on' : ''}" style="top:${96 + i * 44}px">${icon(ic)}<span>${l}</span></div>`; });
+  h += `<div class="tb-nav ${settings ? 'on' : ''}" style="top:728px">${icon('sliders')}<span>Settings</span></div></div>`;
+  h += `<div class="tb-top"><div class="tb-search">${icon('search')}<span>Search invoices, clients…</span></div><div class="tb-bell">${icon('bell')}</div><div class="tb-email">maya@northwind.co</div><div class="tb-avatar">MO</div></div>`;
+  if (!settings) {
+    h += '<div class="tb-h1">Dashboard</div><div class="tb-sub">October 2026</div>';
+    [['Outstanding','$12,480.00'],['Paid this month','$8,920.00'],['Overdue','3 invoices']].forEach(([l, v], i) => { h += `<div class="tb-card" style="left:${264 + i * 316}px"><div class="tb-card-l">${l}</div><div class="tb-card-v">${v}</div></div>`; });
+    const rows = [['INV-1042','Northwind Co','$2,400.00','Paid','paid'],['INV-1041','Bluebird Studio','$860.00','Sent','sent'],['INV-1040','Harbor Bakery','$1,120.00','Overdue','over'],['INV-1039','Pine & Co','$3,050.00','Paid','paid'],['INV-1038','Atlas Freight','$640.00','Draft','draft']];
+    h += '<div class="tb-table"><div class="tb-tr th"><span>Invoice</span><span>Client</span><span>Amount</span><span>Status</span></div>';
+    rows.forEach(r => { h += `<div class="tb-tr"><span>${r[0]}</span><span>${esc(r[1])}</span><span>${r[2]}</span><span class="tb-pill tb-${r[4]}">${r[3]}</span></div>`; });
+    h += '</div>';
+  } else {
+    h += '<div class="tb-h1">Settings</div><div class="tb-sub">Manage your profile and email preferences.</div><div class="tb-tabs-line"></div>';
+    const notif = key !== 'profile';
+    [['Profile',264,80,!notif],['Notifications',352,120,notif],['Billing',480,70,false],['Team',558,64,false]].forEach(([l, x, w, on]) => { h += `<div class="tb-tab ${on ? 'on' : ''}" style="left:${x}px;width:${w}px">${l}</div>`; });
+    if (!notif) {
+      [['Full name','Maya Okafor',240],['Email','maya@northwind.co',324],['Time zone','Europe/London',408]].forEach(([l, v, y]) => { h += `<div class="tb-label" style="top:${y}px">${l}</div><div class="tb-input" style="top:${y + 24}px">${v}</div>`; });
+    } else {
+      const weekly = key !== 'notif';
+      h += '<div class="tb-section">Email me when…</div>';
+      [['Invoice paid','When a client pays an invoice.',true],['Invoice overdue','The day an invoice passes its due date.',true],['Weekly summary',"Monday morning: last week's totals and what's due.",weekly],['Product updates','Occasional news about Tallybook.',false]]
+        .forEach(([t, d, on], i) => { h += `<div class="tb-row" style="top:${268 + i * 72}px"><b>${t}</b><span>${esc(d)}</span><i class="tb-toggle ${on ? 'on' : ''}"></i></div>`; });
+      h += `<div class="tb-btn tb-cancel">Cancel</div><div class="tb-btn tb-save ${key === 'notif-on' ? 'on' : ''}">Save changes</div>`;
+      if (key === 'saved') h += `<div class="tb-toast">${icon('check')}Preferences saved</div>`;
+    }
+  }
+  return h + '</div>';
+}
+function blurHTML(src, editing) {
+  return doc.blurs.filter(b => src >= b.from - 1e-6 && src <= b.to + 1e-6).map(b =>
+    `<div class="blur ${b.style} ${editing && ui.sel && ui.sel.kind === 'blur' && ui.sel.id === b.id ? 'selected' : ''}" data-blur="${b.id}" style="left:${b.rect[0] * W}px;top:${b.rect[1] * H}px;width:${b.rect[2] * W}px;height:${b.rect[3] * H}px"></div>`).join('');
+}
+
+/* ---------- annotation renderer (one renderer for editor and player) ---------- */
+function calloutPos(a) {
+  const ax = a.at[0] * W, ay = a.at[1] * H;
+  const len = a.text.length || 1;
+  const w = clamp(Math.round(len * 10.4 + 36), 120, 330);
+  const lines = Math.max(1, Math.ceil((len * 10.4) / (w - 34)));
+  const h = lines * 27 + 24;
+  let side = a.placement;
+  if (side === 'auto') side = a.at[0] < 0.18 ? 'right' : a.at[0] > 0.82 ? 'left' : a.at[1] > 0.7 ? 'top' : 'bottom';
+  let left, top, tip;
+  if (side === 'right' || side === 'left') {
+    left = side === 'right' ? ax + 22 : ax - 22 - w;
+    top = clamp(ay - h / 2, 12, H - 12 - h); tip = clamp(ay - top, 14, h - 14);
+  } else {
+    left = clamp(ax - w / 2, 12, W - 12 - w);
+    top = side === 'bottom' ? ay + 22 : ay - 22 - h; tip = clamp(ax - left, 16, w - 16);
+  }
+  left = clamp(left, 12, W - 12 - w); top = clamp(top, 12, H - 12 - h);
+  return { left, top, w, side, tip };
+}
+function annBox(a) {
+  if (a.type === 'spotlight' || a.type === 'box') return [a.rect[0] * W, a.rect[1] * H, a.rect[2] * W, a.rect[3] * H];
+  if (a.type === 'click') return [a.at[0] * W - 26, a.at[1] * H - 26, 52, 52];
+  if (a.type === 'arrow') { const xs = [a.from[0] * W, a.to[0] * W], ys = [a.from[1] * H, a.to[1] * H]; const x = Math.min(...xs) - 14, y = Math.min(...ys) - 14; return [x, y, Math.max(...xs) + 14 - x, Math.max(...ys) + 14 - y]; }
+  return null;
+}
+function arrowSVG(a, col) {
+  const x1 = a.from[0] * W, y1 = a.from[1] * H, x2 = a.to[0] * W, y2 = a.to[1] * H;
+  const c = a.curve ?? 0.2, cx = (x1 + x2) / 2 - (y2 - y1) * c, cy = (y1 + y2) / 2 + (x2 - x1) * c;
+  const ul = Math.hypot(x2 - cx, y2 - cy) || 1, nx = (x2 - cx) / ul, ny = (y2 - cy) / ul, hs = 26;
+  const bx = x2 - nx * hs, by = y2 - ny * hs, px = -ny * hs * 0.55, py = nx * hs * 0.55;
+  const path = `M${x1.toFixed(1)} ${y1.toFixed(1)} Q${cx.toFixed(1)} ${cy.toFixed(1)} ${bx.toFixed(1)} ${by.toFixed(1)}`;
+  const head = `${x2.toFixed(1)},${y2.toFixed(1)} ${(bx + px).toFixed(1)},${(by + py).toFixed(1)} ${(bx - px).toFixed(1)},${(by - py).toFixed(1)}`;
+  return `<path d="${path}" fill="none" stroke="${col.halo}" stroke-width="13" stroke-linecap="round"/><polygon points="${head}" fill="${col.halo}" stroke="${col.halo}" stroke-width="6" stroke-linejoin="round"/>` +
+         `<path d="${path}" fill="none" stroke="${col.stroke}" stroke-width="7" stroke-linecap="round"/><polygon points="${head}" fill="${col.stroke}"/>` +
+         `<path d="${path}" fill="none" stroke="transparent" stroke-width="30"/>`;
+}
+function annHTML(step, o) {
+  if (!step) return '';
+  const reveal = o.reveal ?? 99;
+  const anns = step.annotations.filter(a => a.reveal <= reveal);
+  const fresh = a => (o.animateGroup && a.reveal === o.animateGroup ? ' reveal-in' : '');
+  const spots = anns.filter(a => a.type === 'spotlight');
+  let s = `<svg width="1280" height="800" viewBox="0 0 1280 800" aria-hidden="true">`;
+  if (spots.length) {
+    const m = o.prefix + '-mask', f = o.prefix + '-feather';
+    s += `<defs><filter id="${f}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter><mask id="${m}"><rect width="1280" height="800" fill="#FFFFFF"/>` +
+         spots.map(a => `<rect x="${a.rect[0] * W}" y="${a.rect[1] * H}" width="${a.rect[2] * W}" height="${a.rect[3] * H}" rx="12" fill="#000000" filter="url(#${f})"/>`).join('') + '</mask></defs>';
+    s += `<rect width="1280" height="800" fill="#0E1116" fill-opacity=".55" mask="url(#${m})"/>`;
+    spots.forEach(a => { s += `<rect class="hit" data-ann="${a.id}" x="${a.rect[0] * W}" y="${a.rect[1] * H}" width="${a.rect[2] * W}" height="${a.rect[3] * H}" rx="12" fill="transparent"/>`; });
+  }
+  anns.forEach(a => {
+    const col = ANN[a.color] || ANN.coral;
+    if (a.type === 'box') {
+      const [x, y, w, h] = annBox(a);
+      s += `<g class="ann${fresh(a)}" data-ann="${a.id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="none" stroke="${col.halo}" stroke-width="11"/><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${col.stroke}" fill-opacity=".08" stroke="${col.stroke}" stroke-width="5"/></g>`;
+    } else if (a.type === 'arrow') {
+      s += `<g class="ann${fresh(a)}" data-ann="${a.id}">${arrowSVG(a, col)}</g>`;
+    } else if (a.type === 'click') {
+      const x = a.at[0] * W, y = a.at[1] * H;
+      s += `<g class="ann${fresh(a)}" data-ann="${a.id}"><circle class="pulse" cx="${x}" cy="${y}" r="16" fill="none" stroke="${col.stroke}" stroke-width="4"/><circle cx="${x}" cy="${y}" r="21" fill="${col.stroke}" fill-opacity=".22" stroke="${col.stroke}" stroke-width="3"/><circle cx="${x}" cy="${y}" r="7.5" fill="${col.stroke}" stroke="${col.halo}" stroke-width="3"/></g>`;
+    }
+  });
+  if (o.editing && step.zoom) {
+    const [zx, zy, zw, zh] = [step.zoom[0] * W, step.zoom[1] * H, step.zoom[2] * W, step.zoom[3] * H];
+    s += `<g><rect x="${zx}" y="${zy}" width="${zw}" height="${zh}" rx="8" fill="none" stroke="#13B8A6" stroke-width="3" stroke-dasharray="12 8"/><rect x="${zx}" y="${zy - 30}" width="118" height="26" rx="6" fill="#13B8A6"/><text x="${zx + 10}" y="${zy - 12}" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, system-ui, sans-serif" font-size="15" font-weight="700" fill="#0E1116">Zoom ${zoomFactor(step.zoom).toFixed(1)}×</text></g>`;
+  }
+  if (o.editing && o.selId) {
+    const a = anns.find(x => x.id === o.selId);
+    const b = a && annBox(a);
+    if (b) {
+      const [x, y, w, h] = [b[0] - 6, b[1] - 6, b[2] + 12, b[3] + 12];
+      s += `<g pointer-events="none"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="#13B8A6" stroke-width="3" stroke-dasharray="9 6"/>` +
+           [[x, y],[x + w, y],[x, y + h],[x + w, y + h]].map(([hx, hy]) => `<rect x="${hx - 6}" y="${hy - 6}" width="12" height="12" rx="2" fill="#FFFFFF" stroke="#13B8A6" stroke-width="3"/>`).join('') + '</g>';
+    }
+  }
+  s += '</svg>';
+  anns.filter(a => a.type === 'callout').forEach(a => {
+    const col = ANN[a.color] || ANN.ink, p = calloutPos(a);
+    s += `<div class="callout tip-${p.side}${a.color === 'snow' ? ' snow' : ''}${o.editing && o.selId === a.id ? ' selected' : ''}${fresh(a)}" data-ann="${a.id}" style="left:${p.left}px;top:${p.top}px;width:${p.w}px;--tip:${p.tip}px;--cb:${col.fill};background:${col.fill};color:${col.text}">${esc(a.text)}</div>`;
+  });
+  return s;
+}
+function logoHTML() { return doc.logo.src ? `<img class="logo-img c-${doc.logo.corner}" src="${esc(doc.logo.src)}" alt="">` : ''; }
+
+/* ---------- framing (background, padding, corners) ---------- */
+function fitFrame(box, holder, frame, availW, availH) {
+  const f = doc.frame, p = f.preset === 'none' ? 0 : f.padding / 100;
+  const tw = W * (1 + 2 * p), th = H + 2 * p * W;
+  const s = Math.max(0.05, Math.min(availW / tw, availH / th));
+  const pad = p * W * s;
+  box.style.padding = pad + 'px';
+  box.style.background = BG[f.preset];
+  box.style.borderRadius = f.preset === 'none' ? '0' : Math.max(8, pad * 0.6) + 'px';
+  holder.style.width = W * s + 'px'; holder.style.height = H * s + 'px';
+  holder.style.borderRadius = (f.preset === 'none' ? 6 : f.radius * s * 1.6) + 'px';
+  holder.style.boxShadow = f.shadow && f.preset !== 'none' ? '0 14px 40px rgba(0,0,0,.35)' : '0 0 0 1px rgba(14,17,22,.12)';
+  frame.style.transform = `scale(${s})`;
+  return { s, w: tw * s, h: th * s };
+}
+
+/* ---------- DOM refs ---------- */
+const app = $('#app'), stepList = $('#step-list'), stageWrap = $('#stage-wrap'), framebox = $('#framebox'), holder = $('#holder'), frameEl = $('#frame');
+const recEl = $('#rec'), blurEl = $('#blur-layer'), cursorEl = $('#cursor'), annEl = $('#ann-layer'), logoEl = $('#logo-layer'), draftEl = $('#draft');
+const statusEl = $('#stage-status'), inspBody = $('#insp-body'), tlScroll = $('#tl-scroll'), tlInner = $('#tl-inner'), timecodeEl = $('#timecode');
+const nameInput = $('#project-name');
+const stacked = () => matchMedia('(max-width: 900px)').matches;
+
+/* ---------- history ---------- */
+function pushUndo(snap) { hist.undo.push(snap); if (hist.undo.length > 80) hist.undo.shift(); hist.redo.length = 0; renderUndo(); }
+function commit(fn) { pushUndo(clone(doc)); fn(); renderAll(); }
+function fixSel() {
+  const s = ui.sel; if (!s) return;
+  if (s.kind === 'step' && !stepById(s.id)) ui.sel = null;
+  if (s.kind === 'ann') { const st = stepById(s.stepId); if (!st) ui.sel = null; else if (!st.annotations.find(a => a.id === s.id)) ui.sel = { kind:'step', id:st.id }; }
+  if (s.kind === 'clip' && !doc.clips.find(c => c.id === s.id)) ui.sel = null;
+  if (s.kind === 'blur' && !doc.blurs.find(b => b.id === s.id)) ui.sel = null;
+}
+function undo() { if (!hist.undo.length) return; hist.redo.push(clone(doc)); doc = hist.undo.pop(); ui.tl = clamp(ui.tl, 0, tlDur()); fixSel(); renderAll(); }
+function redo() { if (!hist.redo.length) return; hist.undo.push(clone(doc)); doc = hist.redo.pop(); ui.tl = clamp(ui.tl, 0, tlDur()); fixSel(); renderAll(); }
+function renderUndo() { $('#btn-undo').disabled = !hist.undo.length; $('#btn-redo').disabled = !hist.redo.length; }
+
+/* ---------- toasts and tooltips ---------- */
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  $('#toasts').appendChild(t); setTimeout(() => t.remove(), 3600);
+}
+const tip = $('#tip');
+function showTip(el) {
+  const text = el.getAttribute('data-tip'); if (!text) return;
+  tip.textContent = text; tip.hidden = false;
+  const r = el.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  let y = r.top - th - 8; if (y < 8) y = r.bottom + 8;
+  tip.style.left = clamp(r.left + r.width / 2 - tw / 2, 8, innerWidth - tw - 8) + 'px'; tip.style.top = y + 'px';
+}
+document.addEventListener('pointerover', e => { const el = e.target.closest && e.target.closest('[data-tip]'); if (el) showTip(el); });
+document.addEventListener('pointerout', e => { const el = e.target.closest && e.target.closest('[data-tip]'); if (el && !el.contains(e.relatedTarget)) tip.hidden = true; });
+document.addEventListener('focusin', e => { const el = e.target.closest && e.target.closest('[data-tip]'); if (el && el.matches(':focus-visible')) showTip(el); else tip.hidden = true; });
+document.addEventListener('pointerdown', () => { tip.hidden = true; });
+
+/* ---------- rendering ---------- */
+const last = { scr:null, annKey:null, status:null, playing:null };
+function selStepId() { const s = ui.sel; if (!s) return null; return s.kind === 'step' ? s.id : s.kind === 'ann' ? s.stepId : null; }
+function renderAll() {
+  app.classList.toggle('is-empty', ui.empty);
+  $('#empty').hidden = !ui.empty;
+  if (document.activeElement !== nameInput) nameInput.value = doc.name;
+  renderSteps(); renderTools(); fitStage(); last.scr = null; last.annKey = null; last.status = null; last.playing = null; renderAtTime();
+  renderInspector(); renderTimeline(); renderUndo();
+}
+function renderSteps() {
+  $('#step-count').textContent = ui.empty ? '' : doc.steps.length;
+  if (ui.empty) { stepList.innerHTML = '<li class="empty-steps">No steps yet. Once a recording is open, press <span class="kbd">P</span> and click the frame to pin your first step.</li>'; return; }
+  const selId = selStepId();
+  stepList.innerHTML = doc.steps.map((s, i) => {
+    const click = s.annotations.find(a => a.type === 'click');
+    const n = s.annotations.length;
+    return `<li><button class="step-card ${s.id === selId ? 'selected' : ''}" data-step="${s.id}" ${s.id === selId ? 'aria-current="step"' : ''}>` +
+      `<span class="step-num">${i + 1}</span>` +
+      `<span class="thumb" aria-hidden="true"><span class="thumb-inner">${recHTML(screenAt(s.t))}<span class="blur-layer">${blurHTML(s.t, false)}</span></span>${click ? `<span class="thumb-dot" style="left:${click.at[0] * 100}%;top:${click.at[1] * 100}%"></span>` : ''}</span>` +
+      `<span class="step-meta"><span class="step-title">${esc(s.title || 'Untitled step')}</span><span class="step-time">${fmt(srcToTl(s.t))}<span class="sr-only">, ${n} ${n === 1 ? 'annotation' : 'annotations'}</span></span></span></button></li>`;
+  }).join('');
+  updateThumbs();
+}
+function updateThumbs() { stepList.querySelectorAll('.thumb').forEach(t => { const w = t.clientWidth; if (w) t.querySelector('.thumb-inner').style.setProperty('--thumb-s', (w / W).toFixed(4)); }); }
+function renderTools() {
+  const t = $('#tools');
+  if (!t.childElementCount) {
+    t.innerHTML = TOOLS.map((x, i) => `${i === 2 ? '<span class="tool-sep" aria-hidden="true"></span>' : ''}<button class="tool" data-tool="${x.id}" aria-pressed="false" aria-label="${x.label} (${x.key.toUpperCase()})" data-tip="${x.label}: ${x.hint}">${icon(x.icon)}<span class="lbl">${x.label}</span><span class="kbd" aria-hidden="true">${x.key.toUpperCase()}</span></button>`).join('');
+  }
+  t.querySelectorAll('.tool').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === ui.tool)));
+  frameEl.classList.toggle('t-select', ui.tool === 'select');
+  frameEl.classList.toggle('t-draw', ui.tool !== 'select');
+}
+function fitStage() {
+  if (ui.empty) { stageWrap.style.height = ''; return; }
+  const availW = stageWrap.clientWidth;
+  if (stacked()) {
+    const p = doc.frame.preset === 'none' ? 0 : doc.frame.padding / 100;
+    const h = availW * (H + 2 * p * W) / (W * (1 + 2 * p));
+    stageWrap.style.height = Math.ceil(h) + 'px';
+    fitFrame(framebox, holder, frameEl, availW, h);
+  } else {
+    stageWrap.style.height = '';
+    fitFrame(framebox, holder, frameEl, availW, stageWrap.clientHeight);
+  }
+  logoEl.innerHTML = logoHTML();
+}
+function renderAtTime() {
+  const src = curSrc();
+  const scr = screenAt(src);
+  if (scr !== last.scr) { recEl.innerHTML = recHTML(scr); last.scr = scr; }
+  const [cx, cy] = cursorAt(src);
+  cursorEl.style.transform = `translate(${cx}px,${cy}px)`;
+  blurEl.innerHTML = blurHTML(src, true);
+  const st = currentStep();
+  const selAnn = ui.sel && ui.sel.kind === 'ann' ? ui.sel.id : null;
+  const key = (st ? st.id + JSON.stringify(st.annotations) + JSON.stringify(st.zoom) : '-') + '|' + selAnn;
+  if (key !== last.annKey) { annEl.innerHTML = annHTML(st, { prefix:'ed', editing:true, selId:selAnn }); last.annKey = key; }
+  updatePlayhead();
+  renderStatus(st);
+  if (last.playing !== ui.playing) {
+    const pb = $('#btn-play'); last.playing = ui.playing;
+    pb.innerHTML = icon(ui.playing ? 'pause' : 'play', 'fill');
+    pb.setAttribute('aria-label', ui.playing ? 'Pause' : 'Play');
+  }
+}
+function renderStatus(st) {
+  if (ui.empty) return;
+  const tool = TOOLS.find(t => t.id === ui.tool);
+  let h;
+  if (ui.tool !== 'select') h = `<b>${tool.label}</b><span>${tool.hint[0].toUpperCase() + tool.hint.slice(1)}.</span><span class="kbd">esc</span><span>to stop</span>`;
+  else if (st) { const i = stepIndex(st); h = `<span class="dot" aria-hidden="true"></span><b>Step ${i + 1} of ${doc.steps.length}</b><span>${esc(st.title)}</span>`; }
+  else h = `<span class="dot off" aria-hidden="true"></span><b>${fmt(ui.tl)}</b><span>Not a step yet. Press</span><span class="kbd">P</span><span>and click the frame to pin it.</span>`;
+  if (last.status !== h) { statusEl.innerHTML = h; last.status = h; }
+}
+
+/* ---------- inspector ---------- */
+function setTab(tab) {
+  ui.tab = tab;
+  $('#tab-selection').setAttribute('aria-selected', String(tab === 'selection'));
+  $('#tab-guide').setAttribute('aria-selected', String(tab === 'guide'));
+  renderInspector();
+}
+const ordinal = g => ['', 'First', 'Second', 'Third'][g] || g;
+const annName = a => a.type === 'callout' ? `“${a.text.length > 26 ? a.text.slice(0, 25) + '…' : a.text}”` : TYPE_LABEL[a.type];
+function renderInspector() {
+  const focusId = document.activeElement && inspBody.contains(document.activeElement) ? document.activeElement.id : null;
+  $('#tab-selection').setAttribute('aria-selected', String(ui.tab === 'selection'));
+  $('#tab-guide').setAttribute('aria-selected', String(ui.tab === 'guide'));
+  let h = '';
+  if (ui.empty) h = `<div class="nothing"><h3>Nothing to edit yet</h3><p class="help">Steps, annotations and guide settings appear here once a recording is open.</p></div>`;
+  else if (ui.tab === 'guide') h = inspGuide();
+  else {
+    const s = ui.sel;
+    if (s && s.kind === 'step' && stepById(s.id)) h = inspStep(stepById(s.id));
+    else if (s && s.kind === 'ann') { const st = stepById(s.stepId); const a = st && st.annotations.find(x => x.id === s.id); h = a ? inspAnn(st, a) : ''; }
+    else if (s && s.kind === 'clip') h = inspClip(doc.clips.find(c => c.id === s.id));
+    else if (s && s.kind === 'blur') h = inspBlur(doc.blurs.find(b => b.id === s.id));
+    if (!h) h = `<div class="nothing"><h3>Nothing selected</h3><p class="help">Click a step, an annotation on the frame, or a clip on the timeline to edit it.</p><button class="btn secondary sm" data-act="open-guide" style="align-self:flex-start">${icon('sliders')}Guide settings</button></div>`;
+  }
+  inspBody.innerHTML = h;
+  if (focusId) { const el = document.getElementById(focusId); if (el) el.focus(); }
+}
+function inspStep(s) {
+  const i = stepIndex(s), here = currentStep() === s, nd = narrDur(s);
+  const anns = s.annotations.slice().sort((a, b) => a.reveal - b.reveal);
+  return `
+  <div class="insp-title"><span class="step-num">${i + 1}</span><div><h3 class="insp-h">Step ${i + 1} of ${doc.steps.length}</h3><p class="insp-sub">Pinned at ${fmt(srcToTl(s.t))} · frame ${Math.round(s.t * FPS)}</p></div>${here ? '' : `<button class="btn ghost sm" data-act="goto-step">Go to frame</button>`}</div>
+  <div class="field"><label for="f-title">Title</label><input id="f-title" type="text" data-field="title" value="${esc(s.title)}" maxlength="90"></div>
+  <div class="field"><label for="f-note">Note <span class="opt">· shown in PDF exports</span></label><textarea id="f-note" data-field="note" rows="2" placeholder="Extra detail for written guides">${esc(s.note)}</textarea></div>
+  <div class="field"><div class="row"><label for="f-hold">Pause on this step</label><output id="o-hold" for="f-hold">${s.hold.toFixed(1)} s</output></div><input id="f-hold" type="range" min="1" max="8" step="0.5" value="${s.hold}" data-field="hold">${nd + 0.4 > s.hold ? `<p class="help">The narration runs ${nd.toFixed(1)} s, so viewers wait ${effHold(s).toFixed(1)} s.</p>` : ''}</div>
+  <div class="row switch-row"><label for="f-zoom">Zoom into an area</label><input id="f-zoom" class="switch" type="checkbox" role="switch" data-field="zoom" ${s.zoom ? 'checked' : ''}></div>
+  ${s.zoom ? `<p class="help">Zooms ${zoomFactor(s.zoom).toFixed(1)}× when viewers reach this step. Drag with the Zoom tool (<span class="kbd">Z</span>) to change the area.</p>` : ''}
+  <section class="section"><h3>Annotations <span class="h-note">· appear in this order</span></h3>
+    ${anns.length ? `<ul class="ann-list">${anns.map(a => `<li class="ann-row"><button class="ann-pick" data-act="sel-ann" data-id="${a.id}">${icon(TYPE_ICON[a.type])}<span>${esc(annName(a))}</span></button><label class="sr-only" for="rv-${a.id}">When ${esc(annName(a))} appears</label><select id="rv-${a.id}" data-field="reveal" data-id="${a.id}">${[1, 2, 3].map(g => `<option value="${g}" ${a.reveal === g ? 'selected' : ''}>${ordinal(g)}</option>`).join('')}</select><button class="icon-btn sm" data-act="del-ann" data-id="${a.id}" aria-label="Delete ${esc(annName(a))}">${icon('trash')}</button></li>`).join('')}</ul><p class="help">Items marked First appear together, then Second, then Third.</p>`
+      : `<p class="help">No annotations yet. Pick Callout (<span class="kbd">C</span>), Arrow (<span class="kbd">A</span>) or Spotlight (<span class="kbd">S</span>) and use it on the frame.</p>`}
+  </section>
+  <section class="section"><h3>Narration</h3>
+    <label class="sr-only" for="f-narr">Narration</label><select id="f-narr" data-field="narration">${VOICES.map(([v, l]) => `<option value="${v}" ${s.narration === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    <p class="help">${s.narration.startsWith('tts') ? `Reads the title aloud (${nd.toFixed(1)} s). The voice is generated on this computer.` : s.narration === 'record' ? 'Record from your microphone, step by step.' : s.narration === 'original' ? "Plays the recording's own audio for this part." : 'This step is silent.'}</p>
+  </section>
+  <button class="btn danger-ghost" data-act="del-step">${icon('trash')}Delete step</button>`;
+}
+function inspAnn(st, a) {
+  const i = stepIndex(st);
+  return `
+  <button class="back" data-act="back-step">${icon('chev-left')}Step ${i + 1} · ${esc(st.title)}</button>
+  <div class="insp-title"><span class="ann-ic">${icon(TYPE_ICON[a.type])}</span><div><h3 class="insp-h">${TYPE_LABEL[a.type]}</h3><p class="insp-sub">Drag it on the frame to move it.</p></div></div>
+  ${a.type === 'callout' ? `<div class="field"><label for="f-text">Text</label><textarea id="f-text" data-field="text" rows="3">${esc(a.text)}</textarea></div>
+  <div class="field"><span class="label" id="lbl-place">Position</span><div class="seg" role="group" aria-labelledby="lbl-place">${Object.keys(PLACE).map(p => `<button data-act="place" data-v="${p}" aria-pressed="${a.placement === p}">${PLACE[p]}</button>`).join('')}</div></div>` : ''}
+  ${a.type === 'arrow' ? `<div class="field"><div class="row"><label for="f-curve">Curve</label><output id="o-curve">${Math.round(a.curve * 100)}</output></div><input id="f-curve" type="range" min="-0.5" max="0.5" step="0.05" value="${a.curve}" data-field="curve"></div>` : ''}
+  <div class="field"><span class="label" id="lbl-color">Color</span><div class="swatches" role="group" aria-labelledby="lbl-color">${Object.entries(ANN).map(([k, c]) => `<button class="swatch" data-act="color" data-v="${k}" aria-pressed="${a.color === k}" aria-label="${c.name}" style="--sw:${a.type === 'callout' ? c.fill : c.stroke}"></button>`).join('')}</div></div>
+  <div class="field"><label for="f-reveal">Appears</label><select id="f-reveal" data-field="reveal" data-id="${a.id}">${[1, 2, 3].map(g => `<option value="${g}" ${a.reveal === g ? 'selected' : ''}>${ordinal(g)}</option>`).join('')}</select></div>
+  <button class="btn danger-ghost" data-act="del-ann" data-id="${a.id}">${icon('trash')}Delete ${TYPE_LABEL[a.type].toLowerCase()}</button>`;
+}
+function inspClip(c) {
+  if (!c) return '';
+  const i = doc.clips.indexOf(c), d = c.out - c.in;
+  return `
+  <div class="insp-title"><span class="ann-ic">${icon('film')}</span><div><h3 class="insp-h">Clip ${i + 1}</h3><p class="insp-sub">${fmt(c.in)}–${fmt(c.out)} of the recording</p></div></div>
+  <div class="field"><span class="label" id="lbl-speed">Speed</span><div class="seg" role="group" aria-labelledby="lbl-speed">${SPEEDS.map(([v, l]) => `<button data-act="speed" data-v="${v}" aria-pressed="${Math.abs(c.speed - v) < 1e-6}">${l}</button>`).join('')}</div>
+  <p class="help">${d.toFixed(1)} s of recording plays in ${(d / c.speed).toFixed(1)} s. Sped-up audio keeps its pitch.</p></div>
+  <button class="btn secondary sm" data-act="split" style="align-self:flex-start">${icon('scissors')}Split at playhead <span class="kbd">⌘B</span></button>
+  <p class="help">Steps stay pinned to their exact frame when you change speed or split.</p>`;
+}
+function inspBlur(b) {
+  if (!b) return '';
+  return `
+  <div class="insp-title"><span class="ann-ic">${icon('blur')}</span><div><h3 class="insp-h">${esc(b.label)}</h3><p class="insp-sub">Visible ${fmt(srcToTl(b.from))}–${fmt(srcToTl(b.to))}</p></div></div>
+  <div class="field"><span class="label" id="lbl-bstyle">Style</span><div class="seg" role="group" aria-labelledby="lbl-bstyle">${[['pixelate','Pixelate'],['gaussian','Blur'],['solid','Solid']].map(([v, l]) => `<button data-act="bstyle" data-v="${v}" aria-pressed="${b.style === v}">${l}</button>`).join('')}</div></div>
+  <p class="help">Blur is burned into every export and the published guide. Nobody can remove it afterwards.</p>
+  <button class="btn danger-ghost" data-act="del-blur">${icon('trash')}Delete blur</button>`;
+}
+function inspGuide() {
+  const f = doc.frame, p = doc.player;
+  return `
+  <section class="section" style="border-top:0; padding-top:0"><h3>Frame</h3>
+    <div class="field"><span class="label" id="lbl-bg">Background</span><div class="bg-grid" role="group" aria-labelledby="lbl-bg">${Object.keys(BG).map(k => `<button class="bg-tile" data-act="bg" data-v="${k}" aria-pressed="${f.preset === k}"><span class="bg-swatch ${k === 'none' ? 'none' : ''}" style="background:${BG[k]}"></span><span>${BG_NAMES[k]}</span></button>`).join('')}</div></div>
+    <div class="field"><div class="row"><label for="f-pad">Padding</label><output id="o-pad">${f.padding}%</output></div><input id="f-pad" type="range" min="2" max="12" step="1" value="${f.padding}" data-field="padding" ${f.preset === 'none' ? 'disabled' : ''}></div>
+    <div class="field"><div class="row"><label for="f-rad">Corner radius</label><output id="o-rad">${f.radius} px</output></div><input id="f-rad" type="range" min="0" max="32" step="2" value="${f.radius}" data-field="radius"></div>
+    <div class="row switch-row"><label for="f-shadow">Shadow</label><input id="f-shadow" class="switch" type="checkbox" role="switch" data-field="shadow" ${f.shadow ? 'checked' : ''}></div>
+  </section>
+  <section class="section"><h3>Logo</h3>
+    ${doc.logo.src ? `<div class="logo-row"><img src="${esc(doc.logo.src)}" alt="Your logo"><button class="btn ghost sm" data-act="remove-logo">Remove</button></div>
+    <div class="field"><label for="f-corner">Corner</label><select id="f-corner" data-field="corner">${[['tl','Top left'],['tr','Top right'],['bl','Bottom left'],['br','Bottom right']].map(([v, l]) => `<option value="${v}" ${doc.logo.corner === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`
+    : `<label class="btn secondary sm file-btn" for="f-logo">${icon('image')}Upload logo…</label><input id="f-logo" class="sr-only" type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" data-field="logo"><p class="help">PNG or SVG. Appears in a corner of every frame.</p>`}
+  </section>
+  <section class="section"><h3>Player</h3>
+    <div class="field"><span class="label" id="lbl-mode">Playback</span><div class="seg" role="group" aria-labelledby="lbl-mode">${[['guided','Guided'],['auto','Auto'],['video','Video']].map(([v, l]) => `<button data-act="mode" data-v="${v}" aria-pressed="${p.mode === v}">${l}</button>`).join('')}</div><p class="help">${MODE_HELP[p.mode]}</p></div>
+    <div class="field"><span class="label" id="lbl-acc">Accent</span><div class="swatches" role="group" aria-labelledby="lbl-acc">${Object.entries(ACCENTS).map(([k, c]) => `<button class="swatch" data-act="accent" data-v="${k}" aria-pressed="${p.accent === k}" aria-label="${k[0].toUpperCase() + k.slice(1)}" style="--sw:${c.fill}"></button>`).join('')}</div></div>
+    <fieldset class="checks"><legend class="label">Controls</legend>${[['counter','Step counter'],['progress','Progress bar'],['fullscreen','Fullscreen button']].map(([k, l]) => `<label class="check" for="f-ctl-${k}"><input id="f-ctl-${k}" type="checkbox" data-field="ctl" data-k="${k}" ${p[k] ? 'checked' : ''}>${l}</label>`).join('')}</fieldset>
+  </section>
+  <section class="section"><h3>Call to action</h3>
+    <div class="field"><label for="f-cta">Button text</label><input id="f-cta" type="text" data-field="cta-label" value="${esc(doc.cta.label)}"></div>
+    <div class="field"><label for="f-cta-url">Link</label><input id="f-cta-url" type="url" data-field="cta-url" value="${esc(doc.cta.url)}"></div>
+    <p class="help">Shown on the end card when the guide finishes.</p>
+  </section>
+  <section class="section"><h3>Audio</h3>
+    <div class="row switch-row"><label for="f-orig">Keep original audio</label><input id="f-orig" class="switch" type="checkbox" role="switch" data-field="original" ${doc.audio.original ? 'checked' : ''}></div>
+    ${doc.music ? `<div class="field"><div class="row"><label for="f-mvol">Music · ${esc(doc.music.name)}</label><output id="o-mvol">${doc.music.volume}%</output></div><input id="f-mvol" type="range" min="0" max="100" step="5" value="${doc.music.volume}" data-field="music-vol"><p class="help">Gets quieter under narration automatically.</p></div><button class="btn ghost sm" data-act="remove-music" style="align-self:flex-start">Remove music</button>`
+      : `<button class="btn secondary sm" data-act="add-music" style="align-self:flex-start">${icon('music')}Add background music</button>`}
+  </section>
+  <section class="section"><h3>Analytics</h3>
+    <div class="row switch-row"><label for="f-an">Count views</label><input id="f-an" class="switch" type="checkbox" role="switch" data-field="analytics" ${doc.analytics.on ? 'checked' : ''}></div>
+    <p class="help">${doc.analytics.on ? 'No cookies. The player reports which steps each visit reached.' : 'Off. The published guide sends nothing anywhere.'}</p>
+    ${doc.analytics.on ? `<div class="field"><label for="f-an-url">Collector address</label><input id="f-an-url" type="url" data-field="analytics-url" placeholder="https://stats.example.com/e" value="${esc(doc.analytics.url)}"></div>` : ''}
+  </section>`;
+}
+
+/* ---------- timeline ---------- */
+function laneW() { return Math.max(560, tlScroll.clientWidth - 84 - 14) * ui.zoom; }
+function renderTimeline() {
+  if (ui.empty) { tlInner.style.setProperty('--lane-w', '0px'); tlInner.innerHTML = '<div class="tl-empty">The recording\'s timeline appears here: clips, steps, blur, voice and music.</div>'; timecodeEl.innerHTML = '<span>No recording</span>'; return; }
+  const T = tlDur(), lw = laneW(), x = t => (t / T) * lw;
+  tlInner.style.setProperty('--lane-w', lw + 'px');
+  const every = lw / T < 34 ? 2 : 1;
+  let ticks = '';
+  for (let t = 0; t <= T + 1e-6; t += every) {
+    const major = Math.round(t) % 2 === 0;
+    ticks += `<span class="tick ${major ? 'major' : ''}" style="left:${x(t)}px"></span>`;
+    if (major) ticks += `<span class="tick-label ${t === 0 ? 'first' : ''}" style="left:${x(t)}px">${t === 0 ? '0s' : Math.round(t)}</span>`;
+  }
+  const selId = selStepId();
+  const clips = doc.clips.map((c, i) => { const a = srcToTl(c.in), b = srcToTl(c.out); return `<button class="clip ${ui.sel && ui.sel.kind === 'clip' && ui.sel.id === c.id ? 'selected' : ''}" data-clip="${c.id}" style="left:${x(a) + 1}px;width:${Math.max(4, x(b) - x(a) - 2)}px" aria-label="Clip ${i + 1}, ${fmt(c.in)} to ${fmt(c.out)}, ${speedLabel(c.speed)}">${icon('film')}<span>Clip ${i + 1} · ${fmt(c.in)}–${fmt(c.out)}</span><b class="speed">${speedLabel(c.speed)}</b></button>`; }).join('');
+  const pins = doc.steps.map((s, i) => `<button class="pin-marker ${s.id === selId ? 'selected' : ''}" data-step="${s.id}" style="left:${x(srcToTl(s.t))}px" aria-label="Step ${i + 1}: ${esc(s.title)}" data-tip="Step ${i + 1}: ${esc(s.title)}">${i + 1}</button>`).join('');
+  const rowEnds = [], blurRow = {};
+  doc.blurs.slice().sort((a, b) => a.from - b.from).forEach(b => { let r = rowEnds.findIndex(end => end <= b.from + 1e-6); if (r < 0) { r = rowEnds.length; rowEnds.push(0); } rowEnds[r] = b.to; blurRow[b.id] = r; });
+  const blurRows = Math.max(1, rowEnds.length);
+  const blurs = doc.blurs.map(b => { const a = srcToTl(b.from), e = srcToTl(b.to); return `<button class="lane-bar blur-bar ${ui.sel && ui.sel.kind === 'blur' && ui.sel.id === b.id ? 'selected' : ''}" data-blur="${b.id}" style="left:${x(a) + 1}px;width:${Math.max(6, x(e) - x(a) - 2)}px;top:${5 + blurRow[b.id] * 26}px;bottom:auto;height:22px">${icon('blur')}<span>${esc(b.label)}</span></button>`; }).join('');
+  const voices = doc.steps.filter(s => narrDur(s) > 0).map(s => { const a = srcToTl(s.t); return `<button class="lane-bar voice-bar" data-step="${s.id}" style="left:${x(a)}px;width:${Math.max(24, x(narrDur(s)))}px" aria-label="Narration for ${esc(s.title)}">${icon('mic')}<span>${s.narration === 'record' ? 'Recorded' : s.narration === 'tts-lewis' ? 'Lewis' : 'Heart'} · ${narrDur(s).toFixed(1)} s</span></button>`; }).join('');
+  const music = doc.music ? `<button class="lane-bar music-bar" data-act="music" style="left:1px;width:${lw - 2}px">${icon('music')}<span>${esc(doc.music.name)} · ${doc.music.volume}%</span></button>` : `<button class="lane-add" data-act="add-music">${icon('plus')}Add music</button>`;
+  tlInner.innerHTML =
+    `<div class="tl-row ruler"><div class="tl-label"></div><div class="tl-lane" data-scrub>${ticks}</div></div>` +
+    `<div class="tl-row"><div class="tl-label">${icon('film')}Video</div><div class="tl-lane track" data-scrub>${clips}</div></div>` +
+    `<div class="tl-row"><div class="tl-label">${icon('pin')}Steps</div><div class="tl-lane track" data-scrub>${pins}</div></div>` +
+    `<div class="tl-row" style="height:${blurRows * 26 + 6}px"><div class="tl-label">${icon('blur')}Blur</div><div class="tl-lane track" data-scrub>${blurs}</div></div>` +
+    `<div class="tl-row"><div class="tl-label">${icon('mic')}Voice</div><div class="tl-lane track" data-scrub>${voices}</div></div>` +
+    `<div class="tl-row"><div class="tl-label">${icon('music')}Music</div><div class="tl-lane track" data-scrub>${music}</div></div>` +
+    `<div class="playhead" id="playhead"></div>`;
+  updatePlayhead();
+}
+function updatePlayhead() {
+  if (ui.empty) return;
+  const ph = $('#playhead'), T = tlDur();
+  if (ph) ph.style.left = (84 + (ui.tl / T) * laneW()) + 'px';
+  timecodeEl.innerHTML = `${fmt(ui.tl)} <span>/ ${fmt(T)}</span>`;
+}
+
+/* ---------- selection and editing actions ---------- */
+function selectStep(id, opts = {}) {
+  const s = stepById(id); if (!s) return;
+  pause(); ui.sel = { kind:'step', id }; ui.tab = 'selection';
+  if (opts.move !== false) ui.tl = srcToTl(s.t);
+  renderSteps(); renderAtTime(); renderInspector(); renderTimeline();
+  const card = stepList.querySelector(`[data-step="${id}"]`); if (card) card.scrollIntoView({ block:'nearest', inline:'nearest' });
+}
+function selectAnn(step, id) { ui.sel = { kind:'ann', stepId:step.id, id }; ui.tab = 'selection'; renderSteps(); renderAtTime(); renderInspector(); renderTimeline(); }
+function setPlayhead(t, snap) {
+  ui.tl = clamp(t, 0, tlDur());
+  if (snap) { const lw = laneW(), T = tlDur(); for (const s of doc.steps) { const st = srcToTl(s.t); if (Math.abs(st - ui.tl) / T * lw < 7) { ui.tl = st; break; } } }
+  const s = ui.sel; if (s && s.kind === 'ann') { const cs = currentStep(); if (!cs || cs.id !== s.stepId) ui.sel = { kind:'step', id:s.stepId }; }
+  renderAtTime();
+}
+function afterMove() {
+  const cs = currentStep();
+  if (cs && selStepId() !== cs.id) { ui.sel = { kind:'step', id:cs.id }; ui.tab = 'selection'; renderSteps(); renderInspector(); renderTimeline(); }
+  else if (ui.sel && ui.sel.kind === 'step') renderInspector();
+}
+function frameStep(d) { pause(); const T = tlDur(); setPlayhead(Math.round(ui.tl * FPS + d) / FPS); if (ui.tl > T) ui.tl = T; afterMove(); }
+function jumpStep(dir) {
+  pause(); const eps = 0.5 / FPS;
+  const times = doc.steps.map(s => srcToTl(s.t));
+  let target = null;
+  if (dir > 0) target = times.find(t => t > ui.tl + eps); else for (const t of times) if (t < ui.tl - eps) target = t;
+  if (target == null) target = dir > 0 ? tlDur() : 0;
+  setPlayhead(target); afterMove();
+}
+function pinStep(point) {
+  if (ui.empty) return;
+  pause();
+  const src = Math.round(curSrc() * FPS) / FPS, ex = stepAtSrc(src);
+  let created = null;
+  commit(() => {
+    if (ex) {
+      if (point) { const c = ex.annotations.find(a => a.type === 'click'); if (c) c.at = point; else ex.annotations.push({ id:uid('a'), type:'click', at:point, color:'coral', reveal:1 }); }
+      ui.sel = { kind:'step', id:ex.id };
+    } else {
+      created = { id:uid('s'), t:src, title:'New step', note:'', hold:2.5, narration:'tts-heart', zoom:null, annotations: point ? [{ id:uid('a'), type:'click', at:point, color:'coral', reveal:1 }] : [] };
+      doc.steps.push(created); doc.steps.sort((a, b) => a.t - b.t);
+      ui.sel = { kind:'step', id:created.id };
+    }
+    ui.tab = 'selection'; ui.tl = srcToTl(src);
+  });
+  if (created) { toast(`Pinned step ${stepIndex(created) + 1} at ${fmt(ui.tl)}. Give it a title.`); const t = $('#f-title'); if (t) { t.focus(); t.select(); } }
+  else toast(point ? `Moved the click marker on step ${stepIndex(ex) + 1}.` : `Step ${stepIndex(ex) + 1} is already pinned here.`);
+}
+function deleteSelection() {
+  const s = ui.sel; if (!s) return;
+  if (s.kind === 'ann') { commit(() => { const st = stepById(s.stepId); st.annotations = st.annotations.filter(a => a.id !== s.id); ui.sel = { kind:'step', id:st.id }; }); toast('Deleted. Undo with ⌘Z.'); }
+  else if (s.kind === 'step') { const i = stepIndex(stepById(s.id)); commit(() => { doc.steps = doc.steps.filter(x => x.id !== s.id); ui.sel = null; }); toast(`Deleted step ${i + 1}. Undo with ⌘Z.`); }
+  else if (s.kind === 'blur') { commit(() => { doc.blurs = doc.blurs.filter(b => b.id !== s.id); ui.sel = null; }); toast('Deleted the blur. Undo with ⌘Z.'); }
+}
+function splitAtPlayhead() {
+  if (ui.empty) return;
+  const src = curSrc(), c = clipAtSrc(src);
+  if (src - c.in < 2 / FPS || c.out - src < 2 / FPS) { toast('Move the playhead inside a clip to split it.'); return; }
+  commit(() => {
+    const i = doc.clips.indexOf(c), b = { id:uid('c'), in:src, out:c.out, speed:c.speed };
+    c.out = src; doc.clips.splice(i + 1, 0, b); ui.sel = { kind:'clip', id:b.id }; ui.tab = 'selection';
+  });
+  toast(`Split into clips ${doc.clips.findIndex(x => x.id === ui.sel.id)} and ${doc.clips.findIndex(x => x.id === ui.sel.id) + 1}.`);
+}
+function setTool(id) { ui.tool = id; renderTools(); renderStatus(currentStep()); draftEl.innerHTML = ''; }
+
+/* ---------- playback ---------- */
+let raf = 0, lastTs = 0;
+function play() {
+  if (ui.playing || ui.empty) return;
+  if (ui.tl >= tlDur() - 1e-3) ui.tl = 0;
+  if (ui.sel && ui.sel.kind === 'ann') { ui.sel = { kind:'step', id:ui.sel.stepId }; renderInspector(); }
+  ui.playing = true; lastTs = performance.now(); raf = requestAnimationFrame(tick); renderAtTime();
+}
+function tick(ts) {
+  const dt = Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
+  ui.tl = Math.min(tlDur(), ui.tl + dt * ui.previewSpeed);
+  renderAtTime();
+  if (ui.tl >= tlDur()) { pause(); return; }
+  raf = requestAnimationFrame(tick);
+}
+function pause() { if (!ui.playing) return; ui.playing = false; cancelAnimationFrame(raf); renderAtTime(); }
+const togglePlay = () => (ui.playing ? pause() : play());
+
+/* ---------- canvas pointer interactions ---------- */
+function toFrame(e) { const r = frameEl.getBoundingClientRect(); return [clamp((e.clientX - r.left) / r.width, 0, 1), clamp((e.clientY - r.top) / r.height, 0, 1)]; }
+const rectFrom = (a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])];
+function moveAnn(a, o, dx, dy) {
+  const mv = p => [clamp(p[0] + dx, 0, 1), clamp(p[1] + dy, 0, 1)];
+  if (a.type === 'callout' || a.type === 'click') a.at = mv(o.at);
+  else if (a.type === 'arrow') { a.from = mv(o.from); a.to = mv(o.to); }
+  else if (a.rect) a.rect = [clamp(o.rect[0] + dx, 0, 1 - o.rect[2]), clamp(o.rect[1] + dy, 0, 1 - o.rect[3]), o.rect[2], o.rect[3]];
+}
+let drag = null;
+frameEl.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || ui.empty) return;
+  pause();
+  const p = toFrame(e), st = currentStep();
+  const annTarget = e.target.closest('[data-ann]'), blurTarget = e.target.closest('[data-blur]');
+  if (ui.tool === 'pin') { pinStep(p); return; }
+  if (ui.tool === 'select') {
+    if (annTarget && st) {
+      const a = st.annotations.find(x => x.id === annTarget.dataset.ann); if (!a) return;
+      selectAnn(st, a.id);
+      drag = { kind:'move-ann', step:st, ann:a, orig:clone(a), start:p, snap:clone(doc), moved:false };
+    } else if (blurTarget) {
+      const b = doc.blurs.find(x => x.id === blurTarget.dataset.blur); if (!b) return;
+      ui.sel = { kind:'blur', id:b.id }; ui.tab = 'selection'; renderAtTime(); renderInspector(); renderTimeline(); renderSteps();
+      drag = { kind:'move-blur', blur:b, orig:clone(b), start:p, snap:clone(doc), moved:false };
+    } else {
+      ui.sel = st ? { kind:'step', id:st.id } : null; ui.tab = 'selection'; renderSteps(); renderAtTime(); renderInspector(); renderTimeline();
+      return;
+    }
+    frameEl.setPointerCapture(e.pointerId); return;
+  }
+  if (ui.tool !== 'blur' && !st) { toast('Pin this frame first: press P, then click the frame.'); return; }
+  drag = { kind:'draw', tool:ui.tool, start:p, cur:p, step:st };
+  frameEl.setPointerCapture(e.pointerId);
+  drawDraft();
+});
+frameEl.addEventListener('pointermove', e => {
+  if (!drag) {
+    if (ui.tool === 'pin') { const [x, y] = toFrame(e); draftEl.innerHTML = `<circle cx="${x * W}" cy="${y * H}" r="21" fill="#FF5A4E" fill-opacity=".25" stroke="#FF5A4E" stroke-width="3" stroke-dasharray="6 5"/><circle cx="${x * W}" cy="${y * H}" r="6" fill="#FF5A4E"/>`; }
+    return;
+  }
+  const p = toFrame(e), dx = p[0] - drag.start[0], dy = p[1] - drag.start[1];
+  if (drag.kind === 'move-ann') { if (Math.abs(dx) + Math.abs(dy) > 0.002) drag.moved = true; moveAnn(drag.ann, drag.orig, dx, dy); last.annKey = null; renderAtTime(); }
+  else if (drag.kind === 'move-blur') { if (Math.abs(dx) + Math.abs(dy) > 0.002) drag.moved = true; const r = drag.orig.rect; drag.blur.rect = [clamp(r[0] + dx, 0, 1 - r[2]), clamp(r[1] + dy, 0, 1 - r[3]), r[2], r[3]]; renderAtTime(); }
+  else { drag.cur = p; drawDraft(); }
+});
+frameEl.addEventListener('pointerleave', () => { if (!drag && ui.tool === 'pin') draftEl.innerHTML = ''; });
+function endDrag() {
+  if (!drag) return;
+  const d = drag; drag = null; draftEl.innerHTML = '';
+  if (d.kind === 'move-ann' || d.kind === 'move-blur') { if (d.moved) { pushUndo(d.snap); renderSteps(); renderTimeline(); } return; }
+  const small = Math.abs(d.cur[0] - d.start[0]) < 0.015 && Math.abs(d.cur[1] - d.start[1]) < 0.015;
+  let r = rectFrom(d.start, d.cur);
+  if (small) r = [clamp(d.start[0] - 0.09, 0, 0.82), clamp(d.start[1] - 0.04, 0, 0.92), 0.18, 0.08];
+  const st = d.step, newReveal = st ? Math.max(1, maxReveal(st)) : 1;
+  let newId = uid('a');
+  if (d.tool === 'blur') {
+    newId = uid('b');
+    commit(() => { doc.blurs.push({ id:newId, label:`Blur ${doc.blurs.length + 1}`, rect:r, from:Math.max(0, curSrc() - 0.01), to:SRC_DUR, style:'pixelate' }); ui.sel = { kind:'blur', id:newId }; ui.tab = 'selection'; });
+    toast('Blurred from here to the end. Drag it to adjust.');
+  } else if (d.tool === 'zoom') {
+    commit(() => { st.zoom = small ? [clamp(d.start[0] - 0.25, 0, 0.5), clamp(d.start[1] - 0.25, 0, 0.5), 0.5, 0.5] : r; ui.sel = { kind:'step', id:st.id }; ui.tab = 'selection'; });
+  } else {
+    let a;
+    if (d.tool === 'callout') a = { id:newId, type:'callout', at:d.start, text:'Add a short note', placement:'auto', color:'ink', reveal:Math.min(3, newReveal + 1) };
+    else if (d.tool === 'arrow') a = { id:newId, type:'arrow', from: small ? [clamp(d.start[0] - 0.1, 0, 1), clamp(d.start[1] + 0.1, 0, 1)] : d.start, to: small ? d.start : d.cur, curve:0.2, color:'coral', reveal:newReveal };
+    else a = { id:newId, type:d.tool, rect:r, color:'coral', reveal:newReveal };
+    commit(() => { st.annotations.push(a); ui.sel = { kind:'ann', stepId:st.id, id:newId }; ui.tab = 'selection'; });
+    if (d.tool === 'callout') { const t = $('#f-text'); if (t) { t.focus(); t.select(); } }
+  }
+  setTool('select');
+}
+frameEl.addEventListener('pointerup', endDrag);
+frameEl.addEventListener('pointercancel', endDrag);
+frameEl.addEventListener('dblclick', e => { const t = e.target.closest('.callout'); if (t) { const f = $('#f-text'); if (f) { f.focus(); f.select(); } } });
+function drawDraft() {
+  const d = drag; if (!d) return;
+  const [x1, y1] = [d.start[0] * W, d.start[1] * H], [x2, y2] = [d.cur[0] * W, d.cur[1] * H];
+  if (d.tool === 'arrow') draftEl.innerHTML = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#13B8A6" stroke-width="4" stroke-dasharray="10 7" stroke-linecap="round"/>`;
+  else if (d.tool === 'callout') draftEl.innerHTML = `<circle cx="${x1}" cy="${y1}" r="8" fill="#13B8A6"/>`;
+  else { const [rx, ry, rw, rh] = rectFrom([x1, y1], [x2, y2]); draftEl.innerHTML = `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="8" fill="#13B8A6" fill-opacity=".1" stroke="#13B8A6" stroke-width="3" stroke-dasharray="10 7"/>`; }
+}
+
+/* ---------- inspector events (delegated) ---------- */
+let pendingSnap = null;
+inspBody.addEventListener('focusin', e => { if (e.target.matches('[data-field]')) pendingSnap = clone(doc); });
+function takeSnap() { if (pendingSnap) { pushUndo(pendingSnap); pendingSnap = null; } }
+inspBody.addEventListener('input', e => {
+  const el = e.target, f = el.dataset.field; if (!f) return;
+  const st = ui.sel && stepById(selStepId());
+  const ann = ui.sel && ui.sel.kind === 'ann' && st ? st.annotations.find(a => a.id === ui.sel.id) : null;
+  if (['title','note','hold','text','curve','padding','radius','cta-label','cta-url','music-vol','analytics-url'].includes(f)) takeSnap(); else return;
+  if (f === 'title' && st) { st.title = el.value; const c = stepList.querySelector(`[data-step="${st.id}"] .step-title`); if (c) c.textContent = el.value || 'Untitled step'; renderStatus(currentStep()); renderTimeline(); }
+  if (f === 'note' && st) st.note = el.value;
+  if (f === 'hold' && st) { st.hold = +el.value; $('#o-hold').textContent = st.hold.toFixed(1) + ' s'; }
+  if (f === 'text' && ann) { ann.text = el.value; renderAtTime(); }
+  if (f === 'curve' && ann) { ann.curve = +el.value; $('#o-curve').textContent = Math.round(ann.curve * 100); renderAtTime(); }
+  if (f === 'padding') { doc.frame.padding = +el.value; $('#o-pad').textContent = el.value + '%'; fitStage(); }
+  if (f === 'radius') { doc.frame.radius = +el.value; $('#o-rad').textContent = el.value + ' px'; fitStage(); }
+  if (f === 'cta-label') doc.cta.label = el.value;
+  if (f === 'cta-url') doc.cta.url = el.value;
+  if (f === 'music-vol' && doc.music) { doc.music.volume = +el.value; $('#o-mvol').textContent = el.value + '%'; renderTimeline(); }
+  if (f === 'analytics-url') doc.analytics.url = el.value;
+});
+inspBody.addEventListener('change', e => {
+  const el = e.target, f = el.dataset.field; if (!f) return;
+  const st = ui.sel && stepById(selStepId());
+  if (f === 'hold') { renderInspector(); return; }
+  if (f === 'reveal') { commit(() => { const s2 = stepById(selStepId()); const a = s2 && s2.annotations.find(x => x.id === el.dataset.id); if (a) a.reveal = +el.value; }); return; }
+  if (f === 'narration' && st) { commit(() => { stepById(st.id).narration = el.value; }); return; }
+  if (f === 'zoom' && st) { commit(() => { const s2 = stepById(st.id); const c = s2.annotations.find(a => a.type === 'click'); s2.zoom = el.checked ? (c ? [clamp(c.at[0] - 0.25, 0, 0.5), clamp(c.at[1] - 0.25, 0, 0.5), 0.5, 0.5] : [0.25, 0.25, 0.5, 0.5]) : null; }); return; }
+  if (f === 'shadow') { commit(() => { doc.frame.shadow = el.checked; }); return; }
+  if (f === 'corner') { commit(() => { doc.logo.corner = el.value; }); return; }
+  if (f === 'ctl') { commit(() => { doc.player[el.dataset.k] = el.checked; }); return; }
+  if (f === 'original') { commit(() => { doc.audio.original = el.checked; }); return; }
+  if (f === 'analytics') { commit(() => { doc.analytics.on = el.checked; }); return; }
+  if (f === 'logo' && el.files && el.files[0]) { const url = URL.createObjectURL(el.files[0]); commit(() => { doc.logo.src = url; }); toast('Logo added to every frame.'); return; }
+  if (['title','note','text','padding','radius'].includes(f)) { renderSteps(); renderTimeline(); }
+});
+inspBody.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, v = b.dataset.v, st = ui.sel && stepById(selStepId());
+  const ann = ui.sel && ui.sel.kind === 'ann' && st ? st.annotations.find(a => a.id === ui.sel.id) : null;
+  switch (act) {
+    case 'goto-step': if (st) selectStep(st.id); break;
+    case 'sel-ann': if (st) { if (currentStep() !== st) { ui.tl = srcToTl(st.t); } selectAnn(st, b.dataset.id); } break;
+    case 'del-ann': if (st) { commit(() => { const s2 = stepById(st.id); s2.annotations = s2.annotations.filter(a => a.id !== b.dataset.id); ui.sel = { kind:'step', id:s2.id }; }); } break;
+    case 'back-step': if (st) { ui.sel = { kind:'step', id:st.id }; renderAtTime(); renderInspector(); } break;
+    case 'del-step': deleteSelection(); break;
+    case 'del-blur': deleteSelection(); break;
+    case 'place': if (ann) commit(() => { findSelAnn().placement = v; }); break;
+    case 'color': if (ann) commit(() => { findSelAnn().color = v; }); break;
+    case 'speed': {
+      const c = doc.clips.find(x => x.id === ui.sel.id); if (!c) break; const src = curSrc();
+      commit(() => { doc.clips.find(x => x.id === c.id).speed = +v; ui.tl = srcToTl(src); });
+      break; }
+    case 'split': splitAtPlayhead(); break;
+    case 'bstyle': commit(() => { doc.blurs.find(x => x.id === ui.sel.id).style = v; }); break;
+    case 'bg': commit(() => { doc.frame.preset = v; }); break;
+    case 'mode': commit(() => { doc.player.mode = v; }); break;
+    case 'accent': commit(() => { doc.player.accent = v; }); break;
+    case 'add-music': addMusic(); break;
+    case 'remove-music': commit(() => { doc.music = null; }); break;
+    case 'remove-logo': commit(() => { doc.logo.src = null; }); break;
+    case 'open-guide': setTab('guide'); break;
+  }
+});
+function findSelAnn() { const st = stepById(selStepId()); return st.annotations.find(a => a.id === ui.sel.id); }
+function addMusic() { commit(() => { doc.music = { name:'Calm loop.mp3', volume:25 }; }); toast('Added a sample music track. It gets quieter under narration.'); }
+
+/* ---------- steps rail and timeline events ---------- */
+stepList.addEventListener('click', e => { const c = e.target.closest('[data-step]'); if (c) selectStep(c.dataset.step); });
+$('#btn-add-step').addEventListener('click', () => pinStep(null));
+let scrub = null;
+tlInner.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || ui.empty) return;
+  const stepB = e.target.closest('[data-step]'), clipB = e.target.closest('[data-clip]'), blurB = e.target.closest('[data-blur]'), actB = e.target.closest('[data-act]');
+  if (stepB) { selectStep(stepB.dataset.step); return; }
+  if (clipB) { ui.sel = { kind:'clip', id:clipB.dataset.clip }; ui.tab = 'selection'; renderInspector(); renderTimeline(); renderSteps(); return; }
+  if (blurB) { const b = doc.blurs.find(x => x.id === blurB.dataset.blur); ui.sel = { kind:'blur', id:b.id }; ui.tab = 'selection'; if (curSrc() < b.from || curSrc() > b.to) ui.tl = srcToTl(b.from + 0.05); renderAtTime(); renderInspector(); renderTimeline(); renderSteps(); return; }
+  if (actB) { if (actB.dataset.act === 'add-music') addMusic(); else setTab('guide'); return; }
+  if (!e.target.closest('[data-scrub]')) return;
+  pause();
+  scrub = true; tlInner.setPointerCapture(e.pointerId); scrubTo(e);
+});
+function scrubTo(e) { const r = tlInner.getBoundingClientRect(); const x = e.clientX - r.left - 84; setPlayhead((x / laneW()) * tlDur(), true); }
+tlInner.addEventListener('pointermove', e => { if (scrub) scrubTo(e); });
+tlInner.addEventListener('pointerup', () => { if (scrub) { scrub = null; afterMove(); } });
+tlInner.addEventListener('pointercancel', () => { scrub = null; });
+
+/* ---------- top bar, transport and tools ---------- */
+$('#tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) setTool(b.dataset.tool); });
+$('#btn-play').addEventListener('click', togglePlay);
+$('#btn-prev-frame').addEventListener('click', () => frameStep(-1));
+$('#btn-next-frame').addEventListener('click', () => frameStep(1));
+$('#btn-prev-step').addEventListener('click', () => jumpStep(-1));
+$('#btn-next-step').addEventListener('click', () => jumpStep(1));
+$('#btn-split').addEventListener('click', splitAtPlayhead);
+$('#preview-speed').addEventListener('change', e => { ui.previewSpeed = +e.target.value; });
+$('#tl-zoom').addEventListener('input', e => { ui.zoom = +e.target.value; renderTimeline(); const ph = $('#playhead'); if (ph) tlScroll.scrollLeft = Math.max(0, ph.offsetLeft - tlScroll.clientWidth / 2); });
+$('#btn-undo').addEventListener('click', undo);
+$('#btn-redo').addEventListener('click', redo);
+$('#tab-selection').addEventListener('click', () => setTab('selection'));
+$('#tab-guide').addEventListener('click', () => setTab('guide'));
+$('#btn-projects').addEventListener('click', () => toast('The project list isn\'t part of this mockup.'));
+nameInput.addEventListener('focus', () => { pendingSnap = clone(doc); });
+nameInput.addEventListener('input', () => { takeSnap(); doc.name = nameInput.value; });
+nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') nameInput.blur(); });
+
+function effectiveDark() { const a = document.documentElement.getAttribute('data-theme'); if (a) return a === 'dark'; return matchMedia('(prefers-color-scheme: dark)').matches; }
+function renderThemeBtn() { const b = $('#btn-theme'), dark = effectiveDark(); b.innerHTML = icon(dark ? 'sun' : 'moon'); b.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme'); b.dataset.tip = dark ? 'Switch to light' : 'Switch to dark'; }
+function toggleTheme() { document.documentElement.setAttribute('data-theme', effectiveDark() ? 'light' : 'dark'); renderThemeBtn(); }
+$('#btn-theme').addEventListener('click', toggleTheme);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderThemeBtn);
+
+/* export menu */
+const exportBtn = $('#btn-export'), exportMenu = $('#export-menu');
+function openExportMenu() { exportMenu.hidden = false; exportBtn.setAttribute('aria-expanded', 'true'); const f = exportMenu.querySelector('button'); if (f) f.focus(); }
+function closeExportMenu() { exportMenu.hidden = true; exportBtn.setAttribute('aria-expanded', 'false'); }
+exportBtn.addEventListener('click', () => (exportMenu.hidden ? openExportMenu() : closeExportMenu()));
+document.addEventListener('pointerdown', e => { if (!exportMenu.hidden && !e.target.closest('.menu-wrap')) closeExportMenu(); });
+exportMenu.addEventListener('keydown', e => {
+  const items = [...exportMenu.querySelectorAll('button')], i = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+  if (e.key === 'Escape') { closeExportMenu(); exportBtn.focus(); }
+});
+exportMenu.addEventListener('click', e => { const b = e.target.closest('[data-export]'); if (b) { closeExportMenu(); exportItem(b.dataset.export); } });
+function exportItem(kind) {
+  const n = doc.steps.length, total = tlDur() + doc.steps.reduce((s, x) => s + effHold(x), 0);
+  const msg = { mp4:`a 1080p MP4 of about ${Math.round(total)} s, with ${n} step holds`, pdf:`a ${n}-page PDF, one page per step`, png:`${n} annotated PNG screenshots in a zip`, folder:`a guide folder with index.html, player.js, guide.json and media for ${n} steps` }[kind];
+  toast(`Mockup only: the app would export ${msg}.`);
+}
+
+/* ---------- share dialog ---------- */
+const shareDlg = $('#dlg-share');
+const slug = () => (doc.name || 'guide').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'guide';
+function shareBase() {
+  const host = (shareDlg.querySelector('input[name="host"]:checked') || {}).value;
+  return { github:'https://maya.github.io/guides/', cloudflare:'https://tallybook-guides.pages.dev/', s3:'https://guides.tallybook.example/', folder:'https://your-site.example/guides/' }[host] + slug() + '/';
+}
+function renderShare() {
+  const base = shareBase();
+  $('#share-url').value = base;
+  $('#share-code').value = `<div data-openpin="${base}guide.json"></div>\n<script src="${base}player.js" async><\/script>`;
+  $('#share-iframe').value = `<iframe src="${base}" width="960" height="640" style="border:0" allow="fullscreen" title="${doc.name.replace(/"/g, '&quot;')}"></iframe>`;
+}
+function openShare() { pause(); renderShare(); shareDlg.showModal(); }
+shareDlg.addEventListener('change', renderShare);
+$('#btn-share').addEventListener('click', openShare);
+$('#btn-copy').addEventListener('click', () => {
+  const ta = $('#share-code'), label = $('#btn-copy span');
+  const done = t => { label.textContent = t; setTimeout(() => { label.textContent = 'Copy'; }, 1600); };
+  const fallback = () => { ta.focus(); ta.select(); done('Selected'); };
+  try { navigator.clipboard.writeText(ta.value).then(() => done('Copied'), fallback); } catch (err) { fallback(); }
+});
+$('#btn-publish').addEventListener('click', () => { shareDlg.close(); toast(`Mockup only: nothing was published. The app would upload ${doc.steps.length} steps to ${shareBase()}`); });
+document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
+
+/* ---------- command palette ---------- */
+const palDlg = $('#dlg-palette'), palInput = $('#pal-input'), palList = $('#pal-list');
+let palItems = [], palIdx = 0;
+function commands() {
+  return [
+    { label:'Pin step at playhead', key:'⇧P', run:() => pinStep(null) },
+    { label:'Preview guide', key:'⌘↩', run:openPreview },
+    { label:'Share guide…', run:openShare },
+    { label:'Export video (MP4)', key:'⌘E', run:() => exportItem('mp4') },
+    { label:'Export PDF guide', run:() => exportItem('pdf') },
+    { label:'Export screenshots', run:() => exportItem('png') },
+    { label:'Export guide folder', run:() => exportItem('folder') },
+    { label:'Split clip at playhead', key:'⌘B', run:splitAtPlayhead },
+    { label:'Copy current frame', run:() => toast('Mockup only: the app copies the finished frame to your clipboard.') },
+    ...TOOLS.map(t => ({ label:`Tool: ${t.label}`, key:t.key.toUpperCase(), run:() => setTool(t.id) })),
+    ...doc.steps.map((s, i) => ({ label:`Go to step ${i + 1}: ${s.title}`, run:() => selectStep(s.id) })),
+    { label:'Guide settings', run:() => setTab('guide') },
+    { label:'Play or pause', key:'Space', run:togglePlay },
+    { label:'Undo', key:'⌘Z', run:undo },
+    { label:'Redo', key:'⇧⌘Z', run:redo },
+    { label:'Switch light or dark theme', run:toggleTheme },
+    { label: ui.empty ? 'Open the sample project' : 'Show the empty project screen', run:() => setEmpty(!ui.empty) },
+  ];
+}
+function renderPalette() {
+  const q = palInput.value.trim().toLowerCase();
+  palItems = commands().filter(c => !q || q.split(/\s+/).every(w => c.label.toLowerCase().includes(w)));
+  palIdx = clamp(palIdx, 0, Math.max(0, palItems.length - 1));
+  palList.innerHTML = palItems.length ? palItems.map((c, i) => `<li role="option" id="pal-${i}" aria-selected="${i === palIdx}" data-i="${i}"><span>${esc(c.label)}</span>${c.key ? `<span class="kbd">${c.key}</span>` : ''}</li>`).join('') : '<li aria-disabled="true">No matching actions</li>';
+  palInput.setAttribute('aria-activedescendant', palItems.length ? 'pal-' + palIdx : '');
+  const sel = palList.querySelector('[aria-selected="true"]'); if (sel) sel.scrollIntoView({ block:'nearest' });
+}
+function openPalette() { pause(); palInput.value = ''; palIdx = 0; renderPalette(); palDlg.showModal(); palInput.focus(); }
+function runPalette(i) { const c = palItems[i]; if (!c) return; palDlg.close(); c.run(); }
+palInput.addEventListener('input', () => { palIdx = 0; renderPalette(); });
+palInput.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); palIdx = Math.min(palItems.length - 1, palIdx + 1); renderPalette(); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); palIdx = Math.max(0, palIdx - 1); renderPalette(); }
+  if (e.key === 'Enter') { e.preventDefault(); runPalette(palIdx); }
+});
+palList.addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) runPalette(+li.dataset.i); });
+palDlg.addEventListener('click', e => { if (e.target === palDlg) palDlg.close(); });
+$('#btn-palette').addEventListener('click', openPalette);
+
+/* ---------- empty project demo ---------- */
+function setEmpty(on) { pause(); ui.empty = on; renderAll(); if (!on) toast('Opened the sample project.'); }
+$('#btn-sample').addEventListener('click', () => setEmpty(false));
+$('#btn-record').addEventListener('click', () => toast('Mockup only: the app records your screen straight into a new project.'));
+$('#file-rec').addEventListener('change', e => { if (e.target.files && e.target.files[0]) { toast(`Mockup only: the app would open “${e.target.files[0].name}”. Showing the sample instead.`); e.target.value = ''; setEmpty(false); } });
+
+/* ---------- preview player ---------- */
+const pvDlg = $('#dlg-preview'), player = $('#player'), plStage = $('#pl-stage');
+const PV = { i:-1, src:0, reveal:0, animating:false, end:false, timers:[], raf:0, scr:null, fresh:0 };
+function pvClear() { PV.timers.forEach(clearTimeout); PV.timers = []; cancelAnimationFrame(PV.raf); PV.animating = false; }
+function pvReset() { pvClear(); PV.i = -1; PV.src = 0; PV.reveal = 0; PV.end = false; pvRender(); }
+function pvFit() {
+  const availW = plStage.clientWidth || 800;
+  const fs = document.fullscreenElement === player;
+  const maxH = fs ? innerHeight - 130 : Math.max(220, innerHeight - 300);
+  const p = doc.frame.preset === 'none' ? 0 : doc.frame.padding / 100;
+  const h = Math.min(maxH, availW * (H + 2 * p * W) / (W * (1 + 2 * p)));
+  plStage.style.height = Math.round(h) + 'px';
+  fitFrame($('#pl-box'), $('#pl-holder'), $('#pl-frame'), availW, h);
+}
+function pvArrive(i) {
+  const st = doc.steps[i]; PV.i = i; PV.src = st.t; PV.animating = false; PV.reveal = 1; PV.fresh = 1; pvRender();
+  const g = maxReveal(st);
+  for (let k = 2; k <= g; k++) PV.timers.push(setTimeout(() => { PV.reveal = k; PV.fresh = k; pvRender(); }, (k - 1) * 480));
+  if (doc.player.mode !== 'guided') PV.timers.push(setTimeout(pvNext, Math.max(0, g - 1) * 480 + effHold(st) * 1000));
+}
+function pvGo(i, animate) {
+  pvClear(); const n = doc.steps.length;
+  if (i >= n) { PV.end = true; PV.reveal = 99; pvRender(); return; }
+  if (i < 0) { pvReset(); return; }
+  PV.end = false;
+  const from = PV.i < 0 ? 0 : PV.src, to = doc.steps[i].t;
+  if (!animate || reduceMotion() || to <= from) { pvArrive(i); return; }
+  PV.animating = true; PV.reveal = 0; PV.i = i;
+  const D = clamp((to - from) / 2.4, 0.7, 1.8) * 1000, t0 = performance.now();
+  const stepFn = ts => { const k = clamp((ts - t0) / D, 0, 1); PV.src = from + (to - from) * k; pvRender(); if (k < 1) PV.raf = requestAnimationFrame(stepFn); else pvArrive(i); };
+  PV.raf = requestAnimationFrame(stepFn);
+}
+function pvNext() { if (PV.end) return; pvGo(PV.i < 0 ? 0 : PV.i + 1, true); }
+function pvPrev() { if (PV.end) { pvGo(doc.steps.length - 1, false); return; } if (PV.i > 0) pvGo(PV.i - 1, false); }
+function pvRender() {
+  const n = doc.steps.length, acc = ACCENTS[doc.player.accent];
+  player.style.setProperty('--acc', acc.fill); player.style.setProperty('--acc-text', acc.text);
+  const scr = screenAt(PV.src); if (scr !== PV.scr) { $('#pl-rec').innerHTML = recHTML(scr); PV.scr = scr; }
+  const [cx, cy] = cursorAt(PV.src); $('#pl-cursor').style.transform = `translate(${cx}px,${cy}px)`;
+  $('#pl-blur').innerHTML = blurHTML(PV.src, false);
+  const st = PV.i >= 0 && !PV.end ? doc.steps[PV.i] : null;
+  const show = st && !PV.animating;
+  $('#pl-ann').innerHTML = show ? annHTML(st, { prefix:'pv', reveal:PV.reveal, animateGroup: reduceMotion() ? 0 : PV.fresh }) : '';
+  PV.fresh = 0;
+  let z = 'none';
+  if (show && st.zoom) { const f = zoomFactor(st.zoom), cxz = (st.zoom[0] + st.zoom[2] / 2) * W, cyz = (st.zoom[1] + st.zoom[3] / 2) * H; const tx = clamp(W / 2 - cxz * f, W - W * f, 0), ty = clamp(H / 2 - cyz * f, H - H * f, 0); z = `translate(${tx}px,${ty}px) scale(${f})`; }
+  $('#pl-zoomer').style.transform = z;
+  $('#pl-logo').innerHTML = logoHTML();
+  $('#pl-start').hidden = PV.i >= 0 || PV.end;
+  $('#pl-end').hidden = !PV.end;
+  const total = tlDur() + doc.steps.reduce((s, x) => s + effHold(x), 0);
+  $('#pl-start-title').textContent = doc.name || 'Untitled guide';
+  $('#pl-start-meta').textContent = `${n} steps · about ${Math.round(total)} seconds`;
+  const cta = $('#pl-cta'); cta.textContent = doc.cta.label || 'Learn more'; cta.href = /^https?:\/\//.test(doc.cta.url) ? doc.cta.url : 'https://example.com/';
+  $('#pl-caption').textContent = PV.end ? 'Finished' : PV.i < 0 ? 'Press Start, or use → to move through the steps.' : `${PV.i + 1}. ${doc.steps[PV.i].title}`;
+  const counter = $('#pl-counter'); counter.hidden = !doc.player.counter; counter.textContent = PV.end ? `${n} / ${n}` : PV.i < 0 ? `0 / ${n}` : `${PV.i + 1} / ${n}`;
+  const prog = $('#pl-progress'); prog.hidden = !doc.player.progress;
+  const done = PV.end ? n : PV.i + 1;
+  $('#pl-fill').style.width = (n ? (done / n) * 100 : 0) + '%';
+  let ticks = prog.querySelectorAll('.pl-tick');
+  if (ticks.length !== n) {
+    ticks.forEach(t => t.remove());
+    doc.steps.forEach((s, i) => { const b = document.createElement('button'); b.className = 'pl-tick'; b.style.left = ((i + 1) / n * 100) + '%'; b.setAttribute('aria-label', `Go to step ${i + 1}: ${s.title}`); b.addEventListener('click', () => pvGo(i, false)); prog.appendChild(b); });
+    ticks = prog.querySelectorAll('.pl-tick');
+  }
+  ticks.forEach((t, i) => t.classList.toggle('done', i < done));
+  $('#pl-full').hidden = !doc.player.fullscreen;
+  $('#pl-prev').disabled = PV.i <= 0 && !PV.end;
+  const next = $('#pl-next'); next.disabled = PV.end;
+  next.firstChild.textContent = PV.i < 0 ? 'Start' : PV.i === n - 1 ? 'Finish' : 'Next';
+  $('#pl-mode').textContent = `Playback: ${{ guided:'Guided. Each step waits for the viewer.', auto:'Auto. Steps move on by themselves.', video:'Video. Plays straight through.' }[doc.player.mode]}`;
+}
+function openPreview() {
+  if (ui.empty || !doc.steps.length) { toast('Pin at least one step to preview the guide.'); return; }
+  pause(); closeExportMenu(); PV.scr = null; pvDlg.showModal(); pvReset(); requestAnimationFrame(pvFit); $('#pl-start-btn').focus();
+}
+pvDlg.addEventListener('close', pvClear);
+$('#btn-preview').addEventListener('click', openPreview);
+$('#pl-start-btn').addEventListener('click', () => pvGo(0, true));
+$('#pl-next').addEventListener('click', pvNext);
+$('#pl-prev').addEventListener('click', pvPrev);
+$('#pl-replay').addEventListener('click', () => { pvReset(); $('#pl-start-btn').focus(); });
+$('#pl-full').addEventListener('click', () => { try { const r = document.fullscreenElement ? document.exitFullscreen() : player.requestFullscreen(); if (r && r.catch) r.catch(() => {}); } catch (err) { /* fullscreen unavailable here */ } });
+document.addEventListener('fullscreenchange', () => { if (pvDlg.open) requestAnimationFrame(pvFit); });
+pvDlg.addEventListener('keydown', e => {
+  if (e.target.closest('button, a, input, select, textarea') && (e.key === ' ' || e.key === 'Enter')) return;
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); pvNext(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); pvPrev(); }
+});
+
+/* ---------- keyboard shortcuts ---------- */
+const isTyping = el => el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+document.addEventListener('keydown', e => {
+  if (document.querySelector('dialog[open]')) return;
+  const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase(), typing = isTyping(e.target);
+  if (mod && k === 'k') { e.preventDefault(); openPalette(); return; }
+  if (mod && k === 'z' && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+  if (mod && k === 'b' && !typing) { e.preventDefault(); splitAtPlayhead(); return; }
+  if (mod && k === 'e') { e.preventDefault(); openExportMenu(); return; }
+  if (mod && e.key === 'Enter') { e.preventDefault(); openPreview(); return; }
+  if (typing || mod || ui.empty) return;
+  const onButton = e.target.closest && e.target.closest('button, a, summary');
+  switch (e.key) {
+    case ' ': if (onButton) return; e.preventDefault(); togglePlay(); return;
+    case 'ArrowLeft': e.preventDefault(); if (e.altKey) jumpStep(-1); else if (e.shiftKey) { pause(); setPlayhead(ui.tl - 1); afterMove(); } else frameStep(-1); return;
+    case 'ArrowRight': e.preventDefault(); if (e.altKey) jumpStep(1); else if (e.shiftKey) { pause(); setPlayhead(ui.tl + 1); afterMove(); } else frameStep(1); return;
+    case 'Escape': if (ui.tool !== 'select') setTool('select'); else if (ui.sel && ui.sel.kind === 'ann') { ui.sel = { kind:'step', id:ui.sel.stepId }; renderAtTime(); renderInspector(); } return;
+    case 'Backspace': case 'Delete': if (onButton && !e.target.closest('.step-card')) return; e.preventDefault(); deleteSelection(); return;
+    case 'P': if (e.shiftKey) { e.preventDefault(); pinStep(null); } return;
+  }
+  if (e.altKey || e.shiftKey) return;
+  const t = TOOLS.find(x => x.key === k); if (t) { e.preventDefault(); setTool(t.id); }
+});
+
+/* ---------- start ---------- */
+ui.tl = srcToTl(11.6);
+new ResizeObserver(() => { fitStage(); renderTimeline(); updateThumbs(); }).observe(stageWrap);
+new ResizeObserver(() => { if (pvDlg.open) pvFit(); }).observe(plStage);
+renderThemeBtn();
+renderAll();
+})();
+</script>

@@ -2,6 +2,8 @@
 
 OpenPin should be immediately familiar to anyone who has used a video or guide editor, but look like its own product and be much easier to use than FramePin's editor. This doc covers what's wrong with FramePin's UI, the redesigned editor layout, and **PinKit**, our React component library and design tokens.
 
+**Clickable mockup:** [`design/mockup/editor.html`](../design/mockup/editor.html) puts this layout and these tokens into a working page: open it in Chrome. It has a sample project, all the tools, timeline editing, the guide preview, the Share dialog and the ⌘K command palette. Nothing is saved or exported; it's for judging the design before real code exists.
+
 ## Lessons from FramePin's editor
 
 From the editor screenshot (described in [01-feature-analysis.md](01-feature-analysis.md#what-the-editor-screenshot-shows)):
@@ -82,8 +84,9 @@ All values live in `design/tokens.json`. A small build script turns them into CS
 | `ink-400` | `#8A93A3` | Secondary text (dark; 5.6:1 on `ink-900`) |
 | `ink-300` | `#B7BEC9` | Light-theme borders |
 | `ink-200` | `#D9DDE4` | Light-theme dividers |
-| `ink-100` | `#ECEFF3` | Light-theme panels |
-| `ink-50`  | `#F6F7F9` | Light-theme app background |
+| `ink-100` | `#ECEFF3` | Light-theme app background (behind the panels) |
+| `ink-50`  | `#F6F7F9` | Light-theme inputs, timeline lanes, hover fills |
+| `white`   | `#FFFFFF` | Light-theme panels |
 
 ### Accent and secondary
 
@@ -133,7 +136,7 @@ Four gradient backgrounds built from the palette, plus solid colors and custom i
 ## Typography
 
 - **Editor UI:** `system-ui` (San Francisco on Mac). Timecodes use `font-variant-numeric: tabular-nums` so numbers don't jitter while playing.
-- **Rendered output** (annotations, captions, PDF, player): **Inter** (SIL Open Font License), bundled as WOFF2 so exports look identical on every machine.
+- **Rendered output** (annotations, captions, PDF, player) and the wordmark: **Figtree** (SIL Open Font License), bundled as WOFF2 so exports look identical on every machine. It's friendlier than the UI text most recordings show, so callouts read as separate from the app being demonstrated.
 - **Scale:** 11 / 12 / 13 (base) / 15 / 18 / 22 / 28 px. Callout text: 600 weight, 15 px at 1080p, scaled with the output size.
 
 ## Spacing, radius, elevation, motion

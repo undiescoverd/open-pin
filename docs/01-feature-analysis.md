@@ -126,7 +126,7 @@ Phases are defined in [04-roadmap.md](04-roadmap.md). Libraries named below are 
 | **Click marker** | point | Pulse ring showing "click here". Created automatically by the Pin tool. |
 | **Zoom / focus** (per step) | target rect + easing | The view eases into the rect when the step is reached. |
 
-**One renderer everywhere.** `@openpin/render` draws annotations onto a canvas. The editor preview, the published player and every export (PNG, WebP, PDF, MP4) call the *same function*, so what you see is exactly what you export and what viewers get. In the native plan this needed two renderers plus parity tests; going web removes that. Annotation text uses a bundled font (Inter) so output looks identical on every machine.
+**One renderer everywhere.** `@openpin/render` draws annotations onto a canvas. The editor preview, the published player and every export (PNG, WebP, PDF, MP4) call the *same function*, so what you see is exactly what you export and what viewers get. In the native plan this needed two renderers plus parity tests; going web removes that. Annotation text uses a bundled font (Figtree) so output looks identical on every machine.
 
 **Zoom.** The compositor applies an eased scale and translate before drawing annotations. In the player, the step still is full resolution, so zoom stays sharp.
 
@@ -236,7 +236,7 @@ Rendering a long 4K video takes a while, so export shows progress, can be cancel
 
 **What it does.** One page per pinned step, for documentation, client handoffs or a LinkedIn carousel. Paid FramePin plans host a compressed copy.
 
-**How OpenPin does it.** **pdf-lib** builds the PDF in the browser. Text is real, selectable text in the embedded Inter font; each page shows the step number, title, annotated still and optional body. A bookmark outline lists every step. Page presets: A4/Letter (docs), 16:9 (slides), 1080×1350 (LinkedIn carousel, 4:5). A compressed copy (images 1600 px wide, JPEG quality 0.75) goes into every guide bundle.
+**How OpenPin does it.** **pdf-lib** builds the PDF in the browser. Text is real, selectable text in the embedded Figtree font; each page shows the step number, title, annotated still and optional body. A bookmark outline lists every step. Page presets: A4/Letter (docs), 16:9 (slides), 1080×1350 (LinkedIn carousel, 4:5). A compressed copy (images 1600 px wide, JPEG quality 0.75) goes into every guide bundle.
 
 ## F15 — Screenshot export (PNG/WebP)
 

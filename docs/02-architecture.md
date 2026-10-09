@@ -175,7 +175,7 @@ Workers are called through Comlink, so they look like async functions.
                      AudioContext)
 ```
 
-Annotation text uses a bundled Inter font (WOFF2), so canvas output is identical on every OS.
+Annotation text uses a bundled Figtree font (WOFF2), so canvas output is identical on every OS.
 
 ## Storage
 
