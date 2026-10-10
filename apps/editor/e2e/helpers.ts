@@ -17,7 +17,7 @@ export async function openRecording(page: Page, options: { fullTimeline?: boolea
   await page.goto('/');
   await page.getByTestId('file-input').setInputFiles(FIXTURE);
   await expect(page.getByRole('img', { name: /Recording frame/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Pin step' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Add step' })).toBeEnabled();
   await waitForFrame(page);
   /* the Phase 1 to 3 specs drive the lanes, which live in the full timeline behind Trim & edit video */
   if (options.fullTimeline ?? true) {
@@ -108,3 +108,10 @@ export function watchYellowEdge(page: Page, ms: number): Promise<number[]> {
 
 export const stepRail = (page: Page): Locator => page.getByRole('complementary', { name: /Steps/ });
 export const stepCards = (page: Page): Locator => stepRail(page).getByRole('listitem');
+
+/** Opens the selected step's Advanced section (exact time, pause, appearing order) if it is closed. */
+export async function openStepAdvanced(page: Page): Promise<void> {
+  const position = stepRail(page).getByRole('textbox', { name: 'Position' });
+  if (!(await position.isVisible())) await stepRail(page).getByText('Advanced', { exact: true }).click();
+  await expect(position).toBeVisible();
+}

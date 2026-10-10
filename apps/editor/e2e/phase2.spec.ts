@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { blurAlphaAt, blurRectAt, exportPlan, frameLayout, parseProject, planAt, tlToSrc, type Project } from '@waypost/core';
 import { readFile } from 'node:fs/promises';
-import { dragOnFrame, frameBox, openRecording, playheadSeconds, seekTo, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
+import { dragOnFrame, frameBox, openRecording, openStepAdvanced, playheadSeconds, seekTo, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
 
 /** The Phase 2 acceptance tests (docs/04-roadmap.md, "Phase 2 — Edit and polish"; the checks in docs/05-editor-interactions.md,
     section 10). The fixture is 6 seconds long, 640 × 400, at 30 fps. */
@@ -497,6 +497,7 @@ test.describe('Phase 2: MP4 export', () => {
       for (const t of [0.3, 0.8, 1.3, 2.2, 2.7, 3.2, 3.9, 4.6, 5.2, 5.7]) {
         await seekTo(page, t);
         await page.keyboard.press('Shift+P');
+        await openStepAdvanced(page);
         await typeInto(page.getByLabel('Pause', { exact: true }), '1');
         await page.getByLabel('Title').fill(`Step at ${t}`);
         await leaveField(page);

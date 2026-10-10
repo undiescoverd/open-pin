@@ -1,4 +1,4 @@
-import type { Draft } from 'immer';
+import { current, type Draft } from 'immer';
 import type { Command } from './history';
 import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, type LayerMove } from './effects';
 import { blurRectAt } from './geometry';
@@ -135,6 +135,35 @@ export const commands = {
           d.steps.push({ id: args.stepId, anchor: { source: args.source, time }, title: '', body: '', minHold: 2.5, zoom: null, annotations: m ? [m] : [] });
           sortSteps(d);
         }
+        touch(d, args.now);
+      },
+    };
+  },
+
+  /**
+   * Copies a step's title, note, pause, zoom and annotations onto the frame at `time`. `annotationIds` gives the copies their ids, in
+   * order. Refused (no change) if another step already sits on that frame.
+   */
+  duplicateStep(args: { sourceStepId: string; stepId: string; annotationIds: string[]; time: number; now: number }): Command<Project> {
+    return {
+      label: 'Duplicate step',
+      run: d => {
+        const from = findStep(d, args.sourceStepId);
+        const src = d.sources.find(s => s.id === from.anchor.source);
+        if (!src) return;
+        const time = Math.min(Math.max(0, args.time), src.duration);
+        if (d.steps.some(s => s.anchor.source === src.id && sameFrame(s.anchor.time, time, src.fps))) return;
+        const annotations = from.annotations.map((a, i) => ({ ...structuredClone(current(a)), id: args.annotationIds[i] ?? `${a.id}_copy` }));
+        d.steps.push({
+          id: args.stepId,
+          anchor: { source: src.id, time },
+          title: from.title,
+          body: from.body,
+          minHold: from.minHold,
+          zoom: from.zoom ? structuredClone(current(from.zoom)) : null,
+          annotations,
+        });
+        sortSteps(d);
         touch(d, args.now);
       },
     };

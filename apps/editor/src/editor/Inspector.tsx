@@ -70,7 +70,6 @@ import {
   getEditor,
   moveBlurLayer,
   moveEffect,
-  moveStep,
   notify,
   placeBlur,
   removeAnnotation,
@@ -78,7 +77,6 @@ import {
   removeBlurKeyframeHere,
   removeEffect,
   removeStep,
-  seekSource,
   seekTimeline,
   selectAnnotation,
   selectedAnnotation,
@@ -93,8 +91,6 @@ import {
   setGap,
   setGuide,
   setLogo,
-  setStepHold,
-  setStepText,
   setStepZoom,
   setPreviewOpen,
   sourceTimeAt,
@@ -106,6 +102,7 @@ import {
   updateEffect,
   useEditor,
 } from '../state/store';
+import { TYPE_LABEL, annotationName } from './annotationNames';
 import { useEditSession } from './useEditSession';
 import { switchView } from './visible';
 
@@ -114,8 +111,6 @@ const TABS = [
   { id: 'guide', label: 'Guide' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
-
-const TYPE_LABEL: Record<Annotation['type'], string> = { callout: 'Callout', arrow: 'Arrow', spotlight: 'Spotlight', box: 'Box', click: 'Click marker' };
 
 const tc = (t: number): string => formatTimecode(t);
 const refuse = (m: string): void => notify(m, 'error');
@@ -244,38 +239,12 @@ const REVEAL_OPTIONS = Array.from({ length: REVEAL_GROUPS }, (_, g) => ({ value:
 
 function StepPanel({ project, step }: { project: Project; step: Step }) {
   const number = project.steps.findIndex(s => s.id === step.id) + 1;
-  const media = useEditor(s => s.media);
-  const text = useEditSession();
-  const hold = useEditSession();
   const zoom = useEditSession();
-
-  const place = (seconds: number): boolean | string => {
-    if (!media) return false;
-    const pos = tlToSrc(project.timeline, seconds);
-    if (!pos || seconds > totalDuration(project) + 1e-6) return `That's past the end of the guide (${tc(totalDuration(project))}).`;
-    const time = media.index.snap(pos.time);
-    if (project.steps.some(s => s.id !== step.id && Math.abs(s.anchor.time - time) < 0.5 / media.info.fps)) return 'Another step is already pinned on that frame.';
-    moveStep(step.id, time);
-    seekSource(time);
-    return true;
-  };
 
   return (
     <div>
       <Title icon={<span className="grid size-6 place-items-center rounded-pill bg-pin text-sm font-semibold text-on-pin">{number}</span>} title={`Step ${number}`} />
-      <Help>Viewers see this frame, its annotations, then the next step.</Help>
-      <InspectorSection id="step-text" title="Words">
-        <div {...text.bind} className="flex flex-col gap-3">
-          <TextField label="Title" placeholder={`Step ${number}`} maxLength={120} value={step.title} onChange={e => setStepText(step.id, { title: e.target.value }, text.key())} />
-          <TextArea label="Note" placeholder="Add a sentence of context (optional)" maxLength={2000} value={step.body} onChange={e => setStepText(step.id, { body: e.target.value }, text.key())} />
-        </div>
-      </InspectorSection>
-      <InspectorSection id="step-timing" title="Timing">
-        <TimecodeField label="Position" value={srcToTl(project.timeline, step.anchor.source, step.anchor.time)} format={tc} parse={parseTimecode} onCommit={place} onRefuse={refuse} />
-        <div {...hold.bind}>
-          <ParamRow label="Pause" value={step.minHold} min={1} max={8} step={0.1} unit="s" defaultValue={2.5} onChange={v => setStepHold(step.id, v, hold.key())} />
-        </div>
-      </InspectorSection>
+      <Help>Title, note, pause and position are on the step card in the Steps list.</Help>
       <InspectorSection id="step-zoom" title="Zoom">
         {step.zoom ? (
           <div {...zoom.bind} className="flex flex-col gap-3">
@@ -305,25 +274,13 @@ function StepPanel({ project, step }: { project: Project; step: Step }) {
           <p className="m-0 text-fg-muted">None yet. Pick Callout, Arrow, Spotlight or Box (C, A, S, B) and draw on the frame.</p>
         ) : (
           <>
-            <Help>Each appears with the step or after it, group by group, in the guide and the video.</Help>
+            <Help>When each appears is under Advanced on the step card.</Help>
             <ul className="m-0 flex list-none flex-col gap-1 p-0">
               {step.annotations.map(a => (
                 <li key={a.id} className="flex items-center gap-1 rounded-md bg-raised p-1">
                   <button type="button" onClick={() => selectAnnotation(step.id, a.id)} className={cx('h-7 min-w-0 flex-1 truncate rounded-sm px-2 text-left hover:bg-panel', focusRing)}>
                     {annotationName(a)}
                   </button>
-                  <select
-                    aria-label={`When ${annotationName(a)} appears`}
-                    value={String(a.reveal)}
-                    onChange={e => updateAnnotation(step.id, a.id, { reveal: Number(e.target.value) }, 'Change reveal order')}
-                    className={cx('h-7 w-[92px] rounded-sm border border-line-strong bg-panel px-1 text-sm text-fg', focusRing)}
-                  >
-                    {REVEAL_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>
-                        {o.value === '0' ? 'First' : `Group ${Number(o.value) + 1}`}
-                      </option>
-                    ))}
-                  </select>
                   <button type="button" aria-label={`Delete ${annotationName(a)}`} onClick={() => removeAnnotation(step.id, a.id)} className={cx('grid size-7 place-items-center rounded-sm text-fg-muted hover:bg-panel hover:text-danger', focusRing)}>
                     <Icon icon={Trash2} />
                   </button>
@@ -390,11 +347,6 @@ function ZoomPanel({ project, step }: { project: Project; step: Step }) {
       </div>
     </div>
   );
-}
-
-function annotationName(a: Annotation): string {
-  if (a.type === 'callout') return `Callout “${a.text.length > 26 ? `${a.text.slice(0, 25)}…` : a.text}”`;
-  return TYPE_LABEL[a.type];
 }
 
 const PLACEMENTS: ReadonlyArray<{ value: CalloutPlacement; label: string }> = [

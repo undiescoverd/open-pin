@@ -549,6 +549,29 @@ function formatSeconds(t: number): string {
   return `${m}:${(t - m * 60).toFixed(2).padStart(5, '0')}`;
 }
 
+/** Copies a step onto the frame at the playhead: its words, pause, zoom and annotations. */
+export function duplicateStep(stepId: string): string | null {
+  const playback = currentPlayback();
+  const project = selectProject(getEditor());
+  if (!project || !playback) return null;
+  const from = project.steps.find(s => s.id === stepId);
+  if (!from) return null;
+  playback.pause();
+  const pos = sourceAt(project, playback.time);
+  if (!pos || !canPinAt(project, pos.source, pos.time)) {
+    notify("There's no frame of the recording here (it's a gap), so a step can't go here.", 'error');
+    return null;
+  }
+  if (stepAtTime(project, pos.source, pos.time)) {
+    notify('Move to the frame the copy should go on first. This frame already has a step.', 'error');
+    return null;
+  }
+  const id = newId('s');
+  run(commands.duplicateStep({ sourceStepId: stepId, stepId: id, annotationIds: from.annotations.map(() => newId('a')), time: pos.time, now: Date.now() }));
+  set({ selection: { kind: 'step', stepId: id } });
+  return id;
+}
+
 export function moveStep(stepId: string, sourceTime: number): void {
   run(commands.moveStep(stepId, sourceTime, Date.now()));
 }

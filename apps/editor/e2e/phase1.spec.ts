@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
 import { unzipSync } from 'fflate';
-import { FIXTURE, clickFrame, dragOnFrame, frameBox, openRecording, playheadSeconds, seekTo, stepCards, stepRail, waitForFrame, watchErrors } from './helpers';
+import { FIXTURE, clickFrame, dragOnFrame, frameBox, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepCards, stepRail, waitForFrame, watchErrors } from './helpers';
 
 /** The Phase 1 acceptance test (docs/04-roadmap.md): drop in a recording, pin 5 steps, annotate them, reload without losing
     anything, and export a PDF and PNGs that match the canvas. */
@@ -39,14 +39,14 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
 
     await test.step('title the steps in the Inspector', async () => {
       for (const [i, title] of ['Open the menu', 'Pick a colour', 'Resize the window', 'Save it', 'All done'].entries()) {
-        await stepCards(page).nth(i).getByRole('button').click();
+        await stepCards(page).nth(i).getByRole('button').first().click();
         await page.getByRole('textbox', { name: 'Title' }).fill(title);
       }
       await expect(stepCards(page).nth(2)).toContainText('Resize the window');
     });
 
     await test.step('annotate step 1 with a callout, an arrow, a box and a spotlight', async () => {
-      await stepCards(page).nth(0).getByRole('button').click();
+      await stepCards(page).nth(0).getByRole('button').first().click();
       await page.keyboard.press('c');
       await clickFrame(page, 0.35, 0.55);
       await page.getByRole('textbox', { name: 'Text' }).fill('Start here');
@@ -62,7 +62,7 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
     });
 
     await test.step('annotation changes show on the canvas and in the step card', async () => {
-      await stepCards(page).nth(0).getByRole('button').click();
+      await stepCards(page).nth(0).getByRole('button').first().click();
       await expect(page.getByRole('button', { name: /Delete Callout “Start here”/ })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Delete Spotlight' })).toBeVisible();
       await page.getByTestId('annotation-overlay').click({ position: { x: 630, y: 5 } }); /* deselect, so no handles are in the way */
@@ -77,7 +77,7 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
       await expect(stepCards(page)).toHaveCount(5);
       await expect(stepCards(page).nth(0)).toContainText('Open the menu');
       await expect(page.getByRole('textbox', { name: 'Guide name' })).toHaveValue('demo');
-      await stepCards(page).nth(0).getByRole('button').click();
+      await stepCards(page).nth(0).getByRole('button').first().click();
       await expect(page.getByRole('heading', { name: 'Step 1' })).toBeVisible();
       await expect(page.getByRole('button', { name: /Delete Callout “Start here”/ })).toBeVisible();
       await waitForFrame(page);
@@ -85,7 +85,7 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
     });
 
     await test.step('PNG export matches the canvas pixel for pixel', async () => {
-      await stepCards(page).nth(0).getByRole('button').click();
+      await stepCards(page).nth(0).getByRole('button').first().click();
       await expect.poll(() => playheadSeconds(page)).toBeCloseTo(0.5, 2);
       await waitForFrame(page);
       await page.getByRole('button', { name: 'Export' }).click();
@@ -232,14 +232,14 @@ test.describe('the frame and the Pin tool', () => {
     await page.keyboard.press('p');
     await clickFrame(page, 0.75, 0.75);
     await expect(stepCards(page)).toHaveCount(1);
-    await page.getByRole('button', { name: 'Click marker', exact: true }).click();
+    await page.locator('#panel-selection').getByRole('button', { name: 'Click marker', exact: true }).click();
     await expect(page.getByRole('spinbutton', { name: 'X' })).toHaveValue('480'); /* 0.75 of 640 px */
   });
 
   test('Pin step and Shift+P pin the frame with no marker, and pinning twice does not duplicate', async ({ page }) => {
     await openRecording(page);
     await seekTo(page, 2);
-    await page.getByRole('button', { name: 'Pin step' }).click();
+    await page.getByRole('button', { name: 'Add step' }).click();
     await page.keyboard.press('Shift+P');
     await expect(stepCards(page)).toHaveCount(1);
     await expect(page.getByText('None yet')).toBeVisible();
@@ -446,6 +446,7 @@ test.describe('the Inspector', () => {
     await openRecording(page);
     await seekTo(page, 1);
     await page.keyboard.press('Shift+P');
+    await openStepAdvanced(page);
     const position = page.getByRole('textbox', { name: 'Position' });
     await position.fill('2.5');
     await position.press('Enter');
