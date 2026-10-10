@@ -1,17 +1,24 @@
 import type { Draft } from 'immer';
 import type { Command } from './history';
+import { blurRectAt } from './geometry';
 import {
+  DEFAULT_FRAME,
   SCHEMA_VERSION,
   type Annotation,
+  type Asset,
+  type Blur,
   type ClickAnnotation,
+  type Frame,
+  type Logo,
   type Point,
   type Project,
+  type Rect,
   type Source,
   type Step,
 } from './schema';
 import { snapToFrame, srcToTl } from './time';
 
-/* The edits Phase 1 makes to a project. Each is a named command (see history.ts). They take every id they need as an argument,
+/* The edits made to a project, apart from timeline editing (clips.ts). Each is a named command (see history.ts). They take every id they need as an argument,
    so they are deterministic and easy to test. Callers check preconditions with the `can*` helpers first. */
 
 /** The default annotation colour, coral-500 in docs/03-design-system.md. */
@@ -31,8 +38,12 @@ export function createProject(args: { id: string; name: string; source: Source; 
     createdAt: args.now,
     updatedAt: args.now,
     sources: [source],
-    timeline: [{ id: `c_${source.id}`, source: source.id, in: 0, out: source.duration, speed: 1, gap: 0 }],
+    timeline: [{ id: `c_${source.id}`, source: source.id, in: 0, out: source.duration, speed: 1, gap: 0, volume: 1, muted: false }],
     steps: [],
+    blurs: [],
+    assets: [],
+    frame: { ...DEFAULT_FRAME, background: { type: 'none' } },
+    logo: null,
   };
 }
 
@@ -113,7 +124,7 @@ export const commands = {
           }
         } else {
           const m = marker();
-          d.steps.push({ id: args.stepId, anchor: { source: args.source, time }, title: '', body: '', minHold: 2.5, annotations: m ? [m] : [] });
+          d.steps.push({ id: args.stepId, anchor: { source: args.source, time }, title: '', body: '', minHold: 2.5, zoom: null, annotations: m ? [m] : [] });
           sortSteps(d);
         }
         touch(d, args.now);
@@ -206,6 +217,189 @@ export const commands = {
         const i = step.annotations.findIndex(a => a.id === annotationId);
         if (i < 0) return;
         step.annotations.splice(i, 1);
+        touch(d, now);
+      },
+    };
+  },
+
+  setStepHold(stepId: string, seconds: number, now: number, coalesceKey?: string): Command<Project> {
+    return {
+      label: 'Change pause',
+      coalesceKey,
+      run: d => {
+        const step = findStep(d, stepId);
+        const hold = Math.min(8, Math.max(1, seconds));
+        if (step.minHold === hold) return;
+        step.minHold = hold;
+        touch(d, now);
+      },
+    };
+  },
+
+  /** Sets or removes (null) a step's zoom box. */
+  setStepZoom(stepId: string, rect: Rect | null, now: number, label?: string, coalesceKey?: string): Command<Project> {
+    return {
+      label: label ?? (rect ? 'Change zoom' : 'Remove zoom'),
+      coalesceKey,
+      run: d => {
+        const step = findStep(d, stepId);
+        if (JSON.stringify(step.zoom?.rect ?? null) === JSON.stringify(rect)) return;
+        step.zoom = rect ? { rect } : null;
+        touch(d, now);
+      },
+    };
+  },
+
+  addBlur(blur: Blur, now: number): Command<Project> {
+    return {
+      label: 'Add blur',
+      run: d => {
+        d.blurs.push(blur);
+        touch(d, now);
+      },
+    };
+  },
+
+  /** Changes a blur's settings or timing. Keyframes change through `setBlurRect`. */
+  updateBlur(blurId: string, patch: Partial<Omit<Blur, 'id' | 'keyframes' | 'source'>>, now: number, label = 'Edit blur', coalesceKey?: string): Command<Project> {
+    return {
+      label,
+      coalesceKey,
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        if (!blur) return;
+        let changed = false;
+        for (const [key, value] of Object.entries(patch)) {
+          const target = blur as Record<string, unknown>;
+          if (value === undefined || target[key] === value) continue;
+          target[key] = value;
+          changed = true;
+        }
+        if (blur.end < blur.start) [blur.start, blur.end] = [blur.end, blur.start];
+        if (changed) touch(d, now);
+      },
+    };
+  },
+
+  /**
+   * Changes when a blur starts and ends (source seconds). Moving the whole bar passes `shift`, which moves its keyframes by the same
+   * amount so the motion moves with it; trimming an edge leaves them where they are.
+   */
+  setBlurTiming(blurId: string, start: number, end: number, shift: boolean, now: number, coalesceKey?: string): Command<Project> {
+    return {
+      label: shift ? 'Move blur' : 'Trim blur',
+      coalesceKey,
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        const source = blur && d.sources.find(s => s.id === blur.source);
+        if (!blur || !source) return;
+        const s = Math.max(0, Math.min(start, source.duration)), e = Math.max(s, Math.min(end, source.duration));
+        if (Math.abs(s - blur.start) < 1e-9 && Math.abs(e - blur.end) < 1e-9) return;
+        if (shift) for (const k of blur.keyframes) k.time = Math.max(0, k.time + (s - blur.start));
+        blur.start = s;
+        blur.end = e;
+        touch(d, now);
+      },
+    };
+  },
+
+  /**
+   * Puts a blur's rectangle at `rect` at a source time. A keyframe within `tolerance` of the time is moved; otherwise a new one
+   * is added, so moving a blur after scrubbing makes it follow what it hides (F7).
+   */
+  setBlurRect(blurId: string, time: number, rect: Rect, tolerance: number, now: number, label = 'Move blur', coalesceKey?: string): Command<Project> {
+    return {
+      label,
+      coalesceKey,
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        if (!blur) return;
+        const existing = blur.keyframes.find(k => Math.abs(k.time - time) <= tolerance);
+        if (existing) {
+          if (JSON.stringify(existing.rect) === JSON.stringify(rect)) return;
+          existing.rect = rect;
+        } else {
+          blur.keyframes.push({ time, rect });
+          blur.keyframes.sort((a, b) => a.time - b.time);
+        }
+        touch(d, now);
+      },
+    };
+  },
+
+  removeBlurKeyframe(blurId: string, time: number, now: number): Command<Project> {
+    return {
+      label: 'Delete keyframe',
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        if (!blur || blur.keyframes.length < 2) return;
+        const i = blur.keyframes.findIndex(k => k.time === time);
+        if (i < 0) return;
+        blur.keyframes.splice(i, 1);
+        touch(d, now);
+      },
+    };
+  },
+
+  /** Drops every keyframe, keeping the blur where it is at `time` for its whole length. */
+  flattenBlur(blurId: string, time: number, now: number): Command<Project> {
+    return {
+      label: 'Stop blur moving',
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        if (!blur || blur.keyframes.length < 2) return;
+        const rect = blurRectAt(blur, time);
+        blur.keyframes = [{ time: blur.start, rect }];
+        touch(d, now);
+      },
+    };
+  },
+
+  removeBlur(blurId: string, now: number): Command<Project> {
+    return {
+      label: 'Delete blur',
+      run: d => {
+        const i = d.blurs.findIndex(b => b.id === blurId);
+        if (i < 0) return;
+        d.blurs.splice(i, 1);
+        touch(d, now);
+      },
+    };
+  },
+
+  setFrame(patch: Partial<Frame>, now: number, label = 'Change framing', coalesceKey?: string): Command<Project> {
+    return {
+      label,
+      coalesceKey,
+      run: d => {
+        const next = { ...d.frame, ...patch };
+        if (JSON.stringify(next) === JSON.stringify(d.frame)) return;
+        d.frame = next as Frame;
+        touch(d, now);
+      },
+    };
+  },
+
+  setLogo(logo: Logo | null, now: number, label?: string, coalesceKey?: string): Command<Project> {
+    return {
+      label: label ?? (logo ? 'Change logo' : 'Remove logo'),
+      coalesceKey,
+      run: d => {
+        if (JSON.stringify(d.logo) === JSON.stringify(logo)) return;
+        d.logo = logo;
+        touch(d, now);
+      },
+    };
+  },
+
+  /** Adds a file (a logo or background image) and, in the same undo step, puts it to use. */
+  addAsset(asset: Asset, use: { logo?: Logo; background?: true }, now: number): Command<Project> {
+    return {
+      label: use.logo ? 'Add logo' : 'Add background image',
+      run: d => {
+        if (!d.assets.some(a => a.id === asset.id)) d.assets.push(asset);
+        if (use.logo) d.logo = use.logo;
+        if (use.background) d.frame.background = { type: 'image', asset: asset.id };
         touch(d, now);
       },
     };

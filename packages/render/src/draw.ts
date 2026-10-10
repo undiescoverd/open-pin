@@ -15,11 +15,12 @@ function makeLayer(width: number, height: number): LayerCanvas {
   return canvas;
 }
 
-function drawBox(ctx: Ctx, a: BoxAnnotation, size: Size): void {
+function drawBox(ctx: Ctx, a: BoxAnnotation, size: Size, alpha: number): void {
   const u = unit(size);
   const c = colourFor(a.color);
   const [x, y, w, h] = [a.rect[0] * size.width, a.rect[1] * size.height, a.rect[2] * size.width, a.rect[3] * size.height];
   ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.lineJoin = 'round';
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, 10 * u);
@@ -27,16 +28,16 @@ function drawBox(ctx: Ctx, a: BoxAnnotation, size: Size): void {
   ctx.lineWidth = 11 * u;
   ctx.stroke();
   ctx.fillStyle = c.stroke;
-  ctx.globalAlpha = 0.08;
+  ctx.globalAlpha = 0.08 * alpha;
   ctx.fill();
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alpha;
   ctx.strokeStyle = c.stroke;
   ctx.lineWidth = 5 * u;
   ctx.stroke();
   ctx.restore();
 }
 
-function drawArrow(ctx: Ctx, a: ArrowAnnotation, size: Size): void {
+function drawArrow(ctx: Ctx, a: ArrowAnnotation, size: Size, alpha: number): void {
   const u = unit(size);
   const c = colourFor(a.color);
   const g = arrowGeometry(a, size);
@@ -53,6 +54,7 @@ function drawArrow(ctx: Ctx, a: ArrowAnnotation, size: Size): void {
     ctx.closePath();
   };
   ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.strokeStyle = c.halo;
@@ -74,24 +76,24 @@ function drawArrow(ctx: Ctx, a: ArrowAnnotation, size: Size): void {
   ctx.restore();
 }
 
-function drawClick(ctx: Ctx, a: ClickAnnotation, size: Size): void {
+function drawClick(ctx: Ctx, a: ClickAnnotation, size: Size, alpha: number): void {
   const u = unit(size);
   const c = colourFor(a.color);
   const [x, y] = [a.at[0] * size.width, a.at[1] * size.height];
   ctx.save();
   ctx.strokeStyle = c.stroke;
   ctx.lineWidth = 4 * u;
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.55 * alpha;
   ctx.beginPath();
   ctx.arc(x, y, 16 * u, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alpha;
   ctx.beginPath();
   ctx.arc(x, y, 21 * u, 0, Math.PI * 2);
   ctx.fillStyle = c.stroke;
-  ctx.globalAlpha = 0.22;
+  ctx.globalAlpha = 0.22 * alpha;
   ctx.fill();
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alpha;
   ctx.lineWidth = 3 * u;
   ctx.stroke();
   ctx.beginPath();
@@ -104,12 +106,13 @@ function drawClick(ctx: Ctx, a: ClickAnnotation, size: Size): void {
   ctx.restore();
 }
 
-function drawCallout(ctx: Ctx, a: CalloutAnnotation, size: Size): void {
+function drawCallout(ctx: Ctx, a: CalloutAnnotation, size: Size, alpha: number): void {
   const u = unit(size);
   const c = colourFor(a.color);
   const l = layoutCallout(ctx, a, size);
   const half = 8 * u;
   ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.shadowColor = c.id === 'snow' ? 'rgba(0,0,0,.2)' : 'rgba(0,0,0,.28)';
   ctx.shadowBlur = 28 * u;
   ctx.shadowOffsetY = 10 * u;
@@ -121,6 +124,7 @@ function drawCallout(ctx: Ctx, a: CalloutAnnotation, size: Size): void {
 
   /* the pointer: a rounded diamond centred on the bubble's edge, nearest the anchor */
   ctx.save();
+  ctx.globalAlpha = alpha;
   const tipX = l.side === 'left' ? l.left + l.width + 7 * u - half : l.side === 'right' ? l.left - 7 * u + half : l.left + l.tip;
   const tipY = l.side === 'top' ? l.top + l.height + 7 * u - half : l.side === 'bottom' ? l.top - 7 * u + half : l.top + l.tip;
   ctx.translate(tipX, tipY);
@@ -132,6 +136,7 @@ function drawCallout(ctx: Ctx, a: CalloutAnnotation, size: Size): void {
   ctx.restore();
 
   ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.font = calloutFont(size);
   ctx.fillStyle = c.text;
   ctx.textBaseline = 'middle';
@@ -140,7 +145,7 @@ function drawCallout(ctx: Ctx, a: CalloutAnnotation, size: Size): void {
 }
 
 /** Dims the frame except where spotlights are, with a feathered edge (black at 55%, 12 px feather in the design system). */
-function drawSpotlights(ctx: Ctx, spots: readonly SpotlightAnnotation[], size: Size): void {
+function drawSpotlights(ctx: Ctx, spots: readonly SpotlightAnnotation[], size: Size, alpha: number): void {
   if (!spots.length) return;
   const u = unit(size);
   const layer = makeLayer(Math.ceil(size.width), Math.ceil(size.height));
@@ -157,22 +162,28 @@ function drawSpotlights(ctx: Ctx, spots: readonly SpotlightAnnotation[], size: S
     lctx.roundRect(s.rect[0] * size.width, s.rect[1] * size.height, s.rect[2] * size.width, s.rect[3] * size.height, 12 * u);
     lctx.fill();
   }
+  ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.drawImage(layer, 0, 0, size.width, size.height);
+  ctx.restore();
 }
 
 export interface DrawOptions {
-  /** show only annotations in reveal groups up to this one (the player reveals them in order); default all */
-  revealUpTo?: number;
+  /** opacity of each reveal group (F6), by group index; a missing entry means fully shown */
+  reveal?: readonly number[];
 }
 
 /** Draws one step's annotations: spotlights dim first, then boxes, arrows, click markers, and callouts on top. */
 export function drawAnnotations(ctx: Ctx, annotations: readonly Annotation[], size: Size, options: DrawOptions = {}): void {
-  const shown = annotations.filter(a => a.reveal <= (options.revealUpTo ?? Infinity));
-  drawSpotlights(ctx, shown.filter((a): a is SpotlightAnnotation => a.type === 'spotlight'), size);
+  const alpha = (a: Annotation) => options.reveal?.[a.reveal] ?? 1;
+  const shown = annotations.filter(a => alpha(a) > 0);
+  const spots = shown.filter((a): a is SpotlightAnnotation => a.type === 'spotlight');
+  /* the dim is one layer, so it fades with the latest of its spotlights to appear */
+  if (spots.length) drawSpotlights(ctx, spots, size, Math.max(...spots.map(alpha)));
   for (const a of shown) {
-    if (a.type === 'box') drawBox(ctx, a, size);
-    else if (a.type === 'arrow') drawArrow(ctx, a, size);
-    else if (a.type === 'click') drawClick(ctx, a, size);
+    if (a.type === 'box') drawBox(ctx, a, size, alpha(a));
+    else if (a.type === 'arrow') drawArrow(ctx, a, size, alpha(a));
+    else if (a.type === 'click') drawClick(ctx, a, size, alpha(a));
   }
-  for (const a of shown) if (a.type === 'callout') drawCallout(ctx, a, size);
+  for (const a of shown) if (a.type === 'callout') drawCallout(ctx, a, size, alpha(a));
 }

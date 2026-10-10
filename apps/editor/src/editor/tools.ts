@@ -21,8 +21,8 @@ export const TOOLS: readonly Tool[] = [
   { id: 'arrow', label: 'Arrow', key: 'a', icon: ArrowUpRight, hint: 'Drag from the tail to the tip.' },
   { id: 'spotlight', label: 'Spotlight', key: 's', icon: Flashlight, hint: 'Drag over the area that should stay bright.' },
   { id: 'box', label: 'Box', key: 'b', icon: Square, hint: 'Drag a box around what matters.' },
-  { id: 'zoom', label: 'Zoom', key: 'z', icon: ZoomIn, hint: 'Zoom arrives with the editing phase.', soon: 'Zoom arrives in the editing phase' },
-  { id: 'blur', label: 'Blur', key: 'x', icon: Grid3x3, hint: 'Blur arrives with the editing phase.', soon: 'Blur arrives in the editing phase' },
+  { id: 'zoom', label: 'Zoom', key: 'z', icon: ZoomIn, hint: 'Drag the part of the frame viewers should zoom into at this step.' },
+  { id: 'blur', label: 'Blur', key: 'x', icon: Grid3x3, hint: 'Drag over what should be hidden. It lasts from here to the end.' },
 ];
 
-export const DRAWING_TOOLS: readonly ToolId[] = ['callout', 'arrow', 'spotlight', 'box'];
+export const DRAWING_TOOLS: readonly ToolId[] = ['callout', 'arrow', 'spotlight', 'box', 'zoom', 'blur'];

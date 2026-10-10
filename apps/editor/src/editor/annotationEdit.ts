@@ -1,4 +1,4 @@
-import { clamp01, newId, type Annotation, type AnnotationType, type Point, type Rect } from '@waypost/core';
+import { ZOOM_MAX, ZOOM_MIN, clamp01, newId, type Annotation, type AnnotationType, type Point, type Rect } from '@waypost/core';
 import { DEFAULT_CALLOUT_COLOR } from '@waypost/render';
 import type { CalloutPlacement } from '@waypost/core';
 
@@ -133,3 +133,60 @@ export const CURSORS: Record<Handle, string> = {
   from: 'grab',
   to: 'grab',
 };
+
+// ----- rectangles that aren't annotations: blur regions and zoom boxes --------------------------------------------------
+
+/** Moves a rectangle by a normalised delta, keeping it inside the frame. */
+export function moveRect(rect: Rect, dx: number, dy: number): Rect {
+  const [x, y, w, h] = rect;
+  return [Math.min(Math.max(x + dx, 0), 1 - w), Math.min(Math.max(y + dy, 0), 1 - h), w, h];
+}
+
+/** The eight handles of any rectangle, in normalised coordinates. */
+export function rectHandles(rect: Rect): Array<{ handle: RectHandle; at: Point }> {
+  const [x, y, w, h] = rect;
+  const at: Record<RectHandle, Point> = { nw: [x, y], n: [x + w / 2, y], ne: [x + w, y], e: [x + w, y + h / 2], se: [x + w, y + h], s: [x + w / 2, y + h], sw: [x, y + h], w: [x, y + h / 2] };
+  return RECT_HANDLES.map(handle => ({ handle, at: at[handle] }));
+}
+
+const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
+
+/** A zoom box dragged out from `a` to `b`: the frame's shape, 25 to 80% of the frame, inside it. */
+export function zoomBetween(a: Point, b: Point): Rect {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const z = clamp(Math.max(Math.abs(dx), Math.abs(dy)), ZOOM_MIN, ZOOM_MAX);
+  return [clamp(dx < 0 ? a[0] - z : a[0], 0, 1 - z), clamp(dy < 0 ? a[1] - z : a[1], 0, 1 - z), z, z];
+}
+
+/**
+ * Drags a handle of a zoom box to `p`. The box keeps the frame's shape: an edge resizes the whole box, keeping the opposite edge
+ * fixed and staying centred on the other axis; a corner keeps the opposite corner fixed (docs/05-editor-interactions.md, 5.2).
+ */
+export function resizeZoom(o: Rect, handle: RectHandle, p: Point): Rect {
+  if (handle.length === 1) {
+    const horiz = handle === 'e' || handle === 'w';
+    const grow = handle === 'e' || handle === 's' ? 1 : -1;
+    const fixed = handle === 'e' ? o[0] : handle === 'w' ? o[0] + o[2] : handle === 's' ? o[1] : o[1] + o[3];
+    const room = Math.min(grow > 0 ? 1 - fixed : fixed, ZOOM_MAX);
+    const z = clamp(((horiz ? p[0] : p[1]) - fixed) * grow, ZOOM_MIN, Math.max(ZOOM_MIN, room));
+    const mid = horiz ? o[1] + o[3] / 2 : o[0] + o[2] / 2;
+    const along = clamp(mid - z / 2, 0, 1 - z);
+    const edge = clamp(grow > 0 ? fixed : fixed - z, 0, 1 - z);
+    return horiz ? [edge, along, z, z] : [along, edge, z, z];
+  }
+  const left = handle.includes('w'), top = handle.includes('n');
+  const ox = left ? o[0] + o[2] : o[0], oy = top ? o[1] + o[3] : o[1];
+  const room = Math.min(left ? ox : 1 - ox, top ? oy : 1 - oy, ZOOM_MAX);
+  const z = clamp(Math.max(Math.abs(p[0] - ox), Math.abs(p[1] - oy)), ZOOM_MIN, Math.max(ZOOM_MIN, room));
+  return [clamp(left ? ox - z : ox, 0, 1 - z), clamp(top ? oy - z : oy, 0, 1 - z), z, z];
+}
+
+/** Whether a normalised point is inside a rectangle. */
+export function inRect(p: Point, r: Rect, pad = 0): boolean {
+  return p[0] >= r[0] - pad && p[0] <= r[0] + r[2] + pad && p[1] >= r[1] - pad && p[1] <= r[1] + r[3] + pad;
+}
+
+/** Whether a normalised point is on a rectangle's outline, within `band` (normalised, per axis). */
+export function onOutline(p: Point, r: Rect, band: [number, number]): boolean {
+  return inRect(p, r, Math.max(...band)) && !(p[0] > r[0] + band[0] && p[0] < r[0] + r[2] - band[0] && p[1] > r[1] + band[1] && p[1] < r[1] + r[3] - band[1]);
+}
