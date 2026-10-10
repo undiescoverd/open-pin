@@ -63,6 +63,7 @@ import {
   zoomBy,
   type Selection,
 } from '../state/store';
+import { releaseFocus } from './keyboard';
 import { nearestEdge, timelineEdges } from './snapping';
 
 /* The timeline (docs/05-editor-interactions.md, section 4). Lanes top to bottom: Steps, Video, Effects (one row per layer, the top
@@ -152,6 +153,7 @@ let dragCounter = 0;
  * elsewhere (another layer) keeps the drag.
  */
 function follow(e: ReactPointerEvent, handlers: { move: (dx: number, ev: PointerEvent) => void; end: (moved: boolean) => void }): void {
+  releaseFocus();
   const x0 = e.clientX, y0 = e.clientY;
   let moved = false;
   const onMove = (ev: PointerEvent) => {
@@ -173,6 +175,7 @@ function follow(e: ReactPointerEvent, handlers: { move: (dx: number, ev: Pointer
 /** Clicking empty space in a lane selects the step at the playhead, or nothing. It never moves the playhead. */
 function onEmptyLane(e: ReactPointerEvent): void {
   if (e.button !== 0 || e.target !== e.currentTarget) return;
+  releaseFocus();
   const state = getEditor();
   const project = selectProject(state);
   const step = project && stepAtPlayhead(project, state.playhead);
@@ -267,6 +270,7 @@ export function Timeline() {
   const onRulerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || phase !== 'ready') return;
     e.preventDefault();
+    releaseFocus();
     e.currentTarget.setPointerCapture(e.pointerId);
     scrub(e, true);
   };

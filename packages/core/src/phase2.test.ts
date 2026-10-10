@@ -14,7 +14,7 @@ import {
   zoomBox,
 } from './geometry';
 import { apply, createHistory, undo } from './history';
-import { exportPlan, holdLook, planAt, stepIntro, stepShown } from './plan';
+import { audioPlan, exportPlan, holdLook, planAt, stepIntro, stepShown } from './plan';
 import { newEffect } from './effects';
 import { parseProject, SCHEMA_VERSION, type Blur, type Project, type Source } from './schema';
 import { clipStarts, cutTimes, spotAt, srcToTl, timelineDuration } from './time';
@@ -327,5 +327,20 @@ describe('blur timing', () => {
     p = run(p, commands.placeBlur('b1', { start: 4, end: 2, shift: false }, 6));
     expect(p.blurs[0]).toMatchObject({ start: 4 });
     expect(p.blurs[0]!.end).toBeCloseTo(4.1, 9);
+  });
+});
+
+describe('the soundtrack', () => {
+  it('plays the recording under clips at 1×, silent in pauses, gaps, muted and sped-up clips', () => {
+    let p = run(twoClips(), pin('s1', 4), clipCommands.trimClip('c_src1', 'out', 8, false, 3), clipCommands.setClipSpeed('c2', 2, 4));
+    p = run(p, clipCommands.setClipAudio('c_src1', { volume: 0.5 }, 5));
+    const segments = audioPlan(p, exportPlan(p));
+    expect(segments).toEqual([
+      { start: 0, duration: 4, source: { time: 0, volume: 0.5 } },
+      { start: 4, duration: 2.5, source: undefined },
+      { start: 6.5, duration: 4, source: { time: 4, volume: 0.5 } },
+      { start: 10.5, duration: 7, source: undefined },
+    ]);
+    expect(segments.reduce((t, s) => t + s.duration, 0)).toBeCloseTo(exportPlan(p).duration, 9);
   });
 });

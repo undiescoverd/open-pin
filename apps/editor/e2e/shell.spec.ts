@@ -13,7 +13,7 @@ test.describe('editor shell', () => {
     await expect(page.getByRole('region', { name: 'Timeline' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Drop a screen recording' })).toBeVisible();
     await expect(page.getByRole('toolbar', { name: 'Tools' }).getByRole('button')).toHaveCount(8);
-    for (const lane of ['Video', 'Steps', 'Blur', 'Voice', 'Music']) await expect(page.getByLabel(`${lane} lane, empty`)).toBeVisible();
+    for (const lane of ['Steps', 'Video', 'Effects', 'Voice', 'Music']) await expect(page.getByLabel(`${lane} lane, empty`)).toBeVisible();
     await expect(page.getByText('0:00.000 / 0:00.000')).toBeVisible();
     expect(errors).toEqual([]);
   });

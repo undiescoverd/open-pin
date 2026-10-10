@@ -48,6 +48,7 @@ export function Stage() {
       </div>
       {phase === 'ready' ? <Workspace /> : <DropZone loading={phase === 'loading'} />}
       {busy && <BusyOverlay text={busy} />}
+      <ExportOverlay />
     </main>
   );
 }
@@ -111,6 +112,33 @@ function MessageLine() {
     <p role="status" aria-live="polite" className={cx('m-0 min-h-5 text-sm', message?.tone === 'error' ? 'text-danger' : 'text-fg-muted')}>
       {message?.text}
     </p>
+  );
+}
+
+/** A long export: what it is doing, how far along, and Cancel. */
+function ExportOverlay() {
+  const exporting = useEditor(s => s.exporting);
+  if (!exporting) return null;
+  const percent = Math.round(exporting.progress * 100);
+  return (
+    <div role="alertdialog" aria-modal="true" aria-label={exporting.label} className="fixed inset-0 z-30 grid place-items-center bg-scrim">
+      <div className="flex w-[380px] flex-col gap-3 rounded-lg border border-line bg-panel px-5 py-4 text-fg shadow-pop">
+        <div className="flex items-center gap-3 text-md">
+          <Icon icon={Loader2} size={20} className="animate-spin" />
+          {exporting.label}
+          <span className="ml-auto font-mono text-sm tabular-nums text-fg-muted">{percent}%</span>
+        </div>
+        <div role="progressbar" aria-label="Export progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-2 overflow-hidden rounded-pill bg-raised">
+          <div className="h-full rounded-pill bg-sel transition-[width]" style={{ width: `${percent}%` }} />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-fg-muted">{exporting.detail}</span>
+          <Button size="sm" className="ml-auto" onClick={exporting.cancel}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

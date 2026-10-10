@@ -117,13 +117,17 @@ function drawBackground(ctx: Ctx, scene: Scene, width: number, height: number): 
 }
 
 /* Scratch canvases, reused between frames: `work` holds the region being processed, `pass` takes one filter pass, `cells` the
-   pixelate grid. */
+   pixelate grid. `work` is always exactly the region's size: the browser's high-quality downscale (pixelate's averaging) depends
+   on the size of the canvas it reads from, and the same region must come out the same however it was drawn before. */
 const scratch = new Map<string, AnyCanvas>();
 function scratchCanvas(which: 'work' | 'pass' | 'cells', width: number, height: number): AnyCanvas {
   let c = scratch.get(which);
-  if (!c || c.width < width || c.height < height) {
-    c = makeCanvas(Math.max(width, c?.width ?? 0), Math.max(height, c?.height ?? 0));
+  if (!c) {
+    c = makeCanvas(width, height);
     scratch.set(which, c);
+  } else if (which === 'work' ? c.width !== width || c.height !== height : c.width < width || c.height < height) {
+    c.width = which === 'work' ? width : Math.max(width, c.width);
+    c.height = which === 'work' ? height : Math.max(height, c.height);
   }
   return c;
 }

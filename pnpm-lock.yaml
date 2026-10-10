@@ -126,9 +126,15 @@ importers:
       '@waypost/render':
         specifier: workspace:*
         version: link:../render
+      comlink:
+        specifier: ^4.4.2
+        version: 4.4.2
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
+      mediabunny:
+        specifier: ^1.61.3
+        version: 1.61.3
       pdf-lib:
         specifier: ^1.17.1
         version: 1.17.1

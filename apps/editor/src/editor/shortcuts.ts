@@ -37,7 +37,7 @@ const TRANSPORT_KEYS = new Set(['j', 'k', 'l', '=', '+', '-']);
 export function useShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (document.querySelector('[role="dialog"]') || e.isComposing) return;
+      if (document.querySelector('[role="dialog"]') || getEditor().exporting || e.isComposing) return;
       const target = e.target;
       if (isTyping(target)) return;
       const key = e.key.toLowerCase(); /* by lowercase key, so shortcuts also work with Caps Lock on */

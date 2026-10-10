@@ -108,3 +108,53 @@ export function planAt(plan: Plan, t: number): { timeline: number; hold: { stepI
   if (item.kind === 'hold') return { timeline: item.at, hold: { stepId: item.stepId, t: clamp(t - item.start, 0, item.duration), duration: item.duration } };
   return { timeline: clamp(item.from + (t - item.start), item.from, item.to), hold: null };
 }
+
+/** A stretch of the video's soundtrack: silence, or the recording's own sound from a source time, at a volume. */
+export interface AudioSegment {
+  /** output seconds */
+  start: number;
+  duration: number;
+  /** where the sound comes from; silence when left out */
+  source?: { time: number; volume: number };
+}
+
+/**
+ * The recording's own sound laid out along a plan (F13): it plays under clips at normal speed, at each clip's volume, and is
+ * silent in pauses, gaps, muted clips and sped-up or slowed clips (changing speed without changing pitch is left for later).
+ */
+export function audioPlan(project: Project, plan: Plan): AudioSegment[] {
+  const segments: AudioSegment[] = [];
+  const push = (start: number, duration: number, source?: AudioSegment['source']) => {
+    if (duration <= 1e-9) return;
+    const last = segments[segments.length - 1];
+    /* join silences, and sound that carries straight on */
+    if (last && !last.source && !source) last.duration += duration;
+    else if (last?.source && source && Math.abs(last.source.time + last.duration - source.time) < 1e-6 && last.source.volume === source.volume) last.duration += duration;
+    else segments.push({ start, duration, source });
+  };
+  const clips = project.timeline;
+  let clipStart = 0;
+  const spans = clips.map(c => {
+    const gapStart = clipStart;
+    clipStart += c.gap;
+    const start = clipStart;
+    clipStart += (c.out - c.in) / c.speed;
+    return { clip: c, gapStart, start, end: clipStart };
+  });
+  for (const item of plan.items) {
+    if (item.kind === 'hold') {
+      push(item.start, item.duration);
+      continue;
+    }
+    for (const s of spans) {
+      /* the gap before the clip */
+      const g0 = Math.max(item.from, s.gapStart), g1 = Math.min(item.to, s.start);
+      if (g1 > g0) push(item.start + (g0 - item.from), g1 - g0);
+      const a = Math.max(item.from, s.start), b = Math.min(item.to, s.end);
+      if (b <= a) continue;
+      const audible = !s.clip.muted && s.clip.volume > 0 && Math.abs(s.clip.speed - 1) < 1e-9;
+      push(item.start + (a - item.from), b - a, audible ? { time: s.clip.in + (a - s.start), volume: s.clip.volume } : undefined);
+    }
+  }
+  return segments;
+}

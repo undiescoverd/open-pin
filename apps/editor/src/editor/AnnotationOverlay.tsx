@@ -43,6 +43,7 @@ import {
   updateAnnotation,
   useEditor,
 } from '../state/store';
+import { releaseFocus } from './keyboard';
 import { isViewer } from './visible';
 
 /* The layer over the recording that turns pointer gestures into edits (docs/05-editor-interactions.md, section 5): the Pin tool,
@@ -135,6 +136,7 @@ export function AnnotationOverlay({ width, height, cssWidth }: OverlayProps) {
   const onPointerDown = (e: ReactPointerEvent) => {
     if (e.button !== 0 || !project) return;
     e.preventDefault();
+    releaseFocus();
     const p = toNorm(e);
     origin.current = { x: e.clientX, y: e.clientY };
     ref.current!.setPointerCapture(e.pointerId);

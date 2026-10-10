@@ -1,10 +1,10 @@
 import { canRedo, canUndo, redoLabel, undoLabel } from '@waypost/core';
 import { Button, Icon, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator } from '@waypost/ui';
-import { ChevronDown, ChevronLeft, ClipboardCopy, Download, Eye, FileArchive, FileDown, FileText, Image as ImageIcon, Redo2, Save, Search, Share, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ClipboardCopy, Download, Eye, FileArchive, FileText, Film, Image as ImageIcon, Redo2, Save, Search, Share, Undo2 } from 'lucide-react';
 import { ThemeButton } from '../ThemeButton';
 import { copyFrame, exportPdfGuide, exportScreenshots, saveFrame } from '../state/exporting';
 import { saveWaypost } from '../state/project';
-import { redo, renameProject, selectProject, setProjectsOpen, undo, useEditor } from '../state/store';
+import { redo, renameProject, selectProject, setExportOpen, setProjectsOpen, undo, useEditor } from '../state/store';
 import { Logo } from './Logo';
 import { useEditSession } from './useEditSession';
 
@@ -81,8 +81,10 @@ export function TopBar() {
           <MenuItem icon={<Icon icon={Save} />} shortcut={['mod', 's']} onSelect={() => void saveWaypost()}>
             Save project file (.waypost)
           </MenuItem>
-          <MenuItem icon={<Icon icon={FileDown} />} disabled>
-            MP4 video (coming soon)
+          <MenuSeparator />
+          <MenuLabel>Video</MenuLabel>
+          <MenuItem icon={<Icon icon={Film} />} onSelect={() => setExportOpen(true)}>
+            MP4 video…
           </MenuItem>
         </Menu>
         <Button variant="primary" icon={<Icon icon={Share} />} disabled>
