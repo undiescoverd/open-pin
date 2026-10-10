@@ -381,6 +381,14 @@ audio{width:100%; height:34px}
 .tl-label{position:sticky; left:0; z-index:5; width:var(--label-w); flex:none; display:flex; align-items:center; gap:7px; padding-left:12px; background:var(--panel); color:var(--text-2); font-size:11.5px; font-weight:500}
 .tl-lane{position:relative; flex:none; width:var(--lane-w, 600px); margin-right:12px}
 .tl-lane.track::before{content:""; position:absolute; left:0; right:0; top:3px; bottom:3px; border-radius:6px; background:var(--raised)}
+.tl-lane.stack{overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin}
+.tl-lane.stack::before{bottom:auto; height:calc(var(--content-h) - 6px)}
+.tl-label.stacked{flex-wrap:wrap; align-content:center; row-gap:2px}
+.lane-more{flex-basis:100%; color:var(--text-2); font-size:10.5px; font-weight:400; white-space:nowrap}
+.tl-label.has-plus{gap:5px; padding-right:4px}
+.lane-plus{margin-left:auto; flex:none; width:18px; height:18px; display:grid; place-items:center; padding:0; border-radius:5px; border:1px solid var(--line); background:var(--panel); color:var(--text-2)}
+.lane-plus:hover{color:var(--text); border-color:var(--line-strong)}
+.lane-plus .ic{width:12px; height:12px}
 .ruler .tl-lane{cursor:ew-resize}
 .tick{position:absolute; bottom:2px; width:1px; height:5px; background:var(--line-strong)}
 .tick.major{height:9px}
@@ -1138,8 +1146,11 @@ function renderUndo() { $('#btn-undo').disabled = !hist.undo.length; $('#btn-red
 
 /* ---------- toasts and tooltips ---------- */
 function toast(msg) {
+  const box = $('#toasts');
+  [...box.children].forEach(o => { if (o.textContent === msg) o.remove(); });
+  while (box.children.length >= 3) box.firstElementChild.remove();
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
-  $('#toasts').appendChild(t); setTimeout(() => t.remove(), 3600);
+  box.appendChild(t); setTimeout(() => t.remove(), 3600);
 }
 const tip = $('#tip');
 function showTip(el) {
@@ -1570,6 +1581,7 @@ function musicSpan() {
   return [Math.min(m.start, Math.max(0, e - 0.5)), e];
 }
 const blurSpan = b => [srcToTl(b.from), srcToTl(b.to)];
+const LANE_ROWS = 4;
 function packRows(items) {
   const ends = [], row = {};
   items.slice().sort((a, b) => a.s - b.s).forEach(it => { let r = ends.findIndex(end => end <= it.s + 1e-6); if (r < 0) { r = ends.length; ends.push(0); } ends[r] = it.e; row[it.id] = r; });
@@ -1609,14 +1621,27 @@ function renderTimeline() {
   let music;
   if (doc.music) { const [a, e] = musicSpan(), m = musicOf(); music = `<button class="lane-bar music-bar ${is('music')} ${m.mute ? 'muted' : ''}" data-music="1" style="left:${x(a)}px;width:${Math.max(30, x(e) - x(a))}px">${fd(m.fadeIn, m.fadeOut)}${icon('music')}<span>${esc(doc.music.name)} · ${m.mute ? 'muted' : doc.music.volume + '%'}</span>${EDGES}</button>`; }
   else music = `<button class="lane-add" data-act="add-music">${icon('plus')}Add music</button>`;
+  /* a lane with more rows than LANE_ROWS scrolls on its own, so the canvas never gets squeezed */
+  const stackRow = (ic, name, rows, html, count, [one, many], extra) => {
+    const stacked = rows > LANE_ROWS, h = Math.min(rows, LANE_ROWS) * 26 + 6;
+    return `<div class="tl-row" style="height:${h}px"><div class="tl-label ${stacked ? 'stacked' : ''} ${extra ? 'has-plus' : ''}">${icon(ic)}${name}${extra}${stacked ? `<small class="lane-more" title="Scroll the lane to see them all">${count} ${count === 1 ? one : many} ↕</small>` : ''}</div>` +
+      `<div class="tl-lane track ${stacked ? 'stack' : ''}" data-lane="${name}" style="--content-h:${rows * 26 + 6}px">${html}</div></div>`;
+  };
+  const keepScroll = {}; tlInner.querySelectorAll('.tl-lane.stack').forEach(l => { keepScroll[l.dataset.lane] = l.scrollTop; });
   tlInner.innerHTML =
     `<div class="tl-row ruler"><div class="tl-label"></div><div class="tl-lane" data-scrub>${ticks}</div></div>` +
     `<div class="tl-row"><div class="tl-label">${icon('film')}Video</div><div class="tl-lane track">${gaps}${clips}</div></div>` +
     `<div class="tl-row"><div class="tl-label">${icon('pin')}Steps</div><div class="tl-lane track">${pins}</div></div>` +
-    `<div class="tl-row" style="height:${bp.n * 26 + 6}px"><div class="tl-label">${icon('blur')}Blur</div><div class="tl-lane track">${blurs}</div></div>` +
-    `<div class="tl-row" style="height:${vp.n * 26 + 6}px"><div class="tl-label">${icon('mic')}Voice</div><div class="tl-lane track">${voices}</div></div>` +
+    stackRow('blur', 'Blur', bp.n, blurs, doc.blurs.length, ['blur', 'blurs'], `<button class="lane-plus" data-act="add-blur" aria-label="Add a blur at the playhead" data-tip="Add a blur at the playhead. Or press X and drag over the frame.">${icon('plus')}</button>`) +
+    stackRow('mic', 'Voice', vp.n, voices, vs.length, ['narration', 'narrations'], '') +
     `<div class="tl-row"><div class="tl-label">${icon('music')}Music</div><div class="tl-lane track">${music}</div></div>` +
     `<div class="snap-line" id="snap-line" hidden></div><div class="playhead" id="playhead"></div>`;
+  tlInner.querySelectorAll('.tl-lane.stack').forEach(l => {
+    if (keepScroll[l.dataset.lane] != null) l.scrollTop = keepScroll[l.dataset.lane];
+    const sel = l.querySelector('.lane-bar.selected'); if (!sel) return;          /* keep the selected bar in view */
+    if (sel.offsetTop < l.scrollTop) l.scrollTop = sel.offsetTop - 5;
+    else if (sel.offsetTop + sel.offsetHeight > l.scrollTop + l.clientHeight) l.scrollTop = sel.offsetTop + sel.offsetHeight - l.clientHeight + 5;
+  });
   updatePlayhead(); updateSnapLine();
 }
 function updateSnapLine() {
@@ -2111,9 +2136,7 @@ function endDrag() {
   const st = d.step, newReveal = st ? Math.max(1, maxReveal(st)) : 1;
   let newId = uid('a');
   if (d.tool === 'blur') {
-    newId = uid('b');
-    commit(() => { doc.blurs.push({ id:newId, label:`Blur ${doc.blurs.length + 1}`, rect:r, from:Math.max(0, curSrc() - 0.01), to:SRC_DUR, style:'pixelate', ...BLUR_DEF }); ui.sel = { kind:'blur', id:newId }; ui.tab = 'selection'; });
-    toast('Blurred from here to the end. Drag its handles, or fine-tune it in the Inspector.');
+    newId = addBlur(r);
   } else if (d.tool === 'zoom') {
     commit(() => { st.zoom = small ? zoomBox(d.start[0], d.start[1], 0.5) : squareFrom(d.start, d.cur); ui.sel = { kind:'zoom', stepId:st.id }; ui.tab = 'selection'; });
   } else {
@@ -2249,6 +2272,16 @@ inspBody.addEventListener('dblclick', e => {            /* double-click a name t
   const d = reg[l.closest('.prm').dataset.pid]; if (d && d.def != null) commit(() => { d.set(d.def); });
 });
 function findSelAnn() { const st = stepById(selStepId()); return st.annotations.find(a => a.id === ui.sel.id); }
+/* any number of blur regions, any number of them at once: each new one starts at the playhead and runs to the end */
+function nextBlurName() { const used = new Set(doc.blurs.map(b => b.label)); let n = doc.blurs.length + 1; while (used.has(`Blur ${n}`)) n++; return `Blur ${n}`; }
+function addBlur(rect) {
+  if (ui.empty) return null;
+  if (!rect) { const k = doc.blurs.filter(b => curSrc() >= b.from && curSrc() <= b.to).length % 6; rect = [0.41 + k * 0.03, 0.44 + k * 0.04, 0.18, 0.08]; }   /* staggered so new ones don't hide each other */
+  const id = uid('b');
+  commit(() => { doc.blurs.push({ id, label:nextBlurName(), rect, from:Math.max(0, curSrc() - 0.01), to:SRC_DUR, style:'pixelate', ...BLUR_DEF }); ui.sel = { kind:'blur', id }; ui.tab = 'selection'; });
+  toast('Blurred from here to the end. Drag its handles, or fine-tune it in the Inspector.');
+  return id;
+}
 function addMusic() { commit(() => { doc.music = { name:'Calm loop.mp3', volume:25, ...MUSIC_DEF }; ui.sel = { kind:'music' }; ui.tab = 'selection'; }); toast('Added a sample music track. It gets quieter under narration.'); }
 
 /* ---------- steps rail and timeline events ---------- */
@@ -2279,7 +2312,7 @@ tlInner.addEventListener('pointerdown', e => {
   }
   if (voiceB) { ui.sel = { kind:'voice', stepId:voiceB.dataset.voice }; ui.tab = 'selection'; renderAtTime(); renderInspector(); renderTimeline(); renderSteps(); startTDrag(e, 'voice', voiceB.dataset.voice, mode); return; }
   if (musicB) { ui.sel = { kind:'music' }; ui.tab = 'selection'; renderAtTime(); renderInspector(); renderTimeline(); renderSteps(); startTDrag(e, 'music', 'music', mode); return; }
-  if (actB) { if (actB.dataset.act === 'add-music') addMusic(); return; }
+  if (actB) { if (actB.dataset.act === 'add-music') addMusic(); else if (actB.dataset.act === 'add-blur') addBlur(); return; }
   if (T.closest('[data-scrub]')) {          /* only the ruler moves the playhead */
     pause(); scrub = true; tlInner.setPointerCapture(e.pointerId); scrubTo(e); return;
   }
@@ -2396,6 +2429,11 @@ function endTL() {
   }
 }
 tlInner.addEventListener('pointerup', endTL);
+/* lane buttons act on pointerdown; Enter or Space on a focused one arrives as a click with no pointer (detail 0) */
+tlInner.addEventListener('click', e => {
+  const b = e.detail === 0 && e.target.closest('[data-act]'); if (!b) return;
+  if (b.dataset.act === 'add-music') addMusic(); else if (b.dataset.act === 'add-blur') addBlur();
+});
 tlInner.addEventListener('pointercancel', endTL);
 
 /* ---------- top bar, transport and tools ---------- */
@@ -2500,6 +2538,7 @@ function commands() {
     { label:'Export screenshots', run:() => exportItem('png') },
     { label:'Export guide folder', run:() => exportItem('folder') },
     { label:'Split clip at playhead', key:'R', run:splitAtPlayhead },
+    { label:'Add a blur at the playhead', run:() => addBlur() },
     { label:'Toggle snapping', key:'N', run:toggleSnap },
     { label:'Toggle ripple trim', key:'⇧R', run:toggleRipple },
     { label:'Turn sound on or off', key:'M', run:toggleSound },

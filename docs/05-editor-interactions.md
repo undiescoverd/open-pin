@@ -68,6 +68,8 @@ Narration length is the clip's real length for a recording or an imported file. 
 ### 4.1 Lanes and the playhead
 
 - Lanes, top to bottom: ruler, Video, Steps, Blur, Voice, Music. Blur and Voice stack into extra rows when items overlap in time.
+- **No limit on blur regions.** A project can have any number, and any number can be on screen at the same moment; each one that overlaps another in time gets its own row. A lane shows at most **four rows** and scrolls for the rest, so the canvas never shrinks; its label then shows the count ("9 blurs ↕"). Selecting a bar that's scrolled out of view scrolls it into view.
+- **Adding a blur:** the Blur tool (`X`), then drag over the frame; or the **+** on the Blur lane's label (or "Add a blur at the playhead" in ⌘K), which adds one in the middle of the frame, staggered so repeated adds don't sit on top of each other. Either way it starts at the playhead and runs to the end of the recording. New blurs are named "Blur N" with a number no other blur uses.
 - **Only the ruler moves the playhead.** Click or drag on the ruler to scrub. Clicking or dragging anywhere in a lane must not.
 - Scrubbing snaps (see [snapping](#44-snapping)).
 
@@ -246,6 +248,7 @@ Written so each can become an automated test in the real editor. The sample proj
 18. `R` splits at the playhead; `⌘B` does nothing; `B` selects Box and `X` selects Blur.
 19. Importing a 1.5 s audio file as a step's narration makes its voice bar 1.5 s long with a waveform; playing from that pin plays it; ⌘Z removes the clip again and ⇧⌘Z brings it back.
 20. Playing from a pin with generated voice speaks the step's script; pausing stops the speech; with sound off (`M`) nothing is spoken.
+21. Adding ten blurs at the same playhead gives twelve blur bars with twelve different names; the Blur lane stays four rows tall, scrolls to the last one, labels itself "12 blurs", and the canvas keeps its size. Deleting one and adding another still gives unique names.
 
 ## Gaps the mockup does not cover
 

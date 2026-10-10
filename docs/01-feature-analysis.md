@@ -147,7 +147,7 @@ Phases are defined in [04-roadmap.md](04-roadmap.md). Libraries named below are 
 
 **How Waypost does it.**
 - `BlurRegion { keyframes: [{ sourceTime, rect }], style: "gaussian" | "pixelate" | "solid", strength }`. Rects interpolate linearly between keyframes; the region is active only inside its time range.
-- **Editing:** Blur tool (B): draw a rect, scrub forward, move it, and a keyframe is added automatically. Blur regions show as bars on their own timeline lane.
+- **Editing:** Blur tool (X): draw a rect, scrub forward, move it, and a keyframe is added automatically. Blur regions show as bars on their own timeline lane. There's no limit on how many regions a project has or how many overlap at once.
 - **Rendering:** the compositor applies canvas `filter: blur()` (gaussian) or a downscale/upscale (pixelate) clipped to the rect. Pixelate and solid are the safest choices for sensitive text.
 - **Always baked:** stills, segments, MP4, PDF and screenshots are rendered from blurred frames. No output has an unblurred path, and the player never sees unblurred pixels.
 - **Phase 6 bonus:** a tracking assist (template matching in a worker) and auto-redaction suggestions using OCR (Tesseract.js, loaded only when used) with patterns for emails, API keys and card numbers.

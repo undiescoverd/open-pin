@@ -38,12 +38,12 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 ## Phase 2 — Edit and polish
 
 - F2 timeline editing: trim, split (R), delete range, per-clip speed (⅓×–5×), with source-time anchoring and orphaned-step warnings. Fit-to-width timeline with zoom.
-- F7 blur regions with keyframes (gaussian, pixelate, solid) and a Blur lane.
+- F7 blur regions with keyframes (gaussian, pixelate, solid) and a Blur lane. **Any number of regions, any number at once**: overlapping ones stack in rows, and the lane scrolls past four rows (docs/05, section 4).
 - F5 zoom/focus per step; F6 reveal-order groups.
 - F18 background framing and presets; F19 logo.
 - F13 MP4 export in a worker (H.264, up to 4K) with holds, animated reveals, captions, original audio; progress and cancel.
 
-**Done when** a 2-minute recording with cuts, a 2× section, 2 blurred regions, a gradient background and 10 steps exports to a 4K MP4 whose blur is present in every frame (checked by a frame-sampling test).
+**Done when** a 2-minute recording with cuts, a 2× section, 8 blurred regions (at least 4 on screen at the same moment), a gradient background and 10 steps exports to a 4K MP4 whose blur is present in every frame (checked by a frame-sampling test).
 
 ## Phase 3 — Interactive guide
 
