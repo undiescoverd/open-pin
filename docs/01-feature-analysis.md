@@ -146,7 +146,7 @@ Phases are defined in [04-roadmap.md](04-roadmap.md). Libraries named below are 
 **How FramePin likely does it (inferred).** Rectangles with keyframes, interpolated per frame and burned into the pixels at export. It has to be burned in: a blur drawn as an overlay could be removed with dev tools.
 
 **How Waypost does it.**
-- `BlurRegion { keyframes: [{ sourceTime, rect }], style: "gaussian" | "pixelate" | "solid", strength }`. Rects interpolate linearly between keyframes; the region is active only inside its time range.
+- `EffectRegion { keyframes: [{ sourceTime, rect }], layer, effects: [{ type: "pixelate" | "blur" | "darken" | "desaturate" | "tint" | "solid", on, amount, color? }] }`. The effects apply in list order and higher layers draw on top, like effects and tracks in DaVinci Resolve. Rects interpolate linearly between keyframes; the region is active only inside its time range.
 - **Editing:** Blur tool (X): draw a rect, scrub forward, move it, and a keyframe is added automatically. Blur regions show as bars on their own timeline lane. There's no limit on how many regions a project has or how many overlap at once.
 - **Rendering:** the compositor applies canvas `filter: blur()` (gaussian) or a downscale/upscale (pixelate) clipped to the rect. Pixelate and solid are the safest choices for sensitive text.
 - **Always baked:** stills, segments, MP4, PDF and screenshots are rendered from blurred frames. No output has an unblurred path, and the player never sees unblurred pixels.

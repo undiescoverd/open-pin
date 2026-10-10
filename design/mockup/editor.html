@@ -25,7 +25,7 @@
   --font-brand:"Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --r-sm:6px; --r-md:10px; --r-lg:14px;
-  --label-w:84px;
+  --label-w:104px;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -199,9 +199,15 @@ button{cursor:pointer}
 @keyframes fadeIn{from{opacity:0} to{opacity:1}}
 @keyframes revealIn{from{opacity:0; transform:scale(.96)} to{opacity:1; transform:none}}
 .blur{position:absolute; border-radius:4px; -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); background:rgba(255,255,255,.06)}
-.blur.pixelate{-webkit-backdrop-filter:blur(5px) saturate(.6); backdrop-filter:blur(5px) saturate(.6);
-  background-image:repeating-linear-gradient(0deg, rgba(0,0,0,.07) 0 1px, transparent 1px var(--cell,9px)), repeating-linear-gradient(90deg, rgba(0,0,0,.07) 0 1px, transparent 1px var(--cell,9px))}
-.blur.solid{-webkit-backdrop-filter:none; backdrop-filter:none; background:#1D2420}
+.fx-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+.fx-row{display:flex; flex-direction:column; gap:6px; padding:8px; border:1px solid var(--line); border-radius:var(--r-md); background:var(--raised)}
+.fx-row.off .prm, .fx-row.off .swatches{opacity:.45}
+.fx-head{display:flex; align-items:center; gap:4px}
+.fx-name{flex:1; font-weight:600}
+.fx-on{margin:0 4px 0 0}
+.swatch.sm{width:20px; height:20px}
+.blur-bar.nofx{opacity:.65; border-style:dashed}
+.editing .blur.nofx{outline:1px dashed rgba(255,255,255,.7); box-shadow:0 0 0 1px rgba(14,17,22,.5)}
 .blur.selected{outline:3px dashed #13B8A6; outline-offset:4px}
 .bh{position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:4px; background:#FFFFFF; border:3px solid #13B8A6; z-index:2; pointer-events:auto}
 .bh-nw{left:0; top:0; cursor:nwse-resize} .bh-n{left:50%; top:0; cursor:ns-resize} .bh-ne{left:100%; top:0; cursor:nesw-resize}
@@ -545,6 +551,7 @@ details[open] summary{margin-bottom:8px}
   <symbol id="i-skip-fwd" viewBox="0 0 24 24"><path d="M6 6v12l8.5-6z"/><path d="M18 6v12"/></symbol>
   <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
   <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-chev-up" viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></symbol>
   <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14.5L4 9.5l5-5"/><path d="M4 9.5h10a5.5 5.5 0 0 1 0 11h-3"/></symbol>
   <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14.5l5-5-5-5"/><path d="M20 9.5H10a5.5 5.5 0 0 0 0 11h3"/></symbol>
@@ -840,8 +847,56 @@ const TYPE_ICON = { callout:'callout', arrow:'arrow', spotlight:'spot', box:'box
 const NARR = [['none','No narration'],['tts','Generated voice'],['record','My recorded voice'],['file','Audio file'],['original','Original audio only']];
 const PLACE = { auto:'Auto', top:'Above', bottom:'Below', left:'Left', right:'Right' };
 const MODE_HELP = { guided:'Stops at every step until the viewer clicks Next.', auto:'Pauses on each step for its pause time, then continues.', video:'Plays straight through, with step markers on the progress bar.' };
-const BLUR_DEF = { amount:45, radius:4, opacity:100, fadeIn:0, fadeOut:0, solid:'ink' };
+const BLUR_DEF = { radius:4, opacity:100, fadeIn:0, fadeOut:0 };
 const blurOf = b => ({ ...BLUR_DEF, ...b });
+/* An effect region (the "Blur" tool draws one) carries a stack of effects, applied from the top of its list down,
+   and sits on a layer of the Effects lane: higher layers draw on top. Like effects and video tracks in DaVinci Resolve. */
+const FX = {
+  pixelate:   { name:'Pixelate',   amount:45,  label:'Block size', unit:'' },
+  blur:       { name:'Blur',       amount:45,  label:'Amount',     unit:'' },
+  darken:     { name:'Darken',     amount:40,  label:'Amount',     unit:'%' },
+  desaturate: { name:'Desaturate', amount:100, label:'Amount',     unit:'%' },
+  tint:       { name:'Tint',       amount:35,  label:'Strength',   unit:'%', color:'coral', colors:['coral','marigold','lagoon','iris','ink','white'] },
+  solid:      { name:'Solid fill', amount:100, label:'Opacity',    unit:'%', color:'ink',   colors:['ink','gray','white','coral'] },
+};
+const FX_COLORS = { ink:'#1D2420', gray:'#8A93A3', white:'#FFFFFF', coral:'#FF5A4E', marigold:'#FFB020', lagoon:'#13B8A6', iris:'#6E6BFF' };
+const newFx = type => ({ id:uid('f'), type, on:true, amount:FX[type].amount, ...(FX[type].color ? { color:FX[type].color } : {}) });
+const fxOn = b => (b.fx || []).filter(f => f.on);
+const fxSummary = b => fxOn(b).map(f => FX[f.type].name).join(' + ') || 'No effects';
+const layerOf = b => b.layer || 0;
+const topLayer = () => doc.blurs.reduce((m, b) => Math.max(m, layerOf(b)), -1);
+const layerMates = b => doc.blurs.some(o => o !== b && layerOf(o) === layerOf(b));
+const overlapsOn = (layer, from, to, exceptId) => doc.blurs.some(o => o.id !== exceptId && layerOf(o) === layer && o.from < to - 1e-6 && o.to > from + 1e-6);
+/* the lowest layer with room for [from, to]; a new one on top if none has */
+function freeLayer(from, to) { const n = topLayer(); for (let L = 0; L <= n; L++) if (!overlapsOn(L, from, to)) return L; return n + 1; }
+/* renumber layers 0..n-1 in the same order, so the lane never shows an empty row */
+function normLayers() { const used = [...new Set(doc.blurs.map(layerOf))].sort((a, b) => a - b); doc.blurs.forEach(b => { b.layer = used.indexOf(layerOf(b)); }); }
+/* up / down pass exactly one layer: into the next one if there's room, otherwise into a new layer just past it */
+function moveLayer(b, how) {
+  const L = layerOf(b), n = topLayer(), lift = k => doc.blurs.forEach(o => { if (o !== b && layerOf(o) >= k) o.layer = layerOf(o) + 1; });
+  if ((how === 'up' || how === 'front') && L === n && !layerMates(b)) return false;
+  if ((how === 'down' || how === 'back') && L === 0 && !layerMates(b)) return false;
+  if (how === 'front') b.layer = n + 1;
+  else if (how === 'back') { lift(0); b.layer = 0; }
+  else if (how === 'up') { if (L < n && !overlapsOn(L + 1, b.from, b.to, b.id)) b.layer = L + 1; else { lift(L + 2); b.layer = L + 2; } }
+  else { if (L > 0 && !overlapsOn(L - 1, b.from, b.to, b.id)) b.layer = L - 1; else { lift(Math.max(0, L - 1)); b.layer = Math.max(0, L - 1); } }
+  normLayers(); return true;
+}
+const rgba = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a.toFixed(3)})`;
+/* the CSS for a region's stack: filters chain in list order; tints and fills lie over them, later ones on top */
+function fxStyle(b) {
+  const filters = [], over = []; let cell = null;
+  for (const f of fxOn(b)) {
+    if (f.type === 'pixelate') { filters.push(`blur(${(f.amount * 0.11).toFixed(1)}px)`, 'saturate(.6)'); cell = (4 + f.amount * 0.12).toFixed(1); }
+    else if (f.type === 'blur') filters.push(`blur(${(f.amount * 0.16).toFixed(1)}px)`);
+    else if (f.type === 'darken') filters.push(`brightness(${(1 - f.amount / 100 * 0.9).toFixed(2)})`);
+    else if (f.type === 'desaturate') filters.push(`grayscale(${(f.amount / 100).toFixed(2)})`);
+    else { const c = rgba(FX_COLORS[f.color] || FX_COLORS.ink, f.amount / 100); over.unshift(`linear-gradient(${c},${c})`); }
+  }
+  if (cell) over.push('repeating-linear-gradient(0deg, rgba(0,0,0,.07) 0 1px, transparent 1px var(--cell))', 'repeating-linear-gradient(90deg, rgba(0,0,0,.07) 0 1px, transparent 1px var(--cell))');
+  const bf = filters.join(' ') || 'none';
+  return `-webkit-backdrop-filter:${bf};backdrop-filter:${bf};background:${over.join(',') || 'transparent'};${cell ? `--cell:${cell}px;` : ''}`;
+}
 const SOLID = { ink:'#1D2420', gray:'#8A93A3', white:'#FFFFFF' };
 const MUSIC_DEF = { start:0, end:null, fadeIn:0, fadeOut:0, duck:true, duckTo:35, mute:false };
 const musicOf = () => ({ ...MUSIC_DEF, ...(doc.music || {}) });
@@ -873,8 +928,8 @@ let doc = {
       { id:'a12', type:'callout', at:[0.848,0.7525], text:'Save to start getting the summary', placement:'left', color:'ink', reveal:2 } ] },
   ],
   blurs: [
-    { id:'b1', label:'Email in the header', rect:[0.8078,0.0175,0.1219,0.045], from:0, to:SRC_DUR, style:'pixelate' },
-    { id:'b2', label:'Email field', rect:[0.20625,0.435,0.34375,0.05], from:3.55, to:7.25, style:'pixelate' },
+    { id:'b1', label:'Email in the header', rect:[0.8078,0.0175,0.1219,0.045], from:0, to:SRC_DUR, layer:0, fx:[{ id:'f1', type:'pixelate', on:true, amount:45 }] },
+    { id:'b2', label:'Email field', rect:[0.20625,0.435,0.34375,0.05], from:3.55, to:7.25, layer:1, fx:[{ id:'f2', type:'pixelate', on:true, amount:45 }, { id:'f3', type:'darken', on:true, amount:25 }] },
   ],
   music: null,
   frame: { preset:'reef', padding:6, radius:14, shadow:true },
@@ -999,14 +1054,11 @@ function blurFade(b, src) {
   return clamp(k, 0, 1);
 }
 function blurHTML(src, editing) {
-  return doc.blurs.filter(b => src >= b.from - 1e-6 && src <= b.to + 1e-6).map(raw => {
+  return doc.blurs.filter(b => src >= b.from - 1e-6 && src <= b.to + 1e-6).sort((a, b) => layerOf(a) - layerOf(b)).map(raw => {
     const b = blurOf(raw), sel = editing && ui.sel && ui.sel.kind === 'blur' && ui.sel.id === b.id;
     const op = (b.opacity / 100) * blurFade(b, src);
-    let fx = '';
-    if (b.style === 'gaussian') { const r = (b.amount * 0.16).toFixed(1); fx = `-webkit-backdrop-filter:blur(${r}px);backdrop-filter:blur(${r}px);`; }
-    else if (b.style === 'pixelate') { const r = (b.amount * 0.11).toFixed(1); fx = `-webkit-backdrop-filter:blur(${r}px) saturate(.6);backdrop-filter:blur(${r}px) saturate(.6);--cell:${(4 + b.amount * 0.12).toFixed(1)}px;`; }
-    else fx = `background:${SOLID[b.solid] || SOLID.ink};`;
-    return `<div class="blur ${b.style} ${sel ? 'selected' : ''}" data-blur="${b.id}" style="left:${b.rect[0] * W}px;top:${b.rect[1] * H}px;width:${b.rect[2] * W}px;height:${b.rect[3] * H}px;border-radius:${b.radius}px;opacity:${op.toFixed(3)};${fx}">${sel ? BH.map(h => `<i class="bh bh-${h}" data-bh="${h}"></i>`).join('') : ''}</div>`;
+    const fx = fxStyle(b);
+    return `<div class="blur ${fxOn(b).length ? '' : 'nofx'} ${sel ? 'selected' : ''}" data-blur="${b.id}" style="left:${b.rect[0] * W}px;top:${b.rect[1] * H}px;width:${b.rect[2] * W}px;height:${b.rect[3] * H}px;border-radius:${b.radius}px;opacity:${op.toFixed(3)};${fx}">${sel ? BH.map(h => `<i class="bh bh-${h}" data-bh="${h}"></i>`).join('') : ''}</div>`;
   }).join('');
 }
 
@@ -1472,21 +1524,36 @@ function inspBlur(b) {
     <div class="btn-row"><button class="btn secondary sm" data-act="pset" data-pid="blur-start" data-v="playhead">Start at playhead</button><button class="btn secondary sm" data-act="pset" data-pid="blur-end" data-v="playhead">End at playhead</button></div>
     ${prm({ id:'blur-fi', label:'Fade in', min:0, max:3, step:0.1, def:0, unit:'s', get:() => blurOf(B()).fadeIn, set:v => { B().fadeIn = v; } })}
     ${prm({ id:'blur-fo', label:'Fade out', min:0, max:3, step:0.1, def:0, unit:'s', get:() => blurOf(B()).fadeOut, set:v => { B().fadeOut = v; } })}`;
-  const effect = `<div class="field"><span class="label" id="lbl-bstyle">Style</span><div class="seg" role="group" aria-labelledby="lbl-bstyle">${[['pixelate','Pixelate'],['gaussian','Blur'],['solid','Solid']].map(([v, l]) => `<button data-act="bstyle" data-v="${v}" aria-pressed="${b.style === v}">${l}</button>`).join('')}</div></div>
-    ${b.style === 'solid'
-      ? segp({ id:'blur-solid', label:'Fill', opts:[['ink','Ink'],['gray','Gray'],['white','White']], get:() => blurOf(B()).solid, set:v => { B().solid = v; } })
-      : prm({ id:'blur-amount', label:b.style === 'pixelate' ? 'Block size' : 'Amount', min:0, max:100, step:1, def:BLUR_DEF.amount, unit:'', get:() => blurOf(B()).amount, set:v => { B().amount = v; } })}
+  /* the effect stack: applied from the top of the list down; each can be switched off, reordered or removed */
+  const list = b.fx || [];
+  const rows = list.map((f, i) => {
+    const d = FX[f.type], F = () => B().fx.find(x => x.id === f.id);
+    return `<li class="fx-row ${f.on ? '' : 'off'}" data-fx-row="${f.id}">
+      <div class="fx-head"><input type="checkbox" class="fx-on" id="fxon-${f.id}" data-field="fxon" data-fx="${f.id}" ${f.on ? 'checked' : ''}><label for="fxon-${f.id}" class="fx-name">${d.name}</label>
+        <button class="icon-btn sm" data-act="fx-move" data-v="-1" data-fx="${f.id}" aria-label="Move ${d.name} up" data-tip="Apply earlier" ${i === 0 ? 'disabled' : ''}>${icon('chev-up')}</button><button class="icon-btn sm" data-act="fx-move" data-v="1" data-fx="${f.id}" aria-label="Move ${d.name} down" data-tip="Apply later" ${i === list.length - 1 ? 'disabled' : ''}>${icon('chev-down')}</button><button class="icon-btn sm" data-act="fx-del" data-fx="${f.id}" aria-label="Remove ${d.name}" data-tip="Remove">${icon('trash')}</button></div>
+      ${prm({ id:`fx-${f.id}`, label:d.label, min:0, max:100, step:1, def:d.amount, unit:d.unit, get:() => F().amount, set:v => { F().amount = v; } })}
+      ${d.colors ? `<div class="swatches" role="group" aria-label="${d.name} colour">${d.colors.map(k => `<button class="swatch sm" data-act="fx-color" data-fx="${f.id}" data-v="${k}" aria-pressed="${f.color === k}" aria-label="${k[0].toUpperCase() + k.slice(1)}" style="--sw:${FX_COLORS[k]}"></button>`).join('')}</div>` : ''}
+    </li>`;
+  }).join('');
+  const effect = `${list.length ? `<ol class="fx-list">${rows}</ol>` : '<p class="help">No effects, so this region leaves the recording as it is. Add one below.</p>'}
+    <div class="field"><label for="f-fxadd">Add an effect</label><select id="f-fxadd" data-field="fxadd"><option value="">Choose…</option>${Object.entries(FX).map(([k, d]) => `<option value="${k}">${d.name}</option>`).join('')}</select></div>
+    ${list.length > 1 ? '<p class="help">Effects apply from the top of the list down. Untick one to compare without it.</p>' : ''}
     ${prm({ id:'blur-op', label:'Opacity', min:10, max:100, step:1, def:100, unit:'%', get:() => blurOf(B()).opacity, set:v => { B().opacity = v; } })}`;
+  const nL = topLayer() + 1, L = layerOf(b), top = L === nL - 1 && !layerMates(b), bottom = L === 0 && !layerMates(b);
+  const layer = `<p class="help" style="margin:0">Layer ${L + 1} of ${nL}. Higher layers draw on top. You can also drag the bar up or down in the Effects lane.</p>
+    <div class="btn-row"><button class="btn secondary sm" data-act="layer" data-v="up" ${top ? 'disabled' : ''}>Bring forward</button><button class="btn secondary sm" data-act="layer" data-v="down" ${bottom ? 'disabled' : ''}>Send backward</button></div>
+    <div class="btn-row"><button class="btn ghost sm" data-act="layer" data-v="front" ${top ? 'disabled' : ''}>Bring to front</button><button class="btn ghost sm" data-act="layer" data-v="back" ${bottom ? 'disabled' : ''}>Send to back</button></div>`;
   return `
-  <div class="insp-title"><span class="ann-ic">${icon('blur')}</span><div><h3 class="insp-h">${esc(b.label)}</h3><p class="insp-sub">${fmt(s0)}–${fmt(e0)} · ${(e0 - s0).toFixed(2)} s</p></div></div>
+  <div class="insp-title"><span class="ann-ic">${icon('blur')}</span><div><h3 class="insp-h">${esc(b.label)}</h3><p class="insp-sub">${fmt(s0)}–${fmt(e0)} · ${(e0 - s0).toFixed(2)} s · layer ${layerOf(b) + 1}</p></div></div>
   ${txt({ id:'blur-label', label:'Name', get:() => B().label, set:v => { B().label = v; } })}
+  ${grp('blur-fx', `Effects · ${list.length}`, effect)}
+  ${grp('blur-layer', 'Layer', layer)}
   ${grp('blur-timing', 'Timing', timing)}
   ${grp('blur-geom', 'Position and size', rectPx(0, 'X') + rectPx(1, 'Y') + rectPx(2, 'Width') + rectPx(3, 'Height') +
     prm({ id:'blur-rad', label:'Corner radius', min:0, max:40, step:1, def:BLUR_DEF.radius, unit:'px', get:() => blurOf(B()).radius, set:v => { B().radius = v; } }) +
     '<p class="help">Drag the box on the frame, or its handles to resize it.</p>')}
-  ${grp('blur-fx', 'Effect', effect)}
-  <p class="help">Blur is burned into every export and the published guide. Nobody can remove it afterwards.</p>
-  <button class="btn danger-ghost" data-act="del-blur">${icon('trash')}Delete blur</button>`;
+  <p class="help">Effects are burned into every export and the published guide. Nobody can remove them afterwards.</p>
+  <button class="btn danger-ghost" data-act="del-blur">${icon('trash')}Delete effect region</button>`;
 }
 function inspVoice(st) {
   const id = st.id, S = () => stepById(id), i = stepIndex(st), [vs, ve] = voiceSpan(st), t0 = () => srcToTl(S().t);
@@ -1574,7 +1641,8 @@ function inspGuide() {
 }
 
 /* ---------- timeline ---------- */
-function laneW() { return Math.max(560, tlScroll.clientWidth - 84 - 14) * ui.zoom; }
+const LABEL_W = 104;   /* matches --label-w */
+function laneW() { return Math.max(560, tlScroll.clientWidth - LABEL_W - 14) * ui.zoom; }
 const voiceSpan = st => { const a = srcToTl(st.t) + voiceOf(st).delay; return [a, a + narrDur(st)]; };
 function musicSpan() {
   const m = musicOf(), T = tlDur(), e = m.end == null ? T : Math.min(m.end, T);
@@ -1606,8 +1674,9 @@ function renderTimeline() {
   const clips = doc.clips.map((c, i) => { const a = srcToTl(c.in), b = srcToTl(c.out), o = clipOf(c); return `<button class="clip ${is('clip', c.id)}" data-clip="${c.id}" style="left:${x(a) + 1}px;width:${Math.max(4, x(b) - x(a) - 2)}px;${o.mute ? 'opacity:.6' : ''}" aria-label="Clip ${i + 1}, ${fmt(c.in)} to ${fmt(c.out)}, ${speedLabel(c.speed)}">${icon('film')}<span>Clip ${i + 1} · ${fmt(c.in)}–${fmt(c.out)}</span><b class="speed">${speedLabel(c.speed)}</b>${EDGES}</button>`; }).join('');
   const gaps = doc.clips.filter(c => c.gap > 0.005).map(c => { const b = srcToTl(c.in), a = b - c.gap; return `<button class="clip-gap ${is('gap', c.id)}" data-gap="${c.id}" style="left:${x(a)}px;width:${Math.max(4, x(b) - x(a))}px" aria-label="Gap of ${c.gap.toFixed(2)} seconds" data-tip="Gap · ${c.gap.toFixed(2)} s. Select it to close it.">${x(b) - x(a) > 54 ? `<span>${c.gap.toFixed(2)} s</span>` : ''}</button>`; }).join('');
   const pins = doc.steps.map((s, i) => `<button class="pin-marker ${s.id === selId ? 'selected' : ''}" data-step="${s.id}" style="left:${x(srcToTl(s.t))}px" aria-label="Step ${i + 1}: ${esc(s.title)}" data-tip="Step ${i + 1}: ${esc(s.title)}. Drag to move it.">${i + 1}</button>`).join('');
-  const bp = packRows(doc.blurs.map(b => { const [a, e] = blurSpan(b); return { id:b.id, s:a, e }; }));
-  const blurs = doc.blurs.map(raw => { const b = blurOf(raw), [a, e] = blurSpan(b); return `<button class="lane-bar blur-bar ${is('blur', b.id)}" data-blur="${b.id}" style="left:${x(a)}px;width:${Math.max(10, x(e) - x(a))}px;top:${5 + bp.row[b.id] * 26}px;bottom:auto;height:22px">${fd(srcToTl(b.from + b.fadeIn) - a, e - srcToTl(b.to - b.fadeOut))}${icon('blur')}<span>${esc(b.label)}</span>${EDGES}</button>`; }).join('');
+  /* Effects lane: one row per layer, the top layer in the top row (it draws on top) */
+  const nL = Math.max(1, topLayer() + 1);
+  const blurs = doc.blurs.map(raw => { const b = blurOf(raw), [a, e] = blurSpan(b), n = fxOn(b).length; return `<button class="lane-bar blur-bar ${is('blur', b.id)} ${n ? '' : 'nofx'}" data-blur="${b.id}" style="left:${x(a)}px;width:${Math.max(10, x(e) - x(a))}px;top:${5 + (nL - 1 - layerOf(b)) * 26}px;bottom:auto;height:22px" aria-label="${esc(b.label)}, layer ${layerOf(b) + 1}, ${fxSummary(b)}" data-tip="${esc(b.label)} · ${fxSummary(b)} · layer ${layerOf(b) + 1}">${fd(srcToTl(b.from + b.fadeIn) - a, e - srcToTl(b.to - b.fadeOut))}${icon('blur')}<span>${esc(b.label)}${n > 1 ? ` · ${n} effects` : ''}</span>${EDGES}</button>`; }).join('');
   const vs = doc.steps.filter(s => narrDur(s) > 0);
   const vp = packRows(vs.map(s => { const [a, e] = voiceSpan(s); return { id:s.id, s:a, e }; }));
   const wfPath = pk => pk.map((p, i) => `M${((i + 0.5) * 100 / pk.length).toFixed(2)} ${(10 - p * 9).toFixed(1)}V${(10 + p * 9).toFixed(1)}`).join('');
@@ -1632,7 +1701,7 @@ function renderTimeline() {
     `<div class="tl-row ruler"><div class="tl-label"></div><div class="tl-lane" data-scrub>${ticks}</div></div>` +
     `<div class="tl-row"><div class="tl-label">${icon('film')}Video</div><div class="tl-lane track">${gaps}${clips}</div></div>` +
     `<div class="tl-row"><div class="tl-label">${icon('pin')}Steps</div><div class="tl-lane track">${pins}</div></div>` +
-    stackRow('blur', 'Blur', bp.n, blurs, doc.blurs.length, ['blur', 'blurs'], `<button class="lane-plus" data-act="add-blur" aria-label="Add a blur at the playhead" data-tip="Add a blur at the playhead. Or press X and drag over the frame.">${icon('plus')}</button>`) +
+    stackRow('blur', 'Effects', nL, blurs, doc.blurs.length, ['effect', 'effects'], `<button class="lane-plus" data-act="add-blur" aria-label="Add an effect at the playhead" data-tip="Add an effect region at the playhead. Or press X and drag over the frame.">${icon('plus')}</button>`) +
     stackRow('mic', 'Voice', vp.n, voices, vs.length, ['narration', 'narrations'], '') +
     `<div class="tl-row"><div class="tl-label">${icon('music')}Music</div><div class="tl-lane track">${music}</div></div>` +
     `<div class="snap-line" id="snap-line" hidden></div><div class="playhead" id="playhead"></div>`;
@@ -1647,7 +1716,7 @@ function renderTimeline() {
 function updateSnapLine() {
   const el = $('#snap-line'); if (!el) return;
   if (ui.snapAt == null) { el.hidden = true; return; }
-  el.hidden = false; el.style.left = (84 + (ui.snapAt / tScale()) * laneW()) + 'px';
+  el.hidden = false; el.style.left = (LABEL_W + (ui.snapAt / tScale()) * laneW()) + 'px';
 }
 /* snapping: candidate edges snap to the nearest edge on any layer within 8 px */
 const snapEnabled = invert => ui.snap !== !!invert;
@@ -1672,7 +1741,7 @@ function snapNear(cands, excl) {
 function updatePlayhead() {
   if (ui.empty) return;
   const ph = $('#playhead'), T = tlDur();
-  if (ph) ph.style.left = (84 + (ui.tl / tScale()) * laneW()) + 'px';
+  if (ph) ph.style.left = (LABEL_W + (ui.tl / tScale()) * laneW()) + 'px';
   timecodeEl.innerHTML = `${fmt(ui.tl)} <span>/ ${fmt(T)}</span>`;
   if (ph && !scrub && !tdrag) {   /* when zoomed in, keep the playhead in view */
     const x = ph.offsetLeft, l = tlScroll.scrollLeft, w = tlScroll.clientWidth;
@@ -1787,7 +1856,7 @@ function deleteSelection() {
   if (s.kind === 'zoom') { commit(() => { stepById(s.stepId).zoom = null; ui.sel = { kind:'step', id:s.stepId }; }); toast('Removed the zoom. Undo with ⌘Z.'); return; }
   if (s.kind === 'ann') { commit(() => { const st = stepById(s.stepId); st.annotations = st.annotations.filter(a => a.id !== s.id); ui.sel = { kind:'step', id:st.id }; }); toast('Deleted. Undo with ⌘Z.'); }
   else if (s.kind === 'step') { const i = stepIndex(stepById(s.id)); commit(() => { doc.steps = doc.steps.filter(x => x.id !== s.id); ui.sel = null; }); toast(`Deleted step ${i + 1}. Undo with ⌘Z.`); }
-  else if (s.kind === 'blur') { commit(() => { doc.blurs = doc.blurs.filter(b => b.id !== s.id); ui.sel = null; }); toast('Deleted the blur. Undo with ⌘Z.'); }
+  else if (s.kind === 'blur') { commit(() => { doc.blurs = doc.blurs.filter(b => b.id !== s.id); normLayers(); ui.sel = null; }); toast('Deleted the effect region. Undo with ⌘Z.'); }
   else if (s.kind === 'voice') { commit(() => { stepById(s.stepId).narration = 'none'; ui.sel = { kind:'step', id:s.stepId }; }); toast('Removed the narration. Undo with ⌘Z.'); }
   else if (s.kind === 'music') { commit(() => { doc.music = null; ui.sel = null; }); toast('Removed the music. Undo with ⌘Z.'); }
   else if (s.kind === 'gap') { commit(() => { const c = doc.clips.find(x => x.id === s.id); if (c) c.gap = 0; ui.sel = { kind:'clip', id:s.id }; ui.tl = clamp(ui.tl, 0, tlDur()); }); toast('Closed the gap. Undo with ⌘Z.'); }
@@ -2209,6 +2278,11 @@ function onInspChange(e) {
   }
   if (f === 'pchk') { const d = reg[el.dataset.pid]; if (d) commit(() => { d.set(el.checked); }); return; }
   if (f === 'hold') { renderInspector(); return; }
+  if (f === 'fxon' || f === 'fxadd') {
+    const r = ui.sel && ui.sel.kind === 'blur' && doc.blurs.find(x => x.id === ui.sel.id); if (!r) return;
+    if (f === 'fxadd') { if (!el.value) return; const type = el.value; commit(() => { const R = doc.blurs.find(x => x.id === r.id); R.fx = [...(R.fx || []), newFx(type)]; }); toast(`Added ${FX[type].name} to the end of the stack.`); return; }
+    commit(() => { const fx = doc.blurs.find(x => x.id === r.id).fx.find(x => x.id === el.dataset.fx); if (fx) fx.on = el.checked; }); return;
+  }
   if (f === 'reveal') { commit(() => { const s2 = stepById(selStepId()); const a = s2 && s2.annotations.find(x => x.id === el.dataset.id); if (a) a.reveal = +el.value; }); return; }
   if (f === 'narration' && st) { commit(() => { stepById(st.id).narration = el.value; if (el.value === 'none' && ui.sel && ui.sel.kind === 'voice') ui.sel = { kind:'step', id:st.id }; }); return; }
   if (f === 'zoom' && st) { commit(() => { const s2 = stepById(st.id); const c = s2.annotations.find(a => a.type === 'click'); s2.zoom = el.checked ? (c ? zoomBox(c.at[0], c.at[1], 0.5) : zoomBox(0.5, 0.5, 0.5)) : null; }); return; }
@@ -2244,7 +2318,16 @@ inspBody.addEventListener('click', e => {
     case 'rec-start': if (st) recStart(st); break;
     case 'rec-stop': recStop(); break;
     case 'clip-remove': if (st) removeClip(st); break;
-    case 'bstyle': commit(() => { doc.blurs.find(x => x.id === ui.sel.id).style = v; }); break;
+    case 'fx-move': case 'fx-del': case 'fx-color': {
+      const r = doc.blurs.find(x => x.id === ui.sel.id); if (!r) break;
+      commit(() => {
+        const R = doc.blurs.find(x => x.id === r.id), i = R.fx.findIndex(f => f.id === b.dataset.fx); if (i < 0) return;
+        if (act === 'fx-del') R.fx.splice(i, 1);
+        else if (act === 'fx-color') R.fx[i].color = v;
+        else { const j = i + +v; if (j >= 0 && j < R.fx.length) R.fx.splice(j, 0, R.fx.splice(i, 1)[0]); }
+      });
+      break; }
+    case 'layer': { const r = doc.blurs.find(x => x.id === ui.sel.id); if (!r) break; const snap = clone(doc); if (moveLayer(r, v)) { pushUndo(snap); renderAll(); } else toast(v === 'up' || v === 'front' ? 'Already on top.' : 'Already at the bottom.'); break; }
     case 'bg': commit(() => { doc.frame.preset = v; }); break;
     case 'mode': commit(() => { doc.player.mode = v; }); break;
     case 'accent': commit(() => { doc.player.accent = v; }); break;
@@ -2278,7 +2361,8 @@ function addBlur(rect) {
   if (ui.empty) return null;
   if (!rect) { const k = doc.blurs.filter(b => curSrc() >= b.from && curSrc() <= b.to).length % 6; rect = [0.41 + k * 0.03, 0.44 + k * 0.04, 0.18, 0.08]; }   /* staggered so new ones don't hide each other */
   const id = uid('b');
-  commit(() => { doc.blurs.push({ id, label:nextBlurName(), rect, from:Math.max(0, curSrc() - 0.01), to:SRC_DUR, style:'pixelate', ...BLUR_DEF }); ui.sel = { kind:'blur', id }; ui.tab = 'selection'; });
+  const from = Math.max(0, curSrc() - 0.01);
+  commit(() => { doc.blurs.push({ id, label:nextBlurName(), rect, from, to:SRC_DUR, layer:freeLayer(from, SRC_DUR), fx:[newFx('pixelate')], ...BLUR_DEF }); ui.sel = { kind:'blur', id }; ui.tab = 'selection'; });
   toast('Blurred from here to the end. Drag its handles, or fine-tune it in the Inspector.');
   return id;
 }
@@ -2290,7 +2374,7 @@ $('#btn-add-step').addEventListener('click', () => pinStep(null));
 let scrub = null, tdrag = null;
 const spanOf = (kind, id) => kind === 'blur' ? blurSpan(doc.blurs.find(b => b.id === id)) : kind === 'voice' ? voiceSpan(stepById(id)) : kind === 'music' ? musicSpan() : (t => [t, t])(srcToTl(stepById(id).t));
 function startTDrag(e, kind, id, mode) {
-  tdrag = { kind, id, mode, x0:e.clientX, o:spanOf(kind, id), snap:clone(doc), moved:false };
+  tdrag = { kind, id, mode, x0:e.clientX, y0:e.clientY, o:spanOf(kind, id), snap:clone(doc), moved:false };
   tlInner.setPointerCapture(e.pointerId);
 }
 tlInner.addEventListener('pointerdown', e => {
@@ -2321,7 +2405,7 @@ tlInner.addEventListener('pointerdown', e => {
     renderAtTime(); renderInspector(); renderTimeline(); renderSteps();
   }
 });
-function scrubTo(e) { const r = tlInner.getBoundingClientRect(); const x = e.clientX - r.left - 84; setPlayhead((x / laneW()) * tScale(), true, e.altKey); updateSnapLine(); }
+function scrubTo(e) { const r = tlInner.getBoundingClientRect(); const x = e.clientX - r.left - LABEL_W; setPlayhead((x / laneW()) * tScale(), true, e.altKey); updateSnapLine(); }
 /* Where a clip edge may go. Clips sit end to end, so an edge can't cross its neighbour's footage, can't leave less than 0.2 s,
    and can't pass a pinned step (that would orphan it: move or delete the step first). */
 function clipLimits(c, mode, ref) {
@@ -2400,7 +2484,25 @@ function dragApply(d, dT, snapOn) {
     if (snapOn) { const r = snapNear([e], excl); if (r) { e += r.delta; hit = r.at; } }
     e = clamp(e, s0 + minLen, T);
   }
-  if (d.kind === 'blur') { const b = doc.blurs.find(x => x.id === d.id); b.from = tlToSrc(s); b.to = tlToSrc(e); }
+  if (d.kind === 'blur') {
+    const b = doc.blurs.find(x => x.id === d.id), f = tlToSrc(s), t = tlToSrc(e);
+    if (d.mode === 'move' && d.ty != null && d.ty !== layerOf(b)) {      /* change layer only where the bar fits */
+      if (d.ty >= topLayer() + 1) { if (layerMates(b) || layerOf(b) < topLayer()) { b.layer = topLayer() + 1; normLayers(); } }
+      else if (d.ty < 0) { if (layerMates(b) || layerOf(b) > 0) { doc.blurs.forEach(o => { if (o !== b) o.layer = layerOf(o) + 1; }); b.layer = 0; normLayers(); } }
+      else if (!overlapsOn(d.ty, f, t, b.id)) { b.layer = d.ty; normLayers(); }
+      else {                      /* that row is taken here: slot in a new layer just past it, on the side the bar came from */
+        const at = d.ty > layerOf(b) ? d.ty + 1 : d.ty;
+        doc.blurs.forEach(o => { if (o !== b && layerOf(o) >= at) o.layer = layerOf(o) + 1; }); b.layer = at; normLayers();
+      }
+    }
+    /* two effects never overlap on one layer: stop at the neighbours on this one */
+    const [cs, ce] = blurSpan(b), mates = doc.blurs.filter(o => o !== b && layerOf(o) === layerOf(b)).map(blurSpan);
+    const lo = Math.max(0, ...mates.filter(m => m[1] <= cs + 1e-6).map(m => m[1])), hi = Math.min(T, ...mates.filter(m => m[0] >= ce - 1e-6).map(m => m[0]));
+    if (d.mode === 'move') { const len = e - s; if (s < lo) { s = lo; e = lo + len; hit = null; } if (e > hi) { e = hi; s = hi - len; hit = null; } }
+    else if (d.mode === 'l') { if (s < lo) { s = lo; hit = null; } }
+    else if (e > hi) { e = hi; hit = null; }
+    b.from = tlToSrc(s); b.to = tlToSrc(e);
+  }
   else if (d.kind === 'music') { doc.music.start = s; doc.music.end = e >= T - 0.02 ? null : e; }
   else if (d.kind === 'voice') {
     const st = stepById(d.id), base = baseNarr(st), v = voiceOf(st);
@@ -2415,7 +2517,12 @@ function dragApply(d, dT, snapOn) {
 tlInner.addEventListener('pointermove', e => {
   if (scrub) { scrubTo(e); return; }
   const d = tdrag; if (!d) return;
-  if (!d.moved && Math.abs(e.clientX - d.x0) < 3) return;
+  if (!d.moved && Math.abs(e.clientX - d.x0) < 3 && !(d.kind === 'blur' && d.mode === 'move' && Math.abs(e.clientY - d.y0) >= 6)) return;
+  if (d.kind === 'blur' && d.mode === 'move') {        /* which layer row the pointer is over; above the top row means a new top layer */
+    const lane = tlInner.querySelector('.tl-lane[data-lane="Effects"]'), r = lane.getBoundingClientRect(), nL = topLayer() + 1;
+    const row = Math.floor((e.clientY - r.top + lane.scrollTop - 5) / 26);
+    d.ty = row < 0 ? nL : row >= nL ? -1 : nL - 1 - row;
+  }
   if (!d.moved) { d.moved = true; tlInner.classList.add(d.mode === 'move' ? 'dragging' : 'trimming'); if (d.kind === 'clip') ui.scaleT = d.T0; }
   dragApply(d, ((e.clientX - d.x0) / laneW()) * tScale(), snapEnabled(e.altKey));
   renderTimeline(); renderAtTime(); renderInspector();
