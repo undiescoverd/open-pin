@@ -53,13 +53,14 @@ test.describe('editor shell', () => {
     await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('Zoom and Blur say they are coming rather than doing nothing', async ({ page }) => {
+  test('Z and X pick the Zoom and Blur tools', async ({ page }) => {
     await openRecording(page);
     const tools = page.getByRole('toolbar', { name: 'Tools' });
-    await expect(tools.getByRole('button', { name: 'Zoom' })).toBeDisabled();
-    await expect(tools.getByRole('button', { name: 'Blur' })).toBeDisabled();
+    await page.keyboard.press('z');
+    await expect(tools.getByRole('button', { name: 'Zoom' })).toHaveAttribute('aria-pressed', 'true');
     await page.keyboard.press('x');
-    await expect(page.getByRole('status').filter({ hasText: 'Blur: blur arrives' })).toBeVisible();
+    await expect(tools.getByRole('button', { name: 'Blur' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Escape');
     await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
   });
 

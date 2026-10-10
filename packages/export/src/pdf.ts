@@ -83,7 +83,7 @@ export async function exportPdf(job: ExportJob, options: { page: PdfPage; fonts:
   for (const [i, step] of project.steps.entries()) {
     throwIfCancelled(job.signal);
     job.onProgress?.(i, total);
-    const canvas = await renderStep(job, step, IMAGE_WIDTH);
+    const canvas = await renderStep(job, step, IMAGE_WIDTH, true);
     const jpeg = new Uint8Array(await (await canvasToBlob(canvas, 'image/jpeg', 0.9)).arrayBuffer());
     const image = await doc.embedJpg(jpeg);
     const page = doc.addPage([spec.width, spec.height]);

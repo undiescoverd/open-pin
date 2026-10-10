@@ -1,6 +1,5 @@
 /* @waypost/render: the canvas compositor shared by the editor, the player and every export. */
 export {
-  BLUR_FILLS,
   GRADIENTS,
   OPAQUE_FALLBACK,
   composeScene,

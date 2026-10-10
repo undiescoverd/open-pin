@@ -6,4 +6,5 @@ export * from './geometry';
 export * from './history';
 export * from './clips';
 export * from './plan';
-export { DEFAULT_COLOR, canPinAt, clamp01, commands, createProject, newId, pinTime, stepAtTime, stepIndex } from './commands';
+export * from './effects';
+export { DEFAULT_COLOR, MIN_REGION, canPinAt, clamp01, commands, createProject, newId, pinTime, stepAtTime, stepIndex } from './commands';

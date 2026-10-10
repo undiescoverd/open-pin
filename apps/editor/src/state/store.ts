@@ -16,7 +16,12 @@ import {
   trimLimits,
   undo as undoHistory,
   zoomBox,
+  MIN_REGION,
+  newEffect,
+  nextBlurName,
   type Annotation,
+  type EffectType,
+  type LayerMove,
   type Blur,
   type ClipEdge,
   type Command,
@@ -561,43 +566,73 @@ export function deleteClip(clipId: string): void {
   refreshPlayhead();
 }
 
-// ----- blur (F7) ------------------------------------------------------------------------------------------------------
+// ----- effect regions (F7) ----------------------------------------------------------------------------------------------
 
-const BLUR_MIN_LENGTH = 0.1;
+/** How many regions the lane's + button has added, to stagger them so repeated adds don't sit on top of each other. */
+let staggered = 0;
 
-/** The Blur tool: a new region drawn at the playhead, lasting to the end of the recording. */
+/** A new effect region with one Pixelate effect, from the playhead to the end of the recording, on the lowest layer with room. */
 export function addBlurAtPlayhead(rect: Rect): void {
   const state = getEditor();
   const project = selectProject(state);
   const source = project?.sources[0];
   if (!project || !source) return;
-  const start = Math.min(sourceTimeAt(project, state.playhead), source.duration - BLUR_MIN_LENGTH);
+  currentPlayback()?.pause();
+  const start = Math.max(0, Math.min(sourceTimeAt(project, state.playhead), source.duration - MIN_REGION));
   const blur: Blur = {
     id: newId('b'),
-    name: `Blur ${project.blurs.length + 1}`,
+    name: nextBlurName(project.blurs),
     source: source.id,
     start,
     end: source.duration,
-    style: 'pixelate',
-    amount: 45,
+    layer: 0,
+    effects: [newEffect('pixelate', newId('f'))],
     radius: 4,
     opacity: 1,
     fadeIn: 0,
     fadeOut: 0,
-    fill: 'ink',
     keyframes: [{ time: start, rect }],
   };
   run(commands.addBlur(blur, Date.now()));
   set({ selection: { kind: 'blur', blurId: blur.id }, tool: 'select' });
-  notify('Blurred. Scrub to where it moves and drag it there: it follows with a keyframe.');
+  notify(`Added ${blur.name}. Scrub to where it should move and drag it there: it follows with a keyframe.`);
+}
+
+/** The + on the Effects lane: a region in the middle of the frame, staggered. */
+export function addBlurInMiddle(): void {
+  const k = staggered++ % 6;
+  addBlurAtPlayhead([0.38 + k * 0.025, 0.44 + k * 0.025, 0.24, 0.08]);
 }
 
 export function updateBlur(blurId: string, patch: Parameters<typeof commands.updateBlur>[1], label?: string, coalesceKey?: string): void {
   run(commands.updateBlur(blurId, patch, Date.now(), label, coalesceKey));
 }
 
-export function setBlurTiming(blurId: string, start: number, end: number, shift: boolean, coalesceKey?: string): void {
-  run(commands.setBlurTiming(blurId, start, end, shift, Date.now(), coalesceKey));
+/** Places a region in time (source seconds) and, from a drag in the Effects lane, on a row. */
+export function placeBlur(blurId: string, args: Parameters<typeof commands.placeBlur>[1], coalesceKey?: string): void {
+  run(commands.placeBlur(blurId, args, Date.now(), coalesceKey));
+}
+
+export function moveBlurLayer(blurId: string, how: LayerMove): void {
+  const before = getEditor().history;
+  run(commands.moveBlurLayer(blurId, how, Date.now()));
+  if (getEditor().history === before) notify(how === 'up' || how === 'front' ? 'Already on top.' : 'Already at the bottom.');
+}
+
+export function addEffect(blurId: string, type: EffectType): void {
+  run(commands.addEffect(blurId, newEffect(type, newId('f')), Date.now()));
+}
+
+export function updateEffect(blurId: string, effectId: string, patch: Parameters<typeof commands.updateEffect>[2], coalesceKey?: string): void {
+  run(commands.updateEffect(blurId, effectId, patch, Date.now(), coalesceKey));
+}
+
+export function moveEffect(blurId: string, effectId: string, delta: -1 | 1): void {
+  run(commands.moveEffect(blurId, effectId, delta, Date.now()));
+}
+
+export function removeEffect(blurId: string, effectId: string): void {
+  run(commands.removeEffect(blurId, effectId, Date.now()));
 }
 
 /** Places the blur at the frame showing, adding a keyframe if there isn't one on this frame. */
@@ -610,7 +645,7 @@ export function setBlurRectHere(blurId: string, rect: Rect, label?: string, coal
   const before = blur.keyframes.length;
   run(commands.setBlurRect(blurId, time, rect, halfFrame(), Date.now(), label, coalesceKey));
   const after = selectProject(getEditor())?.blurs.find(b => b.id === blurId)?.keyframes.length ?? before;
-  if (after > before) notify(`Added a keyframe at ${formatSeconds(time)}. The blur now moves between its keyframes.`);
+  if (after > before) notify(`Added a keyframe at ${formatSeconds(time)}. The region now moves between its keyframes.`);
 }
 
 export function removeBlur(blurId: string): void {

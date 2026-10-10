@@ -1,5 +1,5 @@
-import type { Project, Step } from '@waypost/core';
-import { composeFrame, loadRenderFonts } from '@waypost/render';
+import { nativeOutputSize, stepShown, type Project, type Step } from '@waypost/core';
+import { composeScene, loadRenderFonts, sceneFor, type AssetImages } from '@waypost/render';
 import { zipSync } from 'fflate';
 import { safeFileName, stepSlug } from './names';
 
@@ -16,6 +16,8 @@ export interface ExportJob {
   project: Project;
   /** the exact recording frame for a step, at full size; the exporter closes it */
   frameFor: (step: Step) => Promise<ImageBitmap>;
+  /** decoded logo and background images, by asset id */
+  assets?: AssetImages;
   onProgress?: (done: number, total: number) => void;
   signal?: AbortSignal;
 }
@@ -37,15 +39,22 @@ export function canvasToBlob(canvas: AnyCanvas, type: string, quality?: number):
   return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('Could not encode the image'))), type, quality));
 }
 
-/** The step's frame with its annotations, at the recording's full size (or `maxWidth`, keeping the shape). */
-export async function renderStep(job: ExportJob, step: Step, maxWidth?: number): Promise<AnyCanvas> {
+/**
+ * The step as a picture, the way the guide shows it: framed, with its effect regions, zoomed in and every annotation showing, and
+ * the logo. At the recording's own pixel size inside the framing, or `maxWidth` wide, keeping the shape. `opaque` fills a
+ * transparent background, for formats without transparency.
+ */
+export async function renderStep(job: ExportJob, step: Step, maxWidth?: number, opaque = false): Promise<AnyCanvas> {
   await loadRenderFonts();
   const bitmap = await job.frameFor(step);
   try {
-    const scale = maxWidth && bitmap.width > maxWidth ? maxWidth / bitmap.width : 1;
-    const width = Math.round(bitmap.width * scale), height = Math.round(bitmap.height * scale);
+    const source = job.project.sources[0]!;
+    const [nw, nh] = nativeOutputSize(job.project.frame, source.size);
+    const scale = maxWidth && nw > maxWidth ? maxWidth / nw : 1;
+    const width = Math.max(2, Math.round(nw * scale)), height = Math.max(2, Math.round(nh * scale));
     const canvas = makeCanvas(width, height);
-    composeFrame(canvas.getContext('2d') as CanvasRenderingContext2D, bitmap, width, height, { annotations: step.annotations });
+    const scene = sceneFor(job.project, { frame: bitmap, sourceTime: step.anchor.time, step, look: stepShown(step), assets: job.assets, opaque });
+    composeScene(canvas.getContext('2d') as CanvasRenderingContext2D, width, height, scene);
     return canvas;
   } finally {
     bitmap.close();

@@ -364,7 +364,7 @@ function StepsLane({ project, x, timeAt, onDragging, onSnap }: StepsLaneProps) {
     <div aria-label={project?.steps.length ? 'Steps lane' : 'Steps lane, empty'} className="relative h-7 rounded-sm bg-raised">
       {project?.steps.map((step, i) => {
         const tl = drag?.id === step.id ? drag.tl : timelineTimeOf(project, step);
-        const active = selection?.stepId === step.id;
+        const active = selection !== null && 'stepId' in selection && selection.stepId === step.id;
         return (
           <button
             key={step.id}

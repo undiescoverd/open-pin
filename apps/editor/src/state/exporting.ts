@@ -3,7 +3,7 @@ import type { ExportJob, PdfPage, StillFormat } from '@waypost/export';
 import figtree400 from '@fontsource/figtree/files/figtree-latin-400-normal.woff?url';
 import figtree600 from '@fontsource/figtree/files/figtree-latin-600-normal.woff?url';
 import { downloadBlob } from '../storage/waypost-file';
-import { getEditor, notify, patchEditor, selectProject, stepAtPlayhead } from './store';
+import { getEditor, notify, patchEditor, selectProject, sourceTimeAt, stepAtPlayhead } from './store';
 
 /* The exporters (pdf-lib and its font engine are big) load the first time someone exports, not with the editor. */
 const exporters = () => import('@waypost/export');
@@ -19,6 +19,7 @@ function jobFor(): ExportJob | null {
   return {
     project,
     frameFor: (step: Step) => media.frame(media.index.indexAt(step.anchor.time)),
+    assets: state.assetImages,
     onProgress: (done, total) => patchEditor({ busy: `Exporting step ${Math.min(done + 1, total)} of ${total}…` }),
   };
 }
@@ -72,10 +73,10 @@ async function currentFrameBlob(): Promise<{ blob: Blob; name: string } | null> 
   const media = state.media;
   if (!project || !media) return null;
   const step = stepAtPlayhead(project, state.playhead);
-  const time = media.index.timeAt(media.index.indexAt(state.playhead));
-  const shown: Step = step ?? { id: 'frame', anchor: { source: project.sources[0]!.id, time }, title: '', body: '', minHold: 2.5, annotations: [] };
+  const time = sourceTimeAt(project, state.playhead);
+  const shown: Step = step ?? { id: 'frame', anchor: { source: project.sources[0]!.id, time }, title: '', body: '', minHold: 2.5, zoom: null, annotations: [] };
   const { renderStep, canvasToBlob, safeFileName } = await exporters();
-  const canvas = await renderStep({ project, frameFor: () => media.frame(media.index.indexAt(shown.anchor.time)) }, shown);
+  const canvas = await renderStep({ project, frameFor: () => media.frame(media.index.indexAt(shown.anchor.time)), assets: state.assetImages }, shown);
   return { blob: await canvasToBlob(canvas, 'image/png'), name: `${safeFileName(project.name)} ${formatTimecode(time).replace(':', '-')}.png` };
 }
 

@@ -8,6 +8,7 @@ import {
   viewRect,
   type Annotation,
   type Blur,
+  type Effect,
   type Frame,
   type GradientPreset,
   type Logo,
@@ -46,17 +47,15 @@ export const GRADIENTS: Record<GradientPreset, { name: string; stops: [string, s
   paper: { name: 'Paper', stops: ['#F6F7F9', '#D9DDE4'] },
 };
 
-/** Solid blur fills. */
-export const BLUR_FILLS = { ink: '#0E1116', gray: '#8A93A3', white: '#FFFFFF' } as const;
 /** What a video shows where the background is "none", since video has no transparency. */
 export const OPAQUE_FALLBACK = '#0E1116';
 
-/** One blur region as it is at the frame's time. */
+/** One effect region as it is at the frame's time. Scenes list them bottom layer first. */
 export interface SceneBlur {
-  blur: Pick<Blur, 'style' | 'amount' | 'radius' | 'fill'>;
+  blur: Pick<Blur, 'effects' | 'radius'>;
   /** normalised to the recording */
   rect: Rect;
-  /** 0 to 1 */
+  /** 0 to 1: the region's opacity and fades */
   alpha: number;
 }
 
@@ -117,63 +116,108 @@ function drawBackground(ctx: Ctx, scene: Scene, width: number, height: number): 
   }
 }
 
-let scratch: AnyCanvas | null = null;
-let scratchSmall: AnyCanvas | null = null;
-function scratchCanvas(which: 'big' | 'small', width: number, height: number): AnyCanvas {
-  let c = which === 'big' ? scratch : scratchSmall;
+/* Scratch canvases, reused between frames: `work` holds the region being processed, `pass` takes one filter pass, `cells` the
+   pixelate grid. */
+const scratch = new Map<string, AnyCanvas>();
+function scratchCanvas(which: 'work' | 'pass' | 'cells', width: number, height: number): AnyCanvas {
+  let c = scratch.get(which);
   if (!c || c.width < width || c.height < height) {
     c = makeCanvas(Math.max(width, c?.width ?? 0), Math.max(height, c?.height ?? 0));
-    if (which === 'big') scratch = c;
-    else scratchSmall = c;
+    scratch.set(which, c);
   }
   return c;
 }
 
+/** Pixelate block size and blur radius, in output pixels, for an amount of 0 to 100 at `u` output pixels per design pixel. */
+const pixelBlock = (amount: number, u: number): number => Math.max(2, (4 + amount * 0.36) * u);
+const blurRadius = (amount: number, u: number): number => Math.max(0.5, (1 + amount * 0.3) * u);
+
+/** Runs one effect over `w` × `h` of a work canvas (with `m` pixels of margin around the region for blurs to sample). */
+function applyEffect(wctx: Ctx, effect: Effect, x: number, y: number, w: number, h: number, full: [number, number], u: number): void {
+  const amount = effect.amount / 100;
+  wctx.save();
+  wctx.globalCompositeOperation = 'source-over';
+  switch (effect.type) {
+    case 'pixelate': {
+      const block = pixelBlock(effect.amount, u);
+      const cols = Math.max(1, Math.ceil(w / block)), rows = Math.max(1, Math.ceil(h / block));
+      const cells = scratchCanvas('cells', cols, rows);
+      const cctx = cells.getContext('2d') as Ctx;
+      cctx.clearRect(0, 0, cols, rows);
+      cctx.imageSmoothingEnabled = true;
+      cctx.imageSmoothingQuality = 'high';
+      /* each block becomes the average of the pixels under it, then is drawn back as one flat square */
+      cctx.drawImage(wctx.canvas as AnyCanvas, x, y, w, h, 0, 0, cols, rows);
+      wctx.imageSmoothingEnabled = false;
+      wctx.clearRect(x, y, w, h);
+      wctx.drawImage(cells, 0, 0, cols, rows, x, y, cols * block, rows * block);
+      break;
+    }
+    case 'blur': {
+      const [fw, fh] = full;
+      const pass = scratchCanvas('pass', fw, fh);
+      const pctx = pass.getContext('2d') as Ctx;
+      pctx.clearRect(0, 0, fw, fh);
+      pctx.filter = `blur(${blurRadius(effect.amount, u)}px)`;
+      pctx.drawImage(wctx.canvas as AnyCanvas, 0, 0, fw, fh, 0, 0, fw, fh);
+      pctx.filter = 'none';
+      wctx.clearRect(0, 0, fw, fh);
+      wctx.drawImage(pass, 0, 0, fw, fh, 0, 0, fw, fh);
+      break;
+    }
+    case 'darken':
+      /* brightness down to 10% at full strength */
+      wctx.globalAlpha = amount * 0.9;
+      wctx.fillStyle = '#000000';
+      wctx.fillRect(x, y, w, h);
+      break;
+    case 'desaturate':
+      wctx.globalAlpha = amount;
+      wctx.globalCompositeOperation = 'saturation';
+      wctx.fillStyle = '#808080';
+      wctx.fillRect(x, y, w, h);
+      break;
+    case 'tint':
+    case 'solid':
+      wctx.globalAlpha = amount;
+      wctx.fillStyle = effect.color ?? '#0E1116';
+      wctx.fillRect(x, y, w, h);
+      break;
+  }
+  wctx.restore();
+}
+
 /**
- * Burns one blur region into the pixels already on the canvas. Pixelate averages blocks (the safest for text), gaussian blurs, and
- * solid paints over. `u` is output pixels per design pixel of the recording as shown, so the effect covers the same detail at any
- * output size or zoom.
+ * Burns one effect region into the pixels already on the canvas: the region is copied out (with a margin for blurs to sample),
+ * its effects run strictly in list order, and the result goes back inside the rounded rectangle at the region's opacity. `u` is
+ * output pixels per design pixel of the recording as shown, so an effect covers the same detail at any output size or zoom.
  */
-function burnBlur(ctx: Ctx, b: SceneBlur, px: Rect, u: number): void {
+function burnRegion(ctx: Ctx, b: SceneBlur, px: Rect, u: number): void {
   const canvas = ctx.canvas as AnyCanvas;
   /* whole pixels, inside the canvas (a zoom can push part of a region off it) */
   const x = Math.max(0, Math.floor(px[0])), y = Math.max(0, Math.floor(px[1]));
   const w = Math.min(canvas.width, Math.ceil(px[0] + px[2])) - x, h = Math.min(canvas.height, Math.ceil(px[1] + px[3])) - y;
-  if (w < 1 || h < 1 || b.alpha <= 0) return;
+  const effects = b.blur.effects.filter(e => e.on);
+  if (w < 1 || h < 1 || b.alpha <= 0 || effects.length === 0) return;
+  const blurs = effects.filter(e => e.type === 'blur');
+  const m = blurs.length ? Math.ceil(Math.max(...blurs.map(e => blurRadius(e.amount, u))) * 2 * Math.sqrt(blurs.length)) : 0;
+  const sx = Math.max(0, x - m), sy = Math.max(0, y - m);
+  const sw = Math.min(canvas.width, x + w + m) - sx, sh = Math.min(canvas.height, y + h + m) - sy;
+  const work = scratchCanvas('work', sw, sh);
+  const wctx = work.getContext('2d') as Ctx;
+  wctx.save();
+  wctx.clearRect(0, 0, work.width, work.height);
+  wctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+  for (const effect of effects) applyEffect(wctx, effect, x - sx, y - sy, w, h, [sw, sh], u);
+  wctx.restore();
   const radius = Math.min(b.blur.radius * u, w / 2, h / 2);
   ctx.save();
   ctx.globalAlpha = b.alpha;
+  ctx.imageSmoothingEnabled = false;
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, radius);
   ctx.clip();
-  if (b.blur.style === 'solid') {
-    ctx.fillStyle = BLUR_FILLS[b.blur.fill];
-    ctx.fillRect(x, y, w, h);
-  } else if (b.blur.style === 'pixelate') {
-    const block = Math.max(2, (4 + b.blur.amount * 0.36) * u);
-    const cols = Math.max(1, Math.ceil(w / block)), rows = Math.max(1, Math.ceil(h / block));
-    const small = scratchCanvas('small', cols, rows);
-    const sctx = small.getContext('2d') as Ctx;
-    sctx.clearRect(0, 0, cols, rows);
-    sctx.imageSmoothingEnabled = true;
-    sctx.imageSmoothingQuality = 'high';
-    /* each block becomes the average of the pixels under it, then is drawn back as one flat square */
-    sctx.drawImage(canvas, x, y, w, h, 0, 0, cols, rows);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(small, 0, 0, cols, rows, x, y, w, h);
-  } else {
-    const r = Math.max(1, (2 + b.blur.amount * 0.3) * u);
-    const m = Math.ceil(r * 2);
-    const sx = Math.max(0, x - m), sy = Math.max(0, y - m);
-    const sw = Math.min(canvas.width, x + w + m) - sx, sh = Math.min(canvas.height, y + h + m) - sy;
-    const big = scratchCanvas('big', sw, sh);
-    const bctx = big.getContext('2d') as Ctx;
-    bctx.clearRect(0, 0, sw, sh);
-    bctx.filter = `blur(${r}px)`;
-    bctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-    bctx.filter = 'none';
-    ctx.drawImage(big, 0, 0, sw, sh, sx, sy, sw, sh);
-  }
+  ctx.drawImage(work, x - sx, y - sy, w, h, x, y, w, h);
   ctx.restore();
 }
 
@@ -251,7 +295,7 @@ export function composeScene(ctx: Ctx, width: number, height: number, scene: Sce
   const zoom = 1 / view[2];
   for (const b of scene.blurs ?? []) {
     const r = rectToView(b.rect, view);
-    burnBlur(ctx, b, [ix + r[0] * iw, iy + r[1] * ih, r[2] * iw, r[3] * ih], u * zoom);
+    burnRegion(ctx, b, [ix + r[0] * iw, iy + r[1] * ih, r[2] * iw, r[3] * ih], u * zoom);
   }
 
   if (scene.annotations?.length) {
@@ -296,7 +340,8 @@ export interface SceneOptions {
 export function sceneFor(project: Project, options: SceneOptions): Scene {
   const source = project.sources[0]!;
   const blurs: SceneBlur[] = [];
-  for (const blur of project.blurs) {
+  /* bottom layer first, so higher layers draw on top */
+  for (const blur of [...project.blurs].sort((a, b) => a.layer - b.layer)) {
     if (blur.source !== source.id) continue;
     const alpha = blurAlphaAt(blur, options.sourceTime);
     if (alpha > 0) blurs.push({ blur, rect: blurRectAt(blur, options.sourceTime), alpha });

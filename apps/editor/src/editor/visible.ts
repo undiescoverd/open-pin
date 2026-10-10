@@ -1,4 +1,4 @@
-import { REVEAL_FADE, REVEAL_INTERVAL, ZOOM_IN, stepIntro, stepShown, usedGroups, type Annotation, type Project, type Step, type StepLook } from '@waypost/core';
+import { newEffect, topLayer, type Blur, REVEAL_FADE, REVEAL_INTERVAL, ZOOM_IN, stepIntro, stepShown, usedGroups, type Annotation, type Project, type Step, type StepLook } from '@waypost/core';
 import { getEditor, selectProject, stepAtPlayhead, type EditorState } from '../state/store';
 
 /* What the canvas shows right now (docs/03-design-system.md, "Editor layout"): Edit shows the step's annotations with handles;
@@ -52,7 +52,7 @@ export function projectForDrawing(project: Project, state: Pick<EditorState, 'sh
   if (d?.kind !== 'blur') return project;
   const source = project.sources[0]!;
   if (d.blurId === 'new') {
-    const preview = { id: 'new', name: '', source: source.id, start: 0, end: source.duration, style: 'pixelate' as const, amount: 45, radius: 4, opacity: 1, fadeIn: 0, fadeOut: 0, fill: 'ink' as const, keyframes: [{ time: 0, rect: d.rect }] };
+    const preview: Blur = { id: 'new', name: '', source: source.id, start: 0, end: source.duration, layer: topLayer(project.blurs) + 1, effects: [newEffect('pixelate', 'new')], radius: 4, opacity: 1, fadeIn: 0, fadeOut: 0, keyframes: [{ time: 0, rect: d.rect }] };
     return { ...project, blurs: [...project.blurs, preview] };
   }
   return { ...project, blurs: project.blurs.map(b => (b.id === d.blurId ? { ...b, keyframes: [{ time: b.start, rect: d.rect }] } : b)) };

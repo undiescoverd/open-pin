@@ -2,7 +2,7 @@ import type { Step } from '@waypost/core';
 import { describe, expect, it } from 'vitest';
 import { safeFileName, stepSlug, stepTitle } from './names';
 
-const step = (title: string): Step => ({ id: 's', anchor: { source: 'x', time: 1 }, title, body: '', minHold: 2.5, annotations: [] });
+const step = (title: string): Step => ({ id: 's', anchor: { source: 'x', time: 1 }, title, body: '', minHold: 2.5, zoom: null, annotations: [] });
 
 describe('names', () => {
   it('numbers steps in order and slugs the title', () => {

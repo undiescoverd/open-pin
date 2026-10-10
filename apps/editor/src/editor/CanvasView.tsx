@@ -26,7 +26,7 @@ export function CanvasView() {
   /* the recording decodes at up to 1920 px wide; the canvas is the framed output at the same scale */
   const decodeWidth = source ? Math.min(source.size[0], MAX_PREVIEW_WIDTH) : 0;
   const scale = source ? decodeWidth / source.size[0] : 1;
-  const native = source && project ? nativeOutputSize(project.frame, source.size) : [16, 10];
+  const native: [number, number] = source && project ? nativeOutputSize(project.frame, source.size) : [16, 10];
   const width = Math.max(2, Math.round(native[0] * scale));
   const height = Math.max(2, Math.round(native[1] * scale));
   const layout = source && project ? frameLayout(project.frame, source.size, [width, height]) : null;

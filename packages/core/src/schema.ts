@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { separateLayers } from './effects';
 
 /* The project document (docs/02-architecture.md, "Data model"). Zod is the single source of truth: the types below are inferred
    from it, and `parseProject` validates anything read from disk. Geometry is normalised: 0 to 1 of the recording frame. */
@@ -91,15 +92,27 @@ export const StepSchema = z.object({
   annotations: z.array(AnnotationSchema),
 });
 
-export const BlurStyleSchema = z.enum(['pixelate', 'gaussian', 'solid']);
-export const BlurFillSchema = z.enum(['ink', 'gray', 'white']);
+/** The effects a region can stack (docs/05-editor-interactions.md, section 4.1), applied from the top of its list down. */
+export const EFFECT_TYPES = ['pixelate', 'blur', 'darken', 'desaturate', 'tint', 'solid'] as const;
+export const EffectTypeSchema = z.enum(EFFECT_TYPES);
 
-/** Where a blur region sits at one source time. Between keyframes the rectangle moves in a straight line. */
+/** One effect in a region's stack. `amount` is 0 to 100: block size, blur radius, darkness, desaturation, tint strength or fill opacity. */
+export const EffectSchema = z.object({
+  id,
+  type: EffectTypeSchema,
+  on: z.boolean().default(true),
+  amount: z.number().min(0).max(100),
+  /** tint and solid fill only */
+  color: colour.optional(),
+});
+
+/** Where a region sits at one source time. Between keyframes the rectangle moves in a straight line. */
 export const BlurKeyframeSchema = z.object({ time: z.number().min(0), rect: RectSchema });
 
 /**
- * F7: a region of the recording that every output blurs, burned into the pixels. Its timing and keyframes are in source time,
- * so it keeps covering the same pixels when clips are trimmed or sped up.
+ * F7: an effect region (the Blur tool draws one). Each carries its own stack of effects, burned into the pixels of every output,
+ * and sits on a layer of the Effects lane: higher layers draw on top, and two regions never overlap in time on one layer. Timing
+ * and keyframes are in source time, so it keeps covering the same pixels when clips are trimmed or sped up.
  */
 export const BlurSchema = z.object({
   id,
@@ -108,9 +121,10 @@ export const BlurSchema = z.object({
   /** source seconds */
   start: z.number().min(0),
   end: z.number().min(0),
-  style: BlurStyleSchema.default('pixelate'),
-  /** 0 to 100: block size for pixelate, radius for gaussian */
-  amount: z.number().min(0).max(100).default(45),
+  /** 0 is the bottom layer */
+  layer: z.number().int().min(0).default(0),
+  /** applied in order; may be empty, which leaves the recording as it is */
+  effects: z.array(EffectSchema),
   /** corner radius in design pixels (a 1280 px wide frame) */
   radius: z.number().min(0).max(40).default(4),
   /** 0.1 to 1 */
@@ -118,7 +132,6 @@ export const BlurSchema = z.object({
   /** source seconds */
   fadeIn: z.number().min(0).max(3).default(0),
   fadeOut: z.number().min(0).max(3).default(0),
-  fill: BlurFillSchema.default('ink'),
   /** ascending by time; at least one */
   keyframes: z.array(BlurKeyframeSchema).min(1),
 });
@@ -200,8 +213,8 @@ export type Source = z.infer<typeof SourceSchema>;
 export type Clip = z.infer<typeof ClipSchema>;
 export type Zoom = z.infer<typeof ZoomSchema>;
 export type Step = z.infer<typeof StepSchema>;
-export type BlurStyle = z.infer<typeof BlurStyleSchema>;
-export type BlurFill = z.infer<typeof BlurFillSchema>;
+export type EffectType = z.infer<typeof EffectTypeSchema>;
+export type Effect = z.infer<typeof EffectSchema>;
 export type BlurKeyframe = z.infer<typeof BlurKeyframeSchema>;
 export type Blur = z.infer<typeof BlurSchema>;
 export type Asset = z.infer<typeof AssetSchema>;
@@ -242,5 +255,6 @@ export function parseProject(value: unknown): Project {
   }
   const project = result.data;
   for (const blur of project.blurs) blur.keyframes.sort((a, b) => a.time - b.time);
+  separateLayers(project.blurs);
   return project;
 }

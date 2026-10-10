@@ -15,6 +15,7 @@ import {
 } from './geometry';
 import { apply, createHistory, undo } from './history';
 import { exportPlan, holdLook, planAt, stepIntro, stepShown } from './plan';
+import { newEffect } from './effects';
 import { parseProject, SCHEMA_VERSION, type Blur, type Project, type Source } from './schema';
 import { clipStarts, cutTimes, spotAt, srcToTl, timelineDuration } from './time';
 
@@ -168,7 +169,20 @@ describe('speed, gaps and deleting clips', () => {
 });
 
 function newBlur(): Blur {
-  return { id: 'b1', name: '', source: 'src1', start: 1, end: 9, style: 'pixelate', amount: 45, radius: 4, opacity: 1, fadeIn: 0, fadeOut: 0, fill: 'ink', keyframes: [{ time: 1, rect: [0.1, 0.1, 0.2, 0.1] }] };
+  return {
+    id: 'b1',
+    name: 'Blur 1',
+    source: 'src1',
+    start: 1,
+    end: 9,
+    layer: 0,
+    effects: [newEffect('pixelate', 'f1')],
+    radius: 4,
+    opacity: 1,
+    fadeIn: 0,
+    fadeOut: 0,
+    keyframes: [{ time: 1, rect: [0.1, 0.1, 0.2, 0.1] }],
+  };
 }
 
 describe('blur regions', () => {
@@ -198,9 +212,10 @@ describe('blur regions', () => {
     expect(p.blurs[0]!.keyframes).toEqual([{ time: 1, rect: [0.4, 0.1, 0.2, 0.1] }]);
   });
 
-  it('settings change in one command; a start after the end swaps them', () => {
-    const p = run(fresh(), commands.addBlur(newBlur(), 3), commands.updateBlur('b1', { start: 12 }, 4));
-    expect(p.blurs[0]).toMatchObject({ start: 9, end: 12 });
+  it('settings change in one command, and the name is kept short', () => {
+    const p = run(fresh(), commands.addBlur(newBlur(), 3), commands.updateBlur('b1', { opacity: 0.5, name: 'x'.repeat(80) }, 4));
+    expect(p.blurs[0]).toMatchObject({ opacity: 0.5 });
+    expect(p.blurs[0]!.name).toHaveLength(60);
   });
 });
 
@@ -241,7 +256,7 @@ describe('framing', () => {
     const [w, h] = nativeOutputSize({ aspect: '16:9', padding: 0 }, [1280, 800]);
     expect(w / h).toBeCloseTo(16 / 9, 2);
     expect(frameLayout({ aspect: '16:9', padding: 0 }, [1280, 800], [w, h]).inset).toBe(true);
-    expect(outputSizeForHeight({ aspect: '16:9', padding: 0.05 }, [1280, 800], 2160)).toEqual([3840, 2160]);
+    expect(outputSizeForHeight({ aspect: '16:9' }, [1280, 800], 2160)).toEqual([3840, 2160]);
   });
 
   it('maps a pointer on the output back onto the recording', () => {
@@ -302,12 +317,15 @@ describe('the export plan', () => {
 describe('blur timing', () => {
   it('moving the bar moves its keyframes with it; trimming an edge does not', () => {
     const blur: Blur = { ...newBlur(), keyframes: [{ time: 1, rect: [0, 0, 0.1, 0.1] }, { time: 5, rect: [0.5, 0, 0.1, 0.1] }] };
-    let p = run(fresh(), commands.addBlur(blur, 2), commands.setBlurTiming('b1', 3, 11, true, 3));
+    let p = run(fresh(), commands.addBlur(blur, 2), commands.placeBlur('b1', { start: 3, end: 11, shift: true }, 3));
     expect(p.blurs[0]).toMatchObject({ start: 3, end: 11 });
     expect(p.blurs[0]!.keyframes.map(k => k.time)).toEqual([3, 7]);
-    p = run(p, commands.setBlurTiming('b1', 4, 11, false, 4));
+    p = run(p, commands.placeBlur('b1', { start: 4, end: 11, shift: false }, 4));
     expect(p.blurs[0]!.keyframes.map(k => k.time)).toEqual([3, 7]);
-    p = run(p, commands.setBlurTiming('b1', 4, 99, false, 5));
+    p = run(p, commands.placeBlur('b1', { start: 4, end: 99, shift: false }, 5));
     expect(p.blurs[0]!.end).toBe(20);
+    p = run(p, commands.placeBlur('b1', { start: 4, end: 2, shift: false }, 6));
+    expect(p.blurs[0]).toMatchObject({ start: 4 });
+    expect(p.blurs[0]!.end).toBeCloseTo(4.1, 9);
   });
 });

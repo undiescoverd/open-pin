@@ -1,5 +1,6 @@
 import type { Draft } from 'immer';
 import type { Command } from './history';
+import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, type LayerMove } from './effects';
 import { blurRectAt } from './geometry';
 import {
   DEFAULT_FRAME,
@@ -7,6 +8,7 @@ import {
   type Annotation,
   type Asset,
   type Blur,
+  type Effect,
   type ClickAnnotation,
   type Frame,
   type Logo,
@@ -23,6 +25,9 @@ import { snapToFrame, srcToTl } from './time';
 
 /** The default annotation colour, coral-500 in docs/03-design-system.md. */
 export const DEFAULT_COLOR = '#FF5A4E';
+
+/** An effect region is at least this long, in source seconds. */
+export const MIN_REGION = 0.1;
 
 export function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
@@ -250,18 +255,19 @@ export const commands = {
     };
   },
 
+  /** Adds an effect region on the lowest layer with room for it. */
   addBlur(blur: Blur, now: number): Command<Project> {
     return {
-      label: 'Add blur',
+      label: 'Add effect region',
       run: d => {
-        d.blurs.push(blur);
+        d.blurs.push({ ...blur, layer: freeLayer(d.blurs, blur.start, blur.end) });
         touch(d, now);
       },
     };
   },
 
-  /** Changes a blur's settings or timing. Keyframes change through `setBlurRect`. */
-  updateBlur(blurId: string, patch: Partial<Omit<Blur, 'id' | 'keyframes' | 'source'>>, now: number, label = 'Edit blur', coalesceKey?: string): Command<Project> {
+  /** Changes a region's name, corner radius, opacity or fades. Timing, layer, effects and keyframes have their own commands. */
+  updateBlur(blurId: string, patch: Partial<Pick<Blur, 'name' | 'radius' | 'opacity' | 'fadeIn' | 'fadeOut'>>, now: number, label = 'Edit effect region', coalesceKey?: string): Command<Project> {
     return {
       label,
       coalesceKey,
@@ -272,32 +278,132 @@ export const commands = {
         for (const [key, value] of Object.entries(patch)) {
           const target = blur as Record<string, unknown>;
           if (value === undefined || target[key] === value) continue;
-          target[key] = value;
+          target[key] = key === 'name' ? String(value).slice(0, 60) : value;
           changed = true;
         }
-        if (blur.end < blur.start) [blur.start, blur.end] = [blur.end, blur.start];
         if (changed) touch(d, now);
       },
     };
   },
 
   /**
-   * Changes when a blur starts and ends (source seconds). Moving the whole bar passes `shift`, which moves its keyframes by the same
-   * amount so the motion moves with it; trimming an edge leaves them where they are.
+   * Places a region in time (source seconds) and, from a drag in the Effects lane, on a row: see `dropOnLayer`. Moving the whole
+   * bar passes `shift`, which moves its keyframes with it so the motion moves too; trimming an edge leaves them where they are. On
+   * its layer it stops at its neighbours, and it keeps at least `MIN_REGION`.
    */
-  setBlurTiming(blurId: string, start: number, end: number, shift: boolean, now: number, coalesceKey?: string): Command<Project> {
+  placeBlur(blurId: string, args: { start: number; end: number; shift: boolean; row?: number }, now: number, coalesceKey?: string): Command<Project> {
     return {
-      label: shift ? 'Move blur' : 'Trim blur',
+      label: args.shift || args.row !== undefined ? 'Move effect region' : 'Trim effect region',
       coalesceKey,
       run: d => {
         const blur = d.blurs.find(b => b.id === blurId);
         const source = blur && d.sources.find(s => s.id === blur.source);
         if (!blur || !source) return;
-        const s = Math.max(0, Math.min(start, source.duration)), e = Math.max(s, Math.min(end, source.duration));
-        if (Math.abs(s - blur.start) < 1e-9 && Math.abs(e - blur.end) < 1e-9) return;
-        if (shift) for (const k of blur.keyframes) k.time = Math.max(0, k.time + (s - blur.start));
+        const was = { start: blur.start, end: blur.end };
+        const D = source.duration;
+        let s: number, e: number;
+        if (args.shift) {
+          const length = Math.min(D, Math.max(MIN_REGION, was.end - was.start));
+          s = Math.min(Math.max(0, args.start), D - length);
+          e = s + length;
+        } else {
+          s = Math.min(Math.max(0, args.start), D);
+          e = Math.min(Math.max(0, args.end), D);
+          const leftMoved = Math.abs(s - was.start) > 1e-9;
+          if (e - s < MIN_REGION) [s, e] = leftMoved ? [e - MIN_REGION, e] : [s, s + MIN_REGION];
+        }
         blur.start = s;
         blur.end = e;
+        const layers = d.blurs.map(b => b.layer).join();
+        if (args.row !== undefined) dropOnLayer(d.blurs, blurId, args.row);
+        if (d.blurs.map(b => b.layer).join() === layers) {
+          /* still on its own layer: it stops at its neighbours there, judged from where it was */
+          const room = layerRoom(d.blurs, blurId, was, { min: 0, max: D });
+          if (args.shift) {
+            const length = Math.min(e - s, room.max - room.min);
+            if (s < room.min) [s, e] = [room.min, room.min + length];
+            if (e > room.max) [s, e] = [room.max - length, room.max];
+          } else {
+            s = Math.max(s, room.min);
+            e = Math.min(e, room.max);
+          }
+          blur.start = s;
+          blur.end = e;
+        }
+        if (Math.abs(blur.start - was.start) < 1e-9 && Math.abs(blur.end - was.end) < 1e-9 && d.blurs.map(b => b.layer).join() === layers) return;
+        if (args.shift) for (const k of blur.keyframes) k.time = Math.max(0, k.time + (blur.start - was.start));
+        touch(d, now);
+      },
+    };
+  },
+
+  /** Bring forward, Send backward, Bring to front, Send to back. */
+  moveBlurLayer(blurId: string, how: LayerMove, now: number): Command<Project> {
+    const labels: Record<LayerMove, string> = { up: 'Bring forward', down: 'Send backward', front: 'Bring to front', back: 'Send to back' };
+    return {
+      label: labels[how],
+      run: d => {
+        if (moveLayer(d.blurs, blurId, how)) touch(d, now);
+      },
+    };
+  },
+
+  addEffect(blurId: string, effect: Effect, now: number): Command<Project> {
+    return {
+      label: `Add ${EFFECTS[effect.type].name.toLowerCase()}`,
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        if (!blur) return;
+        blur.effects.push(effect);
+        touch(d, now);
+      },
+    };
+  },
+
+  /** Switches an effect on or off, or changes its amount or colour. */
+  updateEffect(blurId: string, effectId: string, patch: Partial<Pick<Effect, 'on' | 'amount' | 'color'>>, now: number, coalesceKey?: string): Command<Project> {
+    const label = patch.on !== undefined ? (patch.on ? 'Switch effect on' : 'Switch effect off') : patch.color !== undefined ? 'Change effect colour' : 'Change effect';
+    return {
+      label,
+      coalesceKey,
+      run: d => {
+        const effect = d.blurs.find(b => b.id === blurId)?.effects.find(e => e.id === effectId);
+        if (!effect) return;
+        let changed = false;
+        if (patch.on !== undefined && patch.on !== effect.on) [effect.on, changed] = [patch.on, true];
+        if (patch.amount !== undefined) {
+          const amount = Math.min(100, Math.max(0, patch.amount));
+          if (amount !== effect.amount) [effect.amount, changed] = [amount, true];
+        }
+        if (patch.color !== undefined && patch.color !== effect.color && effect.color !== undefined) [effect.color, changed] = [patch.color, true];
+        if (changed) touch(d, now);
+      },
+    };
+  },
+
+  /** Moves an effect earlier (-1) or later (1) in its region's stack. */
+  moveEffect(blurId: string, effectId: string, delta: -1 | 1, now: number): Command<Project> {
+    return {
+      label: delta < 0 ? 'Apply effect earlier' : 'Apply effect later',
+      run: d => {
+        const effects = d.blurs.find(b => b.id === blurId)?.effects;
+        const i = effects?.findIndex(e => e.id === effectId) ?? -1;
+        const j = i + delta;
+        if (!effects || i < 0 || j < 0 || j >= effects.length) return;
+        [effects[i], effects[j]] = [effects[j]!, effects[i]!];
+        touch(d, now);
+      },
+    };
+  },
+
+  removeEffect(blurId: string, effectId: string, now: number): Command<Project> {
+    return {
+      label: 'Remove effect',
+      run: d => {
+        const effects = d.blurs.find(b => b.id === blurId)?.effects;
+        const i = effects?.findIndex(e => e.id === effectId) ?? -1;
+        if (!effects || i < 0) return;
+        effects.splice(i, 1);
         touch(d, now);
       },
     };
@@ -357,11 +463,12 @@ export const commands = {
 
   removeBlur(blurId: string, now: number): Command<Project> {
     return {
-      label: 'Delete blur',
+      label: 'Delete effect region',
       run: d => {
         const i = d.blurs.findIndex(b => b.id === blurId);
         if (i < 0) return;
         d.blurs.splice(i, 1);
+        compactLayers(d.blurs);
         touch(d, now);
       },
     };
