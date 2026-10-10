@@ -8,7 +8,6 @@ import {
   frameLayout,
   nativeOutputSize,
   outputSizeForHeight,
-  outputToRecording,
   viewRect,
   zoomAmount,
   zoomBox,
@@ -299,12 +298,6 @@ describe('framing', () => {
     expect(w / h).toBeCloseTo(16 / 9, 2);
     expect(frameLayout({ aspect: '16:9', padding: 0 }, [1280, 800], [w, h]).inset).toBe(true);
     expect(outputSizeForHeight({ aspect: '16:9' }, [1280, 800], 2160)).toEqual([3840, 2160]);
-  });
-
-  it('maps a pointer on the output back onto the recording', () => {
-    const layout = frameLayout({ aspect: 'source', padding: 0.1 }, [1000, 1000], [1000, 1000]);
-    expect(outputToRecording([500, 500], layout)).toEqual([0.5, 0.5]);
-    expect(outputToRecording([100, 100], layout)).toEqual([0, 0]);
   });
 });
 

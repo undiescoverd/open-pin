@@ -104,11 +104,6 @@ export function spotAt(clips: readonly TimeClip[], timeline: number): TimelineSp
   return { kind: 'clip', index: last, time: clips[last]!.out };
 }
 
-/** The clip that plays a source time, if any. */
-export function clipIndexAtSource(clips: readonly TimeClip[], source: string, time: number): number {
-  return clips.findIndex(c => c.source === source && time >= c.in - 1e-9 && time <= c.out + 1e-9);
-}
-
 /** Every cut and gap edge on the timeline, ascending, without the two ends. Jump and snap targets. */
 export function cutTimes(clips: readonly TimeClip[]): number[] {
   const times: number[] = [];

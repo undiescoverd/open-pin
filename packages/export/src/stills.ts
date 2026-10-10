@@ -1,5 +1,5 @@
 import { nativeOutputSize, stepShown, type Project, type Step } from '@waypost/core';
-import { composeScene, loadRenderFonts, sceneFor, type AssetImages } from '@waypost/render';
+import { composeScene, loadRenderFonts, makeCanvas, sceneFor, type AnyCanvas, type AssetImages } from '@waypost/render';
 import { zipSync } from 'fflate';
 import { safeFileName, stepSlug } from './names';
 
@@ -24,15 +24,6 @@ export interface ExportJob {
 
 export type StillFormat = 'png' | 'webp';
 
-type AnyCanvas = OffscreenCanvas | HTMLCanvasElement;
-
-function makeCanvas(width: number, height: number): AnyCanvas {
-  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(width, height);
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
-}
 
 export function canvasToBlob(canvas: AnyCanvas, type: string, quality?: number): Promise<Blob> {
   if ('convertToBlob' in canvas) return canvas.convertToBlob({ type, quality });

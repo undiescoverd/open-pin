@@ -1,3 +1,5 @@
+import { textOn } from '@waypost/core';
+
 /* The annotation palette (docs/03-design-system.md, "Annotation palette"). Annotations sit on arbitrary recordings, so every colour
    carries a halo in the opposite tone, and callouts use a darker fill than the stroke so white text passes contrast. */
 
@@ -28,18 +30,10 @@ export const DEFAULT_CALLOUT_COLOR = '#0E1116';
 
 const byStroke = new Map(ANNOTATION_COLORS.map(c => [c.stroke.toLowerCase(), c]));
 
-function luminance(hex: string): number {
-  const channel = (i: number) => {
-    const v = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * channel(0) + 0.7152 * channel(1) + 0.0722 * channel(2);
-}
-
-/** Looks a stored hex up in the palette; any other colour gets a halo and text colour chosen by its brightness. */
+/** Looks a stored hex up in the palette; any other colour gets text and a halo chosen as the player's chrome chooses them. */
 export function colourFor(hex: string): AnnotationColour {
   const known = byStroke.get(hex.toLowerCase());
   if (known) return known;
-  const light = luminance(hex) > 0.4;
-  return { id: 'custom', name: 'Custom', stroke: hex, fill: hex, text: light ? '#0E1116' : '#FFFFFF', halo: light ? '#0E1116' : '#FFFFFF' };
+  const ink = textOn(hex);
+  return { id: 'custom', name: 'Custom', stroke: hex, fill: hex, text: ink, halo: ink };
 }

@@ -64,11 +64,6 @@ export function toView(p: Point, view: Rect): Point {
   return [(p[0] - view[0]) / view[2], (p[1] - view[1]) / view[3]];
 }
 
-/** A point of the view as a point of the recording (the inverse of `toView`). */
-export function fromView(p: Point, view: Rect): Point {
-  return [view[0] + p[0] * view[2], view[1] + p[1] * view[3]];
-}
-
 export function rectToView(r: Rect, view: Rect): Rect {
   const [x, y] = toView([r[0], r[1]], view);
   return [x, y, r[2] / view[2], r[3] / view[3]];
@@ -150,10 +145,4 @@ export function frameLayout(frame: Pick<Frame, 'aspect' | 'padding'>, source: Si
   const inner: Rect = [(W - w) / 2, (H - h) / 2, w, h];
   const inset = inner[0] > 0.5 || inner[1] > 0.5;
   return { width: W, height: H, inner, inset };
-}
-
-/** A point on the output as a point on the recording (normalised), for pointer input on a framed canvas. */
-export function outputToRecording(p: Point, layout: FrameLayout): Point {
-  const [x, y, w, h] = layout.inner;
-  return [(p[0] - x) / w, (p[1] - y) / h];
 }
