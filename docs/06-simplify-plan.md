@@ -8,12 +8,14 @@ This plan takes an outside product review (comparing Waypost with FramePin), kee
 
 Nothing is deleted from the engine. The power stays, but it moves out of the way.
 
+**Progressive disclosure is the house pattern.** Wherever a panel has precise or rarely used controls, they sit in a collapsed **Advanced** section at the end of that panel. Closed, it's one line that says what's inside. It stays where it is, so people learn there's more without being shown all of it. The design canvas "Waypost simple editor" shows the step card with Advanced closed (board 2) and open (board 5), and the Hide panel's Advanced (board 3).
+
 ## What we take from the review
 
 | # | Idea | Decision | Why |
 |---|---|---|---|
 | 1 | Steps first, timeline second | **Take, top priority** | It's the change that matters most. A guide is a list of steps, not a stack of lanes. |
-| 2 | Simple hide options first, advanced effects behind "More" | **Take** | Most people just want to hide an email address or a password. |
+| 2 | Simple hide options first, advanced effects behind "Advanced" | **Take** | Most people just want to hide an email address or a password. |
 | 3 | A focused Step inspector | **Take** | Each step becomes the unit you edit: title, instruction, what to point at. |
 | 4 | Quick actions after pinning ("Add callout here", "Highlight", "Zoom here") | **Take** | It turns four clicks into one, and we already know where the click was. |
 | 5 | Duplicate a step, apply a style to all steps | **Take** | SOPs need a consistent look across many similar steps. |
@@ -57,7 +59,7 @@ Selecting a step (or opening a project) shows one simple panel, in this order:
 4. **Zoom**: on or off, with the area set on the canvas.
 5. **Pause**: Short, Medium or Long, instead of seconds.
 
-The Resolve-style rows (slider, number box, reset button, typed timecodes) move under a **More** disclosure in each group. Every value keeps its precise control, but you only see it when you ask for it.
+The Resolve-style rows (slider, number box, reset button, typed timecodes) move under a collapsed **Advanced** section in each group, closed by default and showing a one-line summary of what is inside. Every value keeps its precise control, but you only see it when you ask for it.
 
 ### 3. Quick actions after pinning
 
@@ -75,7 +77,7 @@ Rename the Blur tool **Hide** (keep the X shortcut). Drawing a region asks one q
 
 - **Cover is the default**, because it's the only one that can't leak. Pixelate is strong by default, never subtle.
 - The region lasts until the end of the recording, as now. The Inspector shows *Start*, *End* and *Follow it as it moves* (which sets the keyframes).
-- Effect stacks, layers, fades, darken, desaturate and tint go under **More**. Existing projects keep them.
+- Effect stacks, layers, fades, darken, desaturate and tint go under **Advanced**. Existing projects keep them.
 - Before any export, a short **privacy check** lists every hidden area with a thumbnail at its first and last frame, plus a warning if the recording's own audio is still on. One click jumps to each one. It doesn't block the export.
 
 ### 5. Duplicate and styles
@@ -128,8 +130,8 @@ It never blocks anything and says nothing once the guide is ready.
 ### Phase 3.5 — Simplify (next)
 
 1. Steps-first strip, with the full timeline behind **Trim & edit video** (change 1).
-2. Step inspector with **More** disclosures (change 2).
-3. Hide tool with Cover, Pixelate and Blur, and the advanced options under More (change 4).
+2. Step inspector with **Advanced** sections (change 2).
+3. Hide tool with Cover, Pixelate and Blur, and the advanced options under Advanced (change 4).
 4. Quick actions after pinning (change 3).
 5. Duplicate step and the guide-wide annotation style (change 5).
 6. Preview step and Preview-from-here (change 6).
@@ -165,7 +167,7 @@ It never blocks anything and says nothing once the guide is ready.
 ## What stays exactly as it is
 
 - The renderer, export pipeline, player, `.waypost` files and storage.
-- Every editing feature, reachable from the full timeline and the **More** sections.
+- Every editing feature, reachable from the full timeline and the **Advanced** sections.
 - Keyboard shortcuts.
 
 ## Open questions for the owner
