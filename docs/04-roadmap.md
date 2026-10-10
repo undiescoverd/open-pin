@@ -58,8 +58,9 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 ## Phase 4 — Audio
 
 - F8 narration: keep original audio; import a voice file; record per step in the browser; generate voiceover with Kokoro in a worker (model downloaded on first use, then cached; voice picker with previews).
-- Hold timing driven by narration length; ducking.
-- F20 background music lane with volume, loop, fades and ducking.
+- Hold timing driven by narration length.
+- **Auto-ducking driven by speech detection**: music dips only while someone is actually speaking, detected in recorded and imported narration, in generated voice (Kokoro's output can be analysed, unlike the browser's speech engine), and in the recording's own audio when it's kept.
+- F20 background music lane, always the bottom lane, with volume, loop and fades.
 - Narration and music in the player ("Start guide" overlay to unlock sound) and in MP4.
 
 **Done when** a guide with generated voiceover and background music plays in sync in the player and in the MP4.

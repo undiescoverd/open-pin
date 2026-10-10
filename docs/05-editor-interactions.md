@@ -50,7 +50,7 @@ Defaults and ranges are the tested ones. Units: s = seconds, % = percent, px = p
 | **Music** | start / end | 0 / end of guide | at least 0.5 s long |
 | | volume / mute | 25% / off | 0–100% |
 | | fade in / out | 0 s | 0–10 s |
-| | lower under narration | on, to 35% | 0–100% |
+| | auto-duck under speech | on, to 35%, recovering over 0.5 s | 0–100%; 0.1–2 s |
 
 Narration length is the clip's real length for a recording or an imported file. Generated voice starts as an estimate (0.6 s + 0.38 s per word of the script, or of the title when the script is empty) and takes the measured length the first time it plays. Either is divided by speaking speed. A step whose source is a recording or a file but has no clip yet shows a dashed placeholder bar and adds nothing to the pause. A step's effective pause is `max(hold, voice offset (if > 0) + voice length + 0.4 s)`.
 
@@ -61,13 +61,13 @@ Narration length is the clip's real length for a recording or an imported file. 
 - **Clicking empty space in a timeline lane** selects the step at the playhead (or nothing). It never moves the playhead.
 - **Esc**, in order: leave a drawing tool, then clear the "stopped at a step" state, then leave the Viewer view, then step an annotation or zoom selection back up to its step.
 - **Delete** removes the selection: a zoom (removes the zoom), an annotation, a step, a blur, narration (sets it to none), music, or a gap (closes it).
-- **Select the layer below / above (`⇧K` / `⇧I`):** the lanes are Video, Steps, Effects, Voice, Music. Take the middle of the selected item in time; in the next lane that has items, pick the item that covers that time, or the nearest one. Empty lanes are skipped. With nothing selected, `⇧K` picks the top lane and `⇧I` the bottom. Pauses playback. Stops at the ends.
+- **Select the layer below / above (`⇧K` / `⇧I`):** the lanes are Steps, Effects, Video, Voice, Music. Take the middle of the selected item in time; in the next lane that has items, pick the item that covers that time, or the nearest one. Empty lanes are skipped. With nothing selected, `⇧K` picks the top lane and `⇧I` the bottom. Pauses playback. Stops at the ends.
 
 ## 4. Timeline
 
 ### 4.1 Lanes and the playhead
 
-- Lanes, top to bottom: ruler, Video, Steps, Effects, Voice, Music. Voice stacks into extra rows when items overlap in time; the Effects lane has one row per **layer** (below).
+- Lanes, top to bottom: ruler, Steps, Effects, Video, Voice, Music. Picture lanes sit above sound lanes in the order they draw, as in DaVinci Resolve: the recording at the bottom of the picture, effect layers over it, and steps (with their annotations) on top of everything. Music is always the last lane, however many effect layers there are. Voice stacks into extra rows when items overlap in time; the Effects lane has one row per **layer** (below).
 - **Effects stack, with no limits, as in DaVinci Resolve.** A project has any number of effect regions, any number can be on screen at once, and each region carries its own **effect stack** of any length.
   - **The stack** is edited in the Inspector: add an effect from the list, switch each one on or off, move it earlier or later, change its amount (and colour for Tint and Fill), or remove it. Effects apply from the top of the list down. A region with no effects leaves the recording as it is and shows a dashed outline while editing. The bar names the stack when there's more than one ("Email field · 3 effects"), and its tooltip lists it.
   - **Layers:** each Effects-lane row is a layer, the top row is the top layer, and higher layers draw on top on the canvas. Two regions never overlap in time on one layer: moving or trimming a bar stops at its neighbours on that layer. A new region goes on the lowest layer with room. Dragging a bar up or down moves it to the row under the pointer if it fits there; if that row is taken at that time, a new layer is slotted in just past it; above the top row or below the bottom row makes a new top or bottom layer. The Inspector's Layer group has Bring forward and Send backward (each passes exactly one layer), Bring to front and Send to back. Empty layers are removed straight away.
@@ -167,6 +167,7 @@ An unselected zoom box is selected by its dashed outline only, so it never block
 - **Jumps:** `⌥←` / `⌥→` previous / next **step**. `⇧J` / `⇧L` previous / next **edit**: the nearest of every snap target listed in 4.4 (pins, cuts, gap edges, voice, blur and music starts and ends, the ends). `⌘,` plays from the very start; `⌘.` pauses at the very end. `←` / `→` step one frame; `⇧←` / `⇧→` jump one second.
 - The status chip reads "Playing 2×" or "Rewinding 4×" while shuttling.
 - **Narration plays while playing forward**, from wherever the playhead enters a voice bar. Recorded and imported clips follow the playhead, the playback speed (pitch kept), volume and fades. Generated voice can't seek or fade, so it only starts within 0.35 s of the bar's start and ignores fades. Pausing, stopping at a step, scrubbing or playing backward silences it. `M` turns sound off; the guide preview uses the same setting.
+- **Music plays under everything** while playing forward, looping to fill its bar, at its volume with fades. **Auto-ducking** lowers it while someone is speaking: speech is detected inside recorded and imported narration (20 ms frames above a threshold set between the clip's noise floor and its peaks; pauses under 0.3 s are bridged and blips under 0.12 s ignored), so the music comes back up in the pauses between sentences. Generated voice ducks for its whole bar, because the browser's speech engine doesn't report its pauses. The music eases down 0.2 s before speech and recovers over the "Recover over" time after it. A line on the music bar draws the ducking.
 
 ## 7. Inspector
 
@@ -193,7 +194,7 @@ Every numeric value is one row: **label, reset button, slider, number box with i
 | Gap | Length, close gap |
 | Effect region | Name, **Effects** (the stack, with Add an effect, and the region's opacity), **Layer** (forward, backward, front, back), **Timing** (start, end, length, start/end at playhead, fades), **Position and size** |
 | Narration | **Source** (generated voice, recorded voice, audio file, original audio, none) and its controls: voice, script and Preview; Record with a level meter and a 2-minute cap; choose, replace or remove a file. **Timing** (start, offset, speaking speed, fades), **Audio** (volume, mute) |
-| Music | **Timing** (start, end, length, start/end at playhead, play to the end, fades), **Audio** (volume, mute, lower under narration and by how much) |
+| Music | **Timing** (start, end, length, start/end at playhead, play to the end, fades), **Audio** (volume, mute, use my own music file), **Ducking** (auto-duck under speech, lower to, recover over) |
 
 ## 8. Undo and redo
 
@@ -231,7 +232,7 @@ Keys are matched case-insensitively, so they also work with Caps Lock on. `⌘,`
 
 Written so each can become an automated test in the real editor. The sample project has four steps (timeline times 0:02.10, 0:05.80, 0:10.30, 0:13.90), two clips, two blur regions and narration on every step.
 
-1. Clicking in the Video, Steps, Effects, Voice or Music lane leaves the playhead where it was; clicking the ruler moves it.
+1. Clicking in the Steps, Effects, Video, Voice or Music lane leaves the playhead where it was; clicking the ruler moves it.
 2. Dragging a blur bar's left edge changes only its start; dragging its body moves both edges.
 3. With snapping on, dragging a bar's edge to within 8 px of a pin makes it equal that pin's time exactly and shows the amber line; with `Alt` held it does not snap.
 4. Dragging a voice bar's right edge changes the speaking speed and keeps the start; the left edge keeps the end.
@@ -254,10 +255,13 @@ Written so each can become an automated test in the real editor. The sample proj
 21. Adding ten effect regions at the same playhead gives twelve bars with twelve different names; the Effects lane stays four rows tall, scrolls, labels itself "12 effects", and the canvas keeps its size. Deleting one and adding another still gives unique names.
 22. Adding Tint, Desaturate, Solid fill and Blur to the Email field region gives a stack of six that the canvas applies in list order; moving Blur to the top, switching Solid fill off, and changing Tint's colour and strength each change the canvas at once; ⌘Z undoes each.
 23. With five overlapping regions, Send to back puts the selected one on layer 1 and lifts the rest; Bring to front puts it on top; Send backward then passes exactly one layer; no layer is ever empty; regions on the same layer never overlap in time, even when a bar is dragged into a neighbour.
+24. The lanes read Steps, Effects, Video, Voice, Music, and Music stays last with nine effect layers; `⇧K` from a step walks to an effect, then a clip, then a narration.
+25. Playing from a step with generated narration and the sample music at 25%: the music plays at 25% × 35% while the narration speaks and returns to 25% after it; pausing stops it.
+26. Importing a narration that talks, pauses for 1.2 s and talks again: playing through it, the music dips, rises back to full in the pause, and dips again; the line on the music bar shows both dips. Turning auto-duck off removes the line; ⌘Z works straight after toggling the switch.
 
 ## Gaps the mockup does not cover
 
-- **Only narration makes sound.** Music, the clip audio and ducking are stored and shown but not played. Generated voice is the browser's speech engine (Kokoro in the app), so it varies by device and can't seek or fade. Recording needs microphone access, which an embedded or published copy of the mockup may not get.
+- **Narration and music make sound; the recording's own audio doesn't** (the sample recording has none), so speech isn't detected in it yet. The guide preview plays narration but not music. Generated voice is the browser's speech engine (Kokoro in the app), so it varies by device and can't seek or fade. Recording needs microphone access, which an embedded or published copy of the mockup may not get.
 - **The preview player ignores gaps.** It steps between pinned steps rather than playing the timeline, so gaps and speed changes don't show there yet; exports must honour them.
 - **Effects are approximated** with CSS backdrop filters, so in the mockup filters always run before tints and fills whatever their place in the stack. The real renderer must apply the stack strictly in order. It must be a true, irreversible redaction in the renderer and in every export, and blur regions should get keyframes (F7).
 - **No clip reordering**, no ripple delete of a range, and no keyboard nudging of timeline items (the Inspector's typed fields are the keyboard route).

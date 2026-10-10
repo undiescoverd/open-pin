@@ -279,7 +279,7 @@ Waypost replaces all of it with one purchase: every feature, no plan limits, no 
 
 **What it does (from the screenshot).** An "ADD BACKGROUND AUDIO" timeline lane.
 
-**How Waypost does it.** A music lane with one audio file: volume, loop, fade in/out, and automatic **ducking** under narration. Mixed into MP4. In the player, music loops quietly while the guide is open, ducks during step narration, and stops when the viewer pauses or leaves.
+**How Waypost does it.** A music lane, always the bottom lane, with one audio file: volume, loop, fade in/out, and **auto-ducking**: speech is detected in the narration (and in the recording's own audio when it's kept), so the music dips only while someone is actually talking and comes back up in the pauses. Mixed into MP4. In the player, music loops quietly while the guide is open, ducks during step narration, and stops when the viewer pauses or leaves.
 
 ## F21 — Snapshot
 
