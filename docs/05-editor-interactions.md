@@ -61,13 +61,13 @@ Narration length is the clip's real length for a recording or an imported file. 
 - **Clicking empty space in a timeline lane** selects the step at the playhead (or nothing). It never moves the playhead.
 - **Esc**, in order: leave a drawing tool, then clear the "stopped at a step" state, then leave the Viewer view, then step an annotation or zoom selection back up to its step.
 - **Delete** removes the selection: a zoom (removes the zoom), an annotation, a step, a blur, narration (sets it to none), music, or a gap (closes it).
-- **Select the layer below / above (`⇧K` / `⇧I`):** the lanes are Steps, Effects, Video, Voice, Music. Take the middle of the selected item in time; in the next lane that has items, pick the item that covers that time, or the nearest one. Empty lanes are skipped. With nothing selected, `⇧K` picks the top lane and `⇧I` the bottom. Pauses playback. Stops at the ends.
+- **Select the layer below / above (`⇧K` / `⇧I`):** the lanes are Steps, Video, Effects, Voice, Music. Take the middle of the selected item in time; in the next lane that has items, pick the item that covers that time, or the nearest one. Empty lanes are skipped. With nothing selected, `⇧K` picks the top lane and `⇧I` the bottom. Pauses playback. Stops at the ends.
 
 ## 4. Timeline
 
 ### 4.1 Lanes and the playhead
 
-- Lanes, top to bottom: ruler, Steps, Effects, Video, Voice, Music. Picture lanes sit above sound lanes in the order they draw, as in DaVinci Resolve: the recording at the bottom of the picture, effect layers over it, and steps (with their annotations) on top of everything. Music is always the last lane, however many effect layers there are. Voice stacks into extra rows when items overlap in time; the Effects lane has one row per **layer** (below).
+- Lanes, top to bottom: ruler, Steps, Video, Effects, Voice, Music. Steps are always the top lane and Music always the last, however many effect layers there are; picture lanes (Steps, Video, Effects) sit above sound lanes (Voice, Music), as in DaVinci Resolve. On the canvas, effects still draw over the recording and steps' annotations over both. Voice stacks into extra rows when items overlap in time; the Effects lane has one row per **layer** (below).
 - **Effects stack, with no limits, as in DaVinci Resolve.** A project has any number of effect regions, any number can be on screen at once, and each region carries its own **effect stack** of any length.
   - **The stack** is edited in the Inspector: add an effect from the list, switch each one on or off, move it earlier or later, change its amount (and colour for Tint and Fill), or remove it. Effects apply from the top of the list down. A region with no effects leaves the recording as it is and shows a dashed outline while editing. The bar names the stack when there's more than one ("Email field · 3 effects"), and its tooltip lists it.
   - **Layers:** each Effects-lane row is a layer, the top row is the top layer, and higher layers draw on top on the canvas. Two regions never overlap in time on one layer: moving or trimming a bar stops at its neighbours on that layer. A new region goes on the lowest layer with room. Dragging a bar up or down moves it to the row under the pointer if it fits there; if that row is taken at that time, a new layer is slotted in just past it; above the top row or below the bottom row makes a new top or bottom layer. The Inspector's Layer group has Bring forward and Send backward (each passes exactly one layer), Bring to front and Send to back. Empty layers are removed straight away.
@@ -232,7 +232,7 @@ Keys are matched case-insensitively, so they also work with Caps Lock on. `⌘,`
 
 Written so each can become an automated test in the real editor. The sample project has four steps (timeline times 0:02.10, 0:05.80, 0:10.30, 0:13.90), two clips, two blur regions and narration on every step.
 
-1. Clicking in the Steps, Effects, Video, Voice or Music lane leaves the playhead where it was; clicking the ruler moves it.
+1. Clicking in the Steps, Video, Effects, Voice or Music lane leaves the playhead where it was; clicking the ruler moves it.
 2. Dragging a blur bar's left edge changes only its start; dragging its body moves both edges.
 3. With snapping on, dragging a bar's edge to within 8 px of a pin makes it equal that pin's time exactly and shows the amber line; with `Alt` held it does not snap.
 4. Dragging a voice bar's right edge changes the speaking speed and keeps the start; the left edge keeps the end.
@@ -255,7 +255,7 @@ Written so each can become an automated test in the real editor. The sample proj
 21. Adding ten effect regions at the same playhead gives twelve bars with twelve different names; the Effects lane stays four rows tall, scrolls, labels itself "12 effects", and the canvas keeps its size. Deleting one and adding another still gives unique names.
 22. Adding Tint, Desaturate, Solid fill and Blur to the Email field region gives a stack of six that the canvas applies in list order; moving Blur to the top, switching Solid fill off, and changing Tint's colour and strength each change the canvas at once; ⌘Z undoes each.
 23. With five overlapping regions, Send to back puts the selected one on layer 1 and lifts the rest; Bring to front puts it on top; Send backward then passes exactly one layer; no layer is ever empty; regions on the same layer never overlap in time, even when a bar is dragged into a neighbour.
-24. The lanes read Steps, Effects, Video, Voice, Music, and Music stays last with nine effect layers; `⇧K` from a step walks to an effect, then a clip, then a narration.
+24. The lanes read Steps, Video, Effects, Voice, Music, and Music stays last with nine effect layers; `⇧K` from a step walks to a clip, then an effect, then a narration.
 25. Playing from a step with generated narration and the sample music at 25%: the music plays at 25% × 35% while the narration speaks and returns to 25% after it; pausing stops it.
 26. Importing a narration that talks, pauses for 1.2 s and talks again: playing through it, the music dips, rises back to full in the pause, and dips again; the line on the music bar shows both dips. Turning auto-duck off removes the line; ⌘Z works straight after toggling the switch.
 

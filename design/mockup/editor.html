@@ -1711,8 +1711,8 @@ function renderTimeline() {
   tlInner.innerHTML =
     `<div class="tl-row ruler"><div class="tl-label"></div><div class="tl-lane" data-scrub>${ticks}</div></div>` +
     `<div class="tl-row"><div class="tl-label">${icon('pin')}Steps</div><div class="tl-lane track">${pins}</div></div>` +
-    stackRow('blur', 'Effects', nL, blurs, doc.blurs.length, ['effect', 'effects'], `<button class="lane-plus" data-act="add-blur" aria-label="Add an effect at the playhead" data-tip="Add an effect region at the playhead. Or press X and drag over the frame.">${icon('plus')}</button>`) +
     `<div class="tl-row"><div class="tl-label">${icon('film')}Video</div><div class="tl-lane track">${gaps}${clips}</div></div>` +
+    stackRow('blur', 'Effects', nL, blurs, doc.blurs.length, ['effect', 'effects'], `<button class="lane-plus" data-act="add-blur" aria-label="Add an effect at the playhead" data-tip="Add an effect region at the playhead. Or press X and drag over the frame.">${icon('plus')}</button>`) +
     stackRow('mic', 'Voice', vp.n, voices, vs.length, ['narration', 'narrations'], '') +
     `<div class="tl-row"><div class="tl-label">${icon('music')}Music</div><div class="tl-lane track">${music}</div></div>` +
     `<div class="snap-line" id="snap-line" hidden></div><div class="playhead" id="playhead"></div>`;
@@ -1813,8 +1813,8 @@ function jumpEdit(dir) {
 function timelineLanes() {
   return [
     { kind:'step', items: doc.steps.map(s => { const t = srcToTl(s.t); return { id:s.id, span:[t, t] }; }) },
-    { kind:'blur', items: doc.blurs.map(b => ({ id:b.id, span:blurSpan(b) })) },
     { kind:'clip', items: doc.clips.map(c => ({ id:c.id, span:[srcToTl(c.in), srcToTl(c.out)] })) },
+    { kind:'blur', items: doc.blurs.map(b => ({ id:b.id, span:blurSpan(b) })) },
     { kind:'voice', items: doc.steps.filter(s => narrDur(s) > 0).map(s => ({ id:s.id, span:voiceSpan(s) })) },
     { kind:'music', items: doc.music ? [{ id:'music', span:musicSpan() }] : [] },
   ];
