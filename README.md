@@ -2,16 +2,20 @@
 
 A web app that turns screen recordings into interactive, click-through product guides, with MP4, PDF and screenshot exports too. It's an alternative to [FramePin](https://framepin.com/) that you buy once instead of subscribing to.
 
-**Status:** Phase 1 of the [roadmap](docs/04-roadmap.md) is built: open a recording, pin steps, annotate them, keep your work, and export a PDF or screenshots. Editing (trim, speed, blur, zoom, framing), MP4 export, the interactive player, audio and publishing arrive in later phases. The full designed behaviour lives in the [clickable mockup](design/mockup/editor.html).
+**Status:** Phases 1 and 2 of the [roadmap](docs/04-roadmap.md) are built: open a recording, edit it, pin and annotate steps, hide what needs hiding, frame it, and export a PDF, screenshots or an MP4. The interactive player, audio and publishing arrive in later phases. The full designed behaviour lives in the [clickable mockup](design/mockup/editor.html).
 
-## What works today (Phase 1)
+## What works today
 
 - Drop in or choose a recording (MP4, MOV, WebM or MKV). It's copied into this browser's private storage; nothing is uploaded.
 - Frame-exact preview with a transport (Space or K, L and J for faster or backward playback that stops at every step, arrow keys for single frames) and a millisecond timecode.
 - Pin the moments that matter: the Pin tool (P) drops a step and a click marker where you click, and "+ Pin step" (⇧P) pins the frame you're on.
-- Give each step a title and a note, and add callouts, arrows, spotlights and boxes. Move and resize them on the frame or type exact positions in the Inspector.
+- Give each step a title and a note, and add callouts, arrows, spotlights and boxes that appear with the step or after it, group by group. Move and resize them on the frame or type exact positions in the Inspector.
+- **Edit the recording:** split with R, trim clip edges with or without ripple (⇧R), set each clip's speed (¼× to 8×) and volume, and close or size the gaps. Steps stay on their frames whatever you cut, and a trim stops at a pinned step.
+- **Hide things:** the Blur tool (X) draws an effect region that lasts from the playhead to the end. Each region has its own stack of effects (pixelate, blur, darken, desaturate, tint, solid fill) applied in order, sits on a layer of the Effects lane as in DaVinci Resolve, and follows what it hides with keyframes. Effects are burned into every export.
+- **Zoom in** on part of the frame at a step with the Zoom tool (Z); the Viewer view shows the step the way the guide will.
+- **Frame it:** put the recording on a colour, gradient or image with padding, rounded corners and a shadow, in its own shape or 16:9, 4:3, 1:1 or 4:5, and add your logo in a corner.
 - Undo and redo (⌘Z, ⇧⌘Z), autosave, a project list, and `.waypost` files you can save, move to another computer and open again.
-- Export a PDF (A4, Letter or 16:9), PNG or WebP screenshots in a zip, or copy or save the frame on screen. Exports use the same renderer as the canvas, so they match it pixel for pixel.
+- Export an MP4 (720p to 4K) that pauses on every step with its zoom, annotations and title, with the recording's sound; a PDF (A4, Letter or 16:9); PNG or WebP screenshots in a zip; or copy or save the frame on screen. Every export uses the same renderer as the canvas.
 
 The editor needs Chrome, Edge, Brave or Arc on a computer (WebCodecs, private file storage). Other browsers see a notice.
 
@@ -50,10 +54,10 @@ pnpm tokens       # regenerate the CSS after editing design/tokens.json
 |---|---|
 | `apps/editor` | The editor web app (Vite, React 19, Tailwind 4) and its Playwright tests |
 | `packages/ui` | PinKit: generated token CSS plus `Button`, `IconButton`, `Tooltip`, `KeyCap`, `Surface`, `Icon`, `Dialog`, `Menu` and the inspector's form controls |
-| `packages/core` | The project model: schema (Zod), time mapping, commands with undo and redo, timecodes. No DOM |
-| `packages/render` | The canvas renderer for annotations, shared by the editor and every export |
+| `packages/core` | The project model: schema (Zod), time mapping, clip editing, effect layers, the export plan, commands with undo and redo, timecodes. No DOM |
+| `packages/render` | The compositor: framing, effect regions, zoom, annotations, logo and captions, shared by the editor and every export |
 | `packages/media` | Reads recordings with Mediabunny in a worker: the time of every frame, exact frame reads |
-| `packages/export` | PNG and WebP zips and the PDF |
+| `packages/export` | PNG and WebP zips, the PDF, and MP4 in an export worker |
 | `packages/player`, `tts` | Empty until their roadmap phase |
 | `design/tokens.json` | Colours, type, radii and motion for both themes; `scripts/build-tokens.mjs` turns it into CSS |
 

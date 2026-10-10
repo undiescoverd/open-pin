@@ -566,6 +566,29 @@ test.describe('Phase 2: MP4 export', () => {
     expect(errors).toEqual([]);
   });
 
+  test("the recording's sound goes into the MP4, and can be left out", async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles('e2e/fixtures/demo-sound.webm');
+    await waitForFrame(page);
+    await seekTo(page, 1);
+    await page.keyboard.press('Shift+P');
+    const exportOnce = async (sound: boolean) => {
+      await page.getByRole('button', { name: 'Export' }).click();
+      await page.getByRole('menuitem', { name: 'MP4 video…' }).click();
+      await page.getByRole('group', { name: 'Size' }).getByRole('button', { name: '720p' }).click();
+      const toggle = page.getByRole('switch', { name: "The recording's own sound" });
+      if ((await toggle.getAttribute('aria-checked')) !== String(sound)) await toggle.click();
+      const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('dialog').getByRole('button', { name: 'Export', exact: true }).click()]);
+      return readFile((await download.path())!);
+    };
+    /* an audio track's sample entry names its codec: mp4a for AAC, Opus for Opus */
+    const hasAudio = (file: Buffer) => file.includes('mp4a') || file.includes('Opus');
+    expect(hasAudio(await exportOnce(true))).toBe(true);
+    await expect(page.getByRole('status').filter({ hasText: /and (AAC|Opus)\)/ })).toBeVisible();
+    expect(hasAudio(await exportOnce(false))).toBe(false);
+  });
+
   test('Cancel stops an export and leaves no file', async ({ page }) => {
     await openRecording(page);
     await seekTo(page, 1);
