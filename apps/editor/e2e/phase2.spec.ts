@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { blurAlphaAt, blurRectAt, exportPlan, frameLayout, parseProject, planAt, tlToSrc, type Project } from '@waypost/core';
 import { readFile } from 'node:fs/promises';
-import { dragOnFrame, frameBox, openRecording, playheadSeconds, seekTo, waitForFrame, watchErrors } from './helpers';
+import { dragOnFrame, frameBox, openRecording, playheadSeconds, seekTo, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
 
 /** The Phase 2 acceptance tests (docs/04-roadmap.md, "Phase 2 — Edit and polish"; the checks in docs/05-editor-interactions.md,
     section 10). The fixture is 6 seconds long, 640 × 400, at 30 fps. */
@@ -371,6 +371,56 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     const edit = await canvasHash(page, [0, 0, 1, 1]);
     await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Viewer' }).click();
     await expect.poll(() => canvasHash(page, [0, 0, 1, 1])).not.toBe(edit);
+  });
+
+  /** A zoomed step shown the Viewer's way, paused on its frame, with the zoom fully in. */
+  async function zoomedViewerStep(page: Page): Promise<void> {
+    await openRecording(page);
+    await seekTo(page, 2);
+    await page.keyboard.press('p');
+    const frame = await frameBox(page);
+    await page.mouse.click(frame.x + frame.width * 0.5, frame.y + frame.height * 0.5);
+    await page.keyboard.press('z');
+    await dragOnFrame(page, [0.3, 0.3], [0.75, 0.75]);
+    await expect(page.getByRole('heading', { name: 'Zoom' })).toBeVisible();
+    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Viewer' }).click();
+    /* the entrance has finished once the yellow bar sits near the left edge (it is a third of the way across when not zoomed) */
+    await expect.poll(async () => (await watchYellowEdge(page, 60)).at(-1)!, { timeout: 5000 }).toBeLessThan(0.12);
+  }
+
+  /** Readings during an exit must start zoomed in, end with the whole frame, pass through values in between, and never go back. */
+  function expectEasedOut(edges: number[]): void {
+    expect(edges.every(e => !Number.isNaN(e))).toBe(true);
+    expect(edges[0]!).toBeLessThan(0.12);
+    expect(edges.at(-1)!).toBeGreaterThan(0.31);
+    expect(edges.filter(e => e > 0.14 && e < 0.29).length).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < edges.length; i++) expect(edges[i]!).toBeGreaterThanOrEqual(edges[i - 1]! - 0.01);
+  }
+
+  test('switching from the Viewer back to Edit eases out of the zoom instead of cutting', async ({ page }) => {
+    await zoomedViewerStep(page);
+    const watching = watchYellowEdge(page, 900);
+    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Edit' }).click();
+    expectEasedOut(await watching);
+  });
+
+  test('Play from a zoomed step eases out of the zoom as the recording carries on', async ({ page }) => {
+    await zoomedViewerStep(page);
+    /* the exit takes half a second; much longer and the fixture's moving streak reaches the row being read */
+    const watching = watchYellowEdge(page, 800);
+    await page.getByRole('button', { name: 'Play', exact: true }).click();
+    expectEasedOut(await watching);
+    expect(await playheadSeconds(page)).toBeGreaterThan(2.3);
+  });
+
+  test('moving the playhead somewhere else cuts at once: only leaving in place eases', async ({ page }) => {
+    await zoomedViewerStep(page);
+    const watching = watchYellowEdge(page, 400);
+    await page.keyboard.press('ArrowRight');
+    const edges = await watching;
+    /* a step further along is not a zoomed step, so the very next readings are already the whole frame */
+    expect(edges.slice(-5).every(e => e > 0.31)).toBe(true);
+    expect(edges.filter(e => e > 0.14 && e < 0.29).length).toBeLessThanOrEqual(1);
   });
 
   test('framing changes the output; a logo is stored with the project and comes back after a reload', async ({ page }) => {

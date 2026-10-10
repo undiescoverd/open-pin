@@ -1,52 +1,31 @@
-import { Button, Icon, IconButton, KeyCap, Segmented, Surface, cx } from '@waypost/ui';
+import { Button, Icon, KeyCap, cx } from '@waypost/ui';
 import { Film, Loader2 } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
-import { currentPlayback } from '../engine/session';
 import { checkSupport } from '../engine/support';
 import { openFile } from '../state/project';
-import { selectProject, setTool, setView, useEditor } from '../state/store';
+import { useEditor } from '../state/store';
 import { CanvasView } from './CanvasView';
-import { TOOLS } from './tools';
+import { Dock } from './Dock';
 
-/* The canvas column: the floating tool palette over the frame. With no recording open the frame is the drop zone. */
+/* The canvas column. Its top edge is the top edge of the Steps and Inspector panels, so the frame gets all the height there is.
+   With no recording open the frame is the drop zone. The tools sit in the dock under the frame (Dock). */
 export function Stage() {
-  const tool = useEditor(s => s.tool);
   const phase = useEditor(s => s.phase);
   const busy = useEditor(s => s.busy);
-  const view = useEditor(s => s.view);
 
   return (
-    <main className="flex min-h-0 min-w-0 flex-col items-center gap-3 [grid-area:stage]" aria-label="Canvas">
-      <div className="flex max-w-full items-center gap-2">
-        <Surface variant="floating" role="toolbar" aria-label="Tools" className="flex max-w-full gap-0.5 overflow-x-auto p-1">
-          {TOOLS.map(t => (
-            <IconButton
-              key={t.id}
-              label={t.label}
-              shortcut={[t.key]}
-              icon={<Icon icon={t.icon} />}
-              pressed={tool === t.id}
-              disabled={phase !== 'ready'}
-              onClick={() => setTool(t.id)}
-              aria-label={t.label}
-            />
-          ))}
-        </Surface>
-        <Surface variant="floating" className="p-1">
-          <Segmented
-            label="View"
-            hideLabel
-            options={[
-              { value: 'edit', label: 'Edit', title: 'Every annotation, with handles' },
-              { value: 'viewer', label: 'Viewer', title: 'The step as the guide shows it: zoomed, groups appearing in order' },
-            ]}
-            value={view}
-            disabled={phase !== 'ready'}
-            onChange={setView}
-          />
-        </Surface>
-      </div>
-      {phase === 'ready' ? <Workspace /> : <DropZone loading={phase === 'loading'} />}
+    <main className="flex min-h-0 min-w-0 flex-col [grid-area:stage]" aria-label="Canvas">
+      {phase === 'ready' ? (
+        <Workspace />
+      ) : (
+        <>
+          <DropZone loading={phase === 'loading'} />
+          {/* the tools wait for a recording, in the same place */}
+          <div className="mt-2 shrink-0">
+            <Dock />
+          </div>
+        </>
+      )}
       {busy && <BusyOverlay text={busy} />}
       <ExportOverlay />
     </main>
@@ -55,53 +34,9 @@ export function Stage() {
 
 function Workspace() {
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-2">
-      <CanvasView />
-      <StatusChip />
-    </div>
-  );
-}
-
-/** What the canvas is waiting for, or what just happened: one line under the frame. */
-function StatusChip() {
-  const message = useEditor(s => s.message);
-  const rate = useEditor(s => s.playback.rate);
-  const stoppedAt = useEditor(s => s.playback.stoppedAt);
-  const tool = useEditor(s => s.tool);
-  const project = useEditor(selectProject);
-  const stepNumber = stoppedAt && project ? project.steps.findIndex(s => s.id === stoppedAt) + 1 : 0;
-  const hint = TOOLS.find(t => t.id === tool)?.hint ?? '';
-
-  let text = '';
-  let tone: 'plain' | 'waiting' | 'error' = 'plain';
-  if (message) {
-    text = message.text;
-    tone = message.tone === 'error' ? 'error' : 'plain';
-  } else if (rate !== 0) text = `${rate > 0 ? 'Playing' : 'Rewinding'}${Math.abs(rate) === 1 ? '' : ` ${Math.abs(rate)}×`}`;
-  else if (stoppedAt && stepNumber > 0) {
-    text = `Stopped at step ${stepNumber}`;
-    tone = 'waiting';
-  } else if (tool !== 'select') text = hint;
-
-  return (
-    <div className="flex min-h-8 justify-center">
-      <div
-        role="status"
-        aria-live="polite"
-        className={cx(
-          'flex max-w-full items-center gap-2 rounded-pill border px-3 py-1 text-sm',
-          tone === 'error' ? 'border-danger text-danger' : tone === 'waiting' ? 'border-pin-line bg-pin-tint text-fg' : 'border-line bg-panel text-fg-muted',
-          !text && 'invisible',
-        )}
-      >
-        <span>{text || ' '}</span>
-        {tone === 'waiting' && (
-          <Button size="sm" variant="primary" onClick={() => currentPlayback()?.toggle()}>
-            Continue
-          </Button>
-        )}
-      </div>
-    </div>
+    <CanvasView>
+      <Dock />
+    </CanvasView>
   );
 }
 

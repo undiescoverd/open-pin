@@ -294,12 +294,18 @@ export function Segmented<T extends string>({ label, hideLabel, options, value, 
             disabled={disabled}
             onClick={() => onChange(o.value)}
             className={cx(
-              'h-7 min-w-0 flex-1 rounded-sm px-2 text-sm whitespace-nowrap text-fg-muted hover:text-fg disabled:cursor-not-allowed disabled:text-fg-disabled',
+              'h-7 min-w-fit flex-1 rounded-sm px-2 text-sm whitespace-nowrap text-fg-muted hover:text-fg disabled:cursor-not-allowed disabled:text-fg-disabled',
               'aria-pressed:bg-panel aria-pressed:font-semibold aria-pressed:text-fg aria-pressed:shadow-sm',
               focusRing,
             )}
           >
-            {o.label}
+            {/* the selected option is bolder; an invisible bold copy reserves that width so the label never overflows or shifts */}
+            <span className="inline-grid">
+              <span className="col-start-1 row-start-1">{o.label}</span>
+              <span aria-hidden="true" className="invisible col-start-1 row-start-1 font-semibold">
+                {o.label}
+              </span>
+            </span>
           </button>
         ))}
       </div>
