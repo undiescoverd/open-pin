@@ -2,6 +2,8 @@
 
 Build order for the Waypost web app. Each phase ends with something usable, and later phases never block earlier ones. Feature IDs (F1–F22) refer to [01-feature-analysis.md](01-feature-analysis.md).
 
+> **Re-planned after Phase 3.** [06-simplify-plan.md](06-simplify-plan.md) adds a Simplify phase next and reorders Phases 4 to 6 around documentation and SOPs. Where the two disagree, that plan wins.
+
 ## Phase 0 — Scaffold
 
 - pnpm monorepo: `apps/editor`, `packages/{core,render,media,export,player,tts,ui}`.
