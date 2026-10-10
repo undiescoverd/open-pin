@@ -33,6 +33,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Player size budget (under 60 KB gzipped)
+        run: pnpm --filter @waypost/player size
       - uses: actions/upload-artifact@v4
         with:
           name: editor-dist

@@ -60,6 +60,8 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 
 ## Phase 3 — Interactive guide
 
+**Status: built, tested in Chromium only.** The acceptance tests are in `apps/editor/e2e/phase3.spec.ts`. Safari, Firefox and iPhone Safari still need a check on real browsers before the "done when" below is fully met; see [Phase 3 as built](#phase-3-as-built).
+
 - `@waypost/player`: state machine, segment/still swap, annotations via `@waypost/render`, controls, keyboard, `aria-live`, reduced motion, Shadow DOM, `[data-waypost]` auto-mount, lazy loading.
 - F9 branding and playback modes; F10 CTA.
 - Guide bundle export (folder via the File System Access API, or zip): segments, stills, `guide.json`, `index.html`, compressed `guide.pdf`.
@@ -67,6 +69,24 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 - In-editor preview using the same player.
 
 **Done when** an exported folder dropped on any static host plays correctly in Safari, Chrome and Firefox (including iPhone Safari), embedded in a plain HTML page *and* inside a React app, with the player under 60 KB gzipped.
+
+### Phase 3 as built
+
+- **What the tests cover.** A three-step guide is exported as a zip, served from a plain static host (with byte ranges, as real hosts serve video) and played in Chromium: the standalone page from the start card to the end card, with the segments really playing from their files; the two-line embed in a page whose own CSS would break an unprotected widget; a phone-sized screen with touch and reduced motion; and a React app that mounts the guide, re-renders and navigates away. Preview is tested in guided, auto (with pause) and video modes.
+- **Not yet tested: Safari, Firefox and iPhone Safari.** Only Chromium runs in this environment and in CI. The player uses only what those browsers have (`<video>`, canvas 2D with `roundRect`, Shadow DOM, container queries, `ResizeObserver`, `IntersectionObserver`). `requestVideoFrameCallback` is used where it exists, and the `playing` event stands in elsewhere. A manual pass on real devices is still owed.
+- **Player size:** 13.7 KB gzipped, renderer included. `pnpm build` fails over 60 KB, and CI reports it as its own step.
+- **Stills are the recording alone.** `steps/<id>.webp` is the pinned frame with its effect regions burned in, but without framing or logo, at the recording's size (up to 2560 px wide). The player composes the framing, logo, zoom and annotations with `@waypost/render`, so the zoom stays sharp and eases in as in the editor. The architecture doc had framing and logo baked into the still, which would have zoomed the background and logo along with the recording. Segments and `poster.webp` do have framing, effects and logo baked in, so the swap from motion to still lines up.
+- **Codecs.** Segments are H.264 where the browser can encode it (Chrome and Edge on Mac and Windows). Chromium on Linux falls back to VP9 in the same MP4, which Chrome and Firefox play but Safari may not; the export says so when it happens.
+- **Segments are silent.** Muted, inline video plays everywhere without a tap, iPhone included. Sound in the guide (narration, music, the recording's own audio) comes with Phase 4, along with the "Start guide" tap that unlocks it.
+- **Reveal groups appear on a timer** (0.6 s apart, as in the editor's Viewer view), not one per click.
+- **Auto and video modes** stay on each step for its pause (and never less than its entrance plus 0.6 s). Both have a pause button. Video mode's progress bar fills in time, with the steps marked where they come.
+- **Call to action** shows on the end card, or in the control bar from a chosen step onward and on the end card. It is outlined in the accent colour in the bar, so Next stays the main button. Click events for analytics come with Phase 5.
+- **Fullscreen** is the player's element going fullscreen. iPhone has no element fullscreen, so the button hides there.
+- **Preview** runs the same player with the same stills, but the motion between steps is the recording drawn live on the player's canvas, as the editor plays it, rather than the encoded segment files. That lets it open at once without encoding anything.
+- **Folder export** uses the File System Access API (Chromium), writing a `<guide-name>` folder inside the folder you pick and clearing old stills and segments there. Other browsers get a zip. Playwright can't drive the folder picker, so only the zip path has an automated test.
+- **The player checks `guide.json` by hand** (schema version, sizes, steps, paths inside the folder, web-only call-to-action links) rather than with Zod, which would take a large share of the size budget. The editor validates every `guide.json` it writes against the full schema.
+- **On a phone**, annotation text scales with the picture like everything else, so a callout is small on a narrow screen. Its text is also read out through the live region.
+- **Cross-origin embeds:** when the page and the guide are on different sites, the guide's host must send `Access-Control-Allow-Origin` for the player to fetch `guide.json` and the fonts. GitHub Pages does; `embed.txt` says to use the iframe otherwise.
 
 ## Phase 4 — Audio
 

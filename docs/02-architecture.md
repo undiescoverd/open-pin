@@ -115,10 +115,12 @@ Onboarding.waypost  (zip)
   "logo": { "image": "assets/logo.svg", "corner": "br", "size": 0.08, "opacity": 0.9 },
   "audio": { "keepOriginal": true, "music": { "file": "audio/music.mp3", "volume": 0.25, "duck": true } },
   "guide": {
-    "playback": { "mode": "guided", "controls": ["prev", "next", "counter", "progress", "fullscreen"] },
-    "branding": { "accent": "#FF5A4E", "chrome": "auto" },
-    "cta": { "label": "Start free trial", "url": "https://example.com/signup", "showAt": "end" },
-    "analytics": { "endpoint": null }
+    "mode": "guided",
+    "controls": { "counter": true, "progress": true, "fullscreen": true },
+    "accent": "#D13A30",
+    "chrome": "auto",
+    "cta": { "label": "Start free trial", "url": "https://example.com/signup", "newTab": true, "showAt": "end" },
+    "address": "https://you.github.io/guides/onboarding/"
   }
 }
 ```
@@ -141,7 +143,7 @@ Keeping the UI smooth while decoding 4K video means heavy work stays off the mai
 |---|---|
 | Main | React UI, canvas interactions, preview `<video>`, drawing the current frame |
 | Media worker | Import, frame index, thumbnails, exact frame reads for pause/scrub |
-| Export worker | PNG/WebP/PDF/MP4 rendering on an `OffscreenCanvas`, encoding, zipping; reports progress, supports cancel |
+| Export worker | MP4 and the guide's stills, poster and segments: rendering on an `OffscreenCanvas` and encoding, written into the private file system; reports progress, supports cancel (stills, the PDF and zipping run on the main thread) |
 | TTS worker | Kokoro model loading and speech generation |
 
 Workers are called through Comlink, so they look like async functions.
@@ -169,11 +171,12 @@ Workers are called through Comlink, so they look like async functions.
  └───────┬─────────────────┬────────────────┬───────────────┬────┘
          ▼                 ▼                ▼               ▼
    Editor canvas     MP4 export       Stills: PNG/WebP   Guide bundle
-   (main thread)     (worker; H.264/  (convertToBlob)    (worker: steps 1–3 + 5 baked
-                     HEVC via Media-   PDF (pdf-lib)      into seg/*.mp4 and steps/*.webp;
-                     bunny + audio                        player draws step 4 live with
-                     from Offline-                        the SAME render package)
-                     AudioContext)
+   (main thread)     (worker; H.264   (convertToBlob)    (worker: steps 1, 2 and 5 baked
+                     via Mediabunny,  PDF (pdf-lib)      into seg/*.mp4 and poster.webp;
+                     the recording's                     steps/*.webp are step 2 alone;
+                     own sound)                          the player draws 1 and 3–5 on
+                                                         them live with the SAME render
+                                                         package)
 ```
 
 Annotation text uses a bundled Figtree font (WOFF2), so canvas output is identical on every OS.
@@ -190,13 +193,18 @@ Annotation text uses a bundled Figtree font (WOFF2), so canvas output is identic
 
 ```
 <guide-slug>/
-├─ index.html            standalone page (also the iframe target)
+├─ index.html            standalone page (also the iframe target), linking the PDF copy
 ├─ player.js             @waypost/player (includes @waypost/render)
-├─ guide.json            schema "waypost.guide/1": steps, annotations, branding, cta, analytics
-├─ guide.pdf             compressed PDF copy
-├─ steps/<step-id>.webp  exact pinned frame (framing/blur/logo baked in, no annotations)
-├─ seg/<step-id>.mp4     motion leading into the step (H.264 for universal playback), ≤1920 px wide by default
-└─ audio/<step-id>.m4a   optional narration (+ audio/music.m4a)
+├─ guide.json            schema "waypost.guide/1": steps, annotations, zoom, framing, logo, playback, branding, cta
+├─ guide.pdf             compressed PDF copy (optional)
+├─ embed.txt             how to host the folder, and the link, two-line embed and iframe snippets
+├─ poster.webp           the first frame, framed, behind the start card
+├─ steps/<step-id>.webp  exact pinned frame, effect regions burned in, no framing, logo or annotations
+├─ seg/<step-id>.mp4     motion leading into the step, framed, effects and logo baked in, silent, ≤1920 px wide
+├─ seg/outro.mp4         whatever plays after the last step
+├─ assets/               the logo and background image, when the guide has them
+├─ fonts/                Figtree for annotation text
+└─ audio/<step-id>.m4a   optional narration (+ audio/music.m4a), from Phase 4
 ```
 
 Embed:
@@ -208,12 +216,13 @@ Embed:
 
 ### Player internals
 
-- Built with Vite in library mode into one file. No framework. Budget: **< 60 KB gzipped** including the renderer (fonts load separately and are cached).
-- Mounts in a **Shadow DOM**; CSS custom properties come from `design/tokens.json` plus the guide's accent color.
-- State machine: `idle → playingSegment(n) → atStep(n, revealGroup) → … → end`.
-- At a segment's `ended` event it swaps to the still (no seek drift). Where `requestVideoFrameCallback` is supported, it hides the swap seam.
-- Preloads the next segment and still while the viewer reads the current step.
-- Annotations are drawn on a canvas over the stage, plus a visually hidden text layer for screen readers.
+- Built with Vite in library mode into one classic script with no imports. No framework. Budget: **< 60 KB gzipped** including the renderer (fonts load separately and are cached); the build fails over it.
+- Mounts in a **Shadow DOM**; CSS custom properties come from `design/tokens.json` (generated into `packages/player/src/tokens.ts`) plus the guide's accent colour.
+- State machine (`packages/player/src/machine.ts`, pure): `start → segment(n) → step(n) → leaving(n) → segment(n+1) → … → end`. Back and the step markers go straight to a still; motion only plays forwards.
+- At a segment's `ended` event it swaps to the still (no seek drift): the still goes on the canvas first, then the video is hidden. A segment only appears once its first frame is on screen (`requestVideoFrameCallback` where supported), which hides the seam the other way.
+- Preloads the next segment (two `<video>` elements take turns) and still while the viewer reads the current step, and loads nothing until the player is near the screen.
+- The still, framing, logo, zoom and annotations are drawn on one canvas with `composeScene`. Step titles, notes and callout text go to a live region for screen readers.
+- Where pictures and motion come from is pluggable: a published guide loads files next to `guide.json`; the editor's preview hands it frames from the media worker and draws the motion live.
 
 ## Hosting the editor
 
@@ -232,7 +241,7 @@ Embed:
 
 ### CI (GitHub Actions)
 
-- Lint, typecheck, unit tests, player size budget.
+- Lint, typecheck, unit tests, build, player size budget.
 - Playwright screenshot and end-to-end tests (Chromium; plus a real-Chrome job for H.264/AAC).
 - On merge to `main`: deploy the editor to Cloudflare Pages, and give pull requests preview deploys.
 

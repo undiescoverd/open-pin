@@ -2,7 +2,7 @@
 
 A web app that turns screen recordings into interactive, click-through product guides, with MP4, PDF and screenshot exports too. It's an alternative to [FramePin](https://framepin.com/) that you buy once instead of subscribing to.
 
-**Status:** Phases 1 and 2 of the [roadmap](docs/04-roadmap.md) are built: open a recording, edit it, pin and annotate steps, hide what needs hiding, frame it, and export a PDF, screenshots or an MP4. The interactive player, audio and publishing arrive in later phases. The full designed behaviour lives in the [clickable mockup](design/mockup/editor.html).
+**Status:** Phases 1 to 3 of the [roadmap](docs/04-roadmap.md) are built: open a recording, edit it, pin and annotate steps, hide what needs hiding, frame it, and publish it as an interactive guide you can host anywhere and embed with two lines of HTML, or export a PDF, screenshots or an MP4. Audio and one-click publishing arrive in later phases. The interactive guide has been tested in Chromium; Safari, Firefox and iPhone still need a check on real devices. The full designed behaviour lives in the [clickable mockup](design/mockup/editor.html).
 
 ## What works today
 
@@ -15,9 +15,11 @@ A web app that turns screen recordings into interactive, click-through product g
 - **Zoom in** on part of the frame at a step with the Zoom tool (Z); the Viewer view shows the step the way the guide will.
 - **Frame it:** put the recording on a colour, gradient or image with padding, rounded corners and a shadow, in its own shape or 16:9, 4:3, 1:1 or 4:5, and add your logo in a corner.
 - Undo and redo (⌘Z, ⇧⌘Z), autosave, a project list, and `.waypost` files you can save, move to another computer and open again.
+- **Publish an interactive guide:** Share exports a folder (or a zip) with a standalone page, the player, `guide.json`, the pictures and motion for every step and an optional PDF copy. Upload it to GitHub Pages, Cloudflare Pages, Netlify, S3 or any static host, then share the link, paste the two-line embed into any page (it works inside React and Vue apps and CMS pages too), or use an iframe. Viewers click through the steps, which play the motion between them and draw each step's zoom and annotations exactly as the editor does, with ← → keys, screen-reader announcements and reduced motion respected. The player is 14 KB gzipped.
+- **Shape how it plays** in the Guide tab: guided (waits at every step), auto (moves on after each step's pause) or video (plays straight through); your accent colour; light, dark or the viewer's own setting; which controls show; and a call-to-action button on the end card or from a chosen step. **Preview** (⌘↩) runs the same player inside the editor.
 - Export an MP4 (720p to 4K) that pauses on every step with its zoom, annotations and title, with the recording's sound; a PDF (A4, Letter or 16:9); PNG or WebP screenshots in a zip; or copy or save the frame on screen. Every export uses the same renderer as the canvas.
 
-The editor needs Chrome, Edge, Brave or Arc on a computer (WebCodecs, private file storage). Other browsers see a notice.
+The editor needs Chrome, Edge, Brave or Arc on a computer (WebCodecs, private file storage). Other browsers see a notice. Published guides are made to play in any modern browser, phones included. For a guide that plays in Safari too, export it from Chrome or Edge on a Mac or PC, which can encode H.264.
 
 ## What it will do
 
@@ -43,8 +45,8 @@ Needs Node 22 and pnpm 10 (`corepack enable` gives you the pinned pnpm).
 
 ```sh
 pnpm install
-pnpm dev          # the editor at http://localhost:5173 (the component gallery is at /kit)
-pnpm check        # tokens, lint, typecheck, unit tests and a production build: what CI runs
+pnpm dev          # builds player.js, then the editor at http://localhost:5173 (the component gallery is at /kit)
+pnpm check        # tokens, lint, typecheck, unit tests and a production build (with the player's size budget): what CI runs
 pnpm test:e2e     # browser tests against the production build (first run: pnpm --filter @waypost/editor exec playwright install chromium)
 pnpm --filter @waypost/editor exec playwright test --update-snapshots   # after an intended change to how annotations draw
 pnpm tokens       # regenerate the CSS after editing design/tokens.json
@@ -54,11 +56,12 @@ pnpm tokens       # regenerate the CSS after editing design/tokens.json
 |---|---|
 | `apps/editor` | The editor web app (Vite, React 19, Tailwind 4) and its Playwright tests |
 | `packages/ui` | PinKit: generated token CSS plus `Button`, `IconButton`, `Tooltip`, `KeyCap`, `Surface`, `Icon`, `Dialog`, `Menu` and the inspector's form controls |
-| `packages/core` | The project model: schema (Zod), time mapping, clip editing, effect layers, the export plan, commands with undo and redo, timecodes. No DOM |
-| `packages/render` | The compositor: framing, effect regions, zoom, annotations, logo and captions, shared by the editor and every export |
+| `packages/core` | The project model: schema (Zod), time mapping, clip editing, effect layers, the export plan, the `guide.json` format, commands with undo and redo, timecodes. No DOM |
+| `packages/render` | The compositor: framing, effect regions, zoom, annotations, logo and captions, shared by the editor, the player and every export |
 | `packages/media` | Reads recordings with Mediabunny in a worker: the time of every frame, exact frame reads |
-| `packages/export` | PNG and WebP zips, the PDF, and MP4 in an export worker |
-| `packages/player`, `tts` | Empty until their roadmap phase |
+| `packages/export` | PNG and WebP zips, the PDF, MP4 and a guide's stills and segments in an export worker, and the guide folder or zip |
+| `packages/player` | The guide player, built to one `player.js` with no dependencies: state machine, Shadow DOM, controls, auto-mount on `[data-waypost]` |
+| `packages/tts` | Empty until its roadmap phase |
 | `design/tokens.json` | Colours, type, radii and motion for both themes; `scripts/build-tokens.mjs` turns it into CSS |
 
 ## Deploying
