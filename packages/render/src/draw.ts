@@ -178,7 +178,7 @@ export function drawAnnotations(ctx: Ctx, annotations: readonly Annotation[], si
   const alpha = (a: Annotation) => options.reveal?.[a.reveal] ?? 1;
   const shown = annotations.filter(a => alpha(a) > 0);
   const spots = shown.filter((a): a is SpotlightAnnotation => a.type === 'spotlight');
-  /* the dim is one layer, so it fades with the latest of its spotlights to appear */
+  /* the dim is one layer, so it fades in with the first of its spotlights to appear and stays while any is shown */
   if (spots.length) drawSpotlights(ctx, spots, size, Math.max(...spots.map(alpha)));
   for (const a of shown) {
     if (a.type === 'box') drawBox(ctx, a, size, alpha(a));

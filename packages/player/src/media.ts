@@ -118,6 +118,7 @@ class VideoDriver implements SegmentDriver {
         for (const other of this.videos) if (other !== v) other.classList.remove('on');
       };
       const done = () => {
+        if (signal.aborted && this.current === v) v.pause();
         v.removeEventListener('ended', done);
         v.removeEventListener('error', done);
         signal.removeEventListener('abort', done);
@@ -129,8 +130,11 @@ class VideoDriver implements SegmentDriver {
       /* older Safari and Firefox have no requestVideoFrameCallback; 'playing' comes a moment early there */
       if (typeof (v as Partial<HTMLVideoElement>).requestVideoFrameCallback === 'function') v.requestVideoFrameCallback(show);
       else v.addEventListener('playing', show, { once: true });
-      /* a refused or failed play skips the motion rather than leaving the viewer stuck */
-      v.play().catch(done);
+      /* a refused or failed play skips the motion rather than leaving the viewer stuck; a pause before playback began is
+         an AbortError, and resume() plays it later */
+      v.play().catch((e: unknown) => {
+        if ((e as Error | null)?.name !== 'AbortError') done();
+      });
     });
   }
 

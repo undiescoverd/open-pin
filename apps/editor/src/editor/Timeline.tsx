@@ -597,11 +597,15 @@ function VideoLane({ project, geometry }: { project: Project | null; geometry: G
               aria-pressed={selected}
               data-clip={clip.id}
               onPointerDown={e => {
-                if (e.button === 0 && !(e.target as HTMLElement).dataset.edge) selectClip(clip.id);
+                if (e.button === 0 && !(e.target as HTMLElement).dataset.edge) {
+                  releaseFocus();
+                  selectClip(clip.id);
+                }
               }}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
+                  e.stopPropagation();
                   selectClip(clip.id);
                 }
               }}
@@ -760,6 +764,7 @@ function EffectsLane({ blurs, layers, geometry }: { blurs: readonly Blur[]; laye
             onKeyDown={e => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
+                e.stopPropagation();
                 selectBlur(blur.id, { seek: true });
               }
             }}

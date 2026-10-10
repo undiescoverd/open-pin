@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { KeyCap } from './KeyCap';
+import { TimecodeField } from './Fields';
 import { Surface } from './Surface';
 import { TooltipProvider } from './Tooltip';
 
@@ -79,5 +80,18 @@ describe('Surface', () => {
     render(<Surface as="aside" variant="floating" aria-label="Tools" />);
     const el = screen.getByRole('complementary', { name: 'Tools' });
     expect(el.className).toContain('backdrop-blur');
+  });
+});
+
+describe('TimecodeField', () => {
+  it('commits once on Enter, not again on the blur that follows', async () => {
+    const onCommit = vi.fn(() => true as const);
+    render(<TimecodeField label="Start" value={1} format={s => s.toFixed(2)} parse={t => (Number.isFinite(Number(t)) ? Number(t) : null)} onCommit={onCommit} />);
+    const field = screen.getByLabelText('Start');
+    await userEvent.click(field);
+    await userEvent.keyboard('9{Enter}');
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(9);
+    expect(field).not.toHaveFocus();
   });
 });

@@ -233,6 +233,25 @@ export const ProjectSchema = z.object({
   frame: FrameSchema.default(DEFAULT_FRAME),
   logo: LogoSchema.nullable().default(null),
   guide: GuideSettingsSchema.default(DEFAULT_GUIDE),
+}).superRefine((p, ctx) => {
+  /* what each field can't check on its own: times run forwards and every reference names something the project has */
+  const issue = (path: (string | number)[], message: string) => ctx.addIssue({ code: 'custom', path, message });
+  if (p.sources.length === 0) issue(['sources'], 'needs a recording');
+  const sources = new Set(p.sources.map(s => s.id));
+  const assets = new Set(p.assets.map(a => a.id));
+  p.timeline.forEach((c, i) => {
+    if (!sources.has(c.source)) issue(['timeline', i, 'source'], 'names no recording');
+    if (!(c.out > c.in)) issue(['timeline', i], 'ends before it starts');
+  });
+  p.steps.forEach((st, i) => {
+    if (!sources.has(st.anchor.source)) issue(['steps', i, 'anchor', 'source'], 'names no recording');
+  });
+  p.blurs.forEach((b, i) => {
+    if (!sources.has(b.source)) issue(['blurs', i, 'source'], 'names no recording');
+    if (b.end < b.start) issue(['blurs', i], 'ends before it starts');
+  });
+  if (p.logo && !assets.has(p.logo.asset)) issue(['logo', 'asset'], 'names no image');
+  if (p.frame.background.type === 'image' && !assets.has(p.frame.background.asset)) issue(['frame', 'background', 'asset'], 'names no image');
 });
 
 export type Point = z.infer<typeof PointSchema>;

@@ -91,8 +91,10 @@ export interface TimecodeFieldProps {
 export function TimecodeField({ label, value, format, parse, onCommit, onRefuse }: TimecodeFieldProps) {
   /* while the field is being edited `draft` holds what was typed; otherwise it shows the formatted value */
   const [draft, setDraft] = useState<string | null>(null);
+  /* set once Enter or Escape has finished with the edit, so the blur that follows doesn't commit it again */
   const cancelled = useRef(false);
   const commit = (el: HTMLInputElement) => {
+    cancelled.current = true;
     const text = draft ?? format(value);
     const seconds = parse(text);
     if (seconds === null) onRefuse?.(`"${text}" isn't a time. Try 3.5 or 0:03.50.`);

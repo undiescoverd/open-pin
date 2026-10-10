@@ -51,6 +51,8 @@ class LiveDriver implements SegmentDriver {
   private readonly video: HTMLVideoElement;
   private paused = false;
   private wake: (() => void) | null = null;
+  /** counts play() calls, so an aborted one can tell whether a newer one owns the video */
+  private plays = 0;
   /** true while a clip of a segment is playing in the video */
   private rolling = false;
   private length = 1;
@@ -85,13 +87,21 @@ class LiveDriver implements SegmentDriver {
 
   /** Waits while paused. */
   private async running(signal: AbortSignal): Promise<void> {
-    while (this.paused && !signal.aborted) await new Promise<void>(resolve => (this.wake = resolve));
+    while (this.paused && !signal.aborted) {
+      await new Promise<void>(resolve => {
+        this.wake = resolve;
+        signal.addEventListener('abort', () => resolve(), { once: true });
+      });
+    }
   }
 
   async play(file: string, signal: AbortSignal): Promise<void> {
     const segment = this.segments.find(s => s.file === file);
     if (!segment) return;
     const v = this.video;
+    const mine = ++this.plays;
+    /* once aborted, a later play() may own the shared video; only the latest one stops it */
+    const superseded = () => signal.aborted && this.plays !== mine;
     this.length = Math.max(1e-3, segment.to - segment.from);
     this.gone = 0;
     for (const piece of segmentPieces(this.project.timeline, segment.from, segment.to)) {
@@ -123,10 +133,12 @@ class LiveDriver implements SegmentDriver {
         };
         requestAnimationFrame(frame);
       });
+      if (superseded()) return;
       this.rolling = false;
       v.pause();
       this.gone = base + (piece.to - piece.from) / piece.speed;
     }
+    if (superseded()) return;
     this.rolling = false;
     v.pause();
   }

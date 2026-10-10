@@ -23,8 +23,8 @@ const api = {
       const times = new Float64Array(reader.index.times);
       return Comlink.transfer({ handle, info: reader.info, times }, [times.buffer]);
     } catch (error) {
-      /* error classes don't survive structured clone, so carry the message and a flag */
-      throw Object.assign(new Error(error instanceof Error ? error.message : String(error)), { unsupported: error instanceof UnsupportedMediaError });
+      /* Comlink sends only an error's message, name and stack across, so the name carries what kind it is */
+      throw Object.assign(new Error(error instanceof Error ? error.message : String(error)), { name: error instanceof UnsupportedMediaError ? error.name : 'Error' });
     }
   },
 

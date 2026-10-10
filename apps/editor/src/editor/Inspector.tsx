@@ -222,7 +222,7 @@ function SelectionPanel() {
       const index = project.timeline.findIndex(c => c.id === selection.clipId);
       const clip = project.timeline[index];
       if (!clip) return null;
-      return selection.kind === 'clip' ? <ClipPanel project={project} clip={clip} index={index} /> : <GapPanel project={project} clip={clip} index={index} />;
+      return selection.kind === 'clip' ? <ClipPanel key={clip.id} project={project} clip={clip} index={index} /> : <GapPanel key={clip.id} project={project} clip={clip} index={index} />;
     }
     case 'blur': {
       const blur = selectedBlur(project, selection);
@@ -231,9 +231,9 @@ function SelectionPanel() {
     default: {
       const step = selectedStep(project, selection);
       if (!step) return null;
-      if (selection.kind === 'zoom' && step.zoom) return <ZoomPanel project={project} step={step} />;
+      if (selection.kind === 'zoom' && step.zoom) return <ZoomPanel key={step.id} project={project} step={step} />;
       const annotation = selectedAnnotation(project, selection);
-      return annotation ? <AnnotationPanel step={step} annotation={annotation} source={source} /> : <StepPanel project={project} step={step} />;
+      return annotation ? <AnnotationPanel key={annotation.id} step={step} annotation={annotation} source={source} /> : <StepPanel key={step.id} project={project} step={step} />;
     }
   }
 }
