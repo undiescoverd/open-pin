@@ -1,4 +1,4 @@
-import { audioPlan, clamp, exportPlan, holdLook, outputSizeForHeight, planAt, tlToSrc, type AudioSegment, type Project } from '@waypost/core';
+import { audioPlan, clamp, exportPlan, holdLook, outputSizeForHeight, planAt, tlToSrc, type AudioSegment, type Plan, type Project } from '@waypost/core';
 import { composeScene, registerWorkerFonts, sceneFor, type AssetImages } from '@waypost/render';
 import {
   ALL_FORMATS,
@@ -17,6 +17,9 @@ import {
   getFirstEncodableAudioCodec,
   getFirstEncodableVideoCodec,
   type AudioCodec,
+  type InputAudioTrack,
+  type InputVideoTrack,
+  type Quality,
   type StreamTargetChunk,
   type VideoCodec,
 } from 'mediabunny';
@@ -121,6 +124,116 @@ async function* soundtrack(segments: readonly AudioSegment[], sink: AudioSampleS
   }
 }
 
+export interface PlanEncode {
+  project: Project;
+  videoTrack: InputVideoTrack;
+  /** the recording's sound, when the video carries it */
+  audioTrack: InputAudioTrack | null;
+  plan: Plan;
+  width: number;
+  height: number;
+  fps: number;
+  captions: boolean;
+  assets: AssetImages;
+  quality: Quality;
+  target: BufferTarget | StreamTarget;
+  /** moov at the front, so a browser can start playing before the file has fully arrived */
+  fastStart: false | 'in-memory';
+  onProgress: (done: number, total: number) => void;
+  cancelled: () => boolean;
+}
+
+/**
+ * Walks a plan frame by frame, drawing each frame with @waypost/render and encoding it, with the recording's sound alongside when
+ * there is an audio track. Throws `ExportCancelled` when `cancelled()` turns true.
+ */
+export async function encodePlan(job: PlanEncode): Promise<{ frames: number; videoCodec: VideoCodec; audioCodec: AudioCodec | null }> {
+  const { project, plan, width, height, fps, videoTrack, audioTrack } = job;
+  const total = Math.max(1, Math.round(plan.duration * fps));
+
+  const videoCodec = await getFirstEncodableVideoCodec(['avc', 'vp9', 'av1'], { width, height });
+  if (!videoCodec) throw new Error(`This browser can't encode video at ${width} × ${height}. Try a smaller size.`);
+  const segments = audioTrack ? audioPlan(project, plan) : [];
+  const audible = segments.some(s => s.source);
+  const audioCodec = audible ? await getFirstEncodableAudioCodec(['aac', 'opus'], { numberOfChannels: CHANNELS, sampleRate: SAMPLE_RATE }) : null;
+
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d')!;
+  const output = new Output({ format: new Mp4OutputFormat({ fastStart: job.fastStart }), target: job.target });
+  const video = new CanvasSource(canvas, { codec: videoCodec, quality: job.quality, keyFrameInterval: 2 });
+  output.addVideoTrack(video, { frameRate: fps });
+  let audio: AudioSampleSource | null = null;
+  if (audioCodec) {
+    audio = new AudioSampleSource({ codec: audioCodec, quality: job.quality, transform: { sampleRate: SAMPLE_RATE, numberOfChannels: CHANNELS } });
+    output.addAudioTrack(audio);
+  }
+  output.setMetadataTags({ title: project.name });
+  await output.start();
+
+  const sound = audio && audioTrack ? soundtrack(segments, new AudioSampleSink(audioTrack), audioTrack.sampleRate, Math.min(CHANNELS, audioTrack.numberOfChannels)) : null;
+  let pending: AudioSample | null = null;
+  /** feeds sound up to output time `until`, so the tracks stay interleaved */
+  const pumpAudio = async (until: number) => {
+    if (!sound || !audio) return;
+    for (;;) {
+      if (!pending) {
+        const next = await sound.next();
+        if (next.done) return;
+        pending = next.value;
+      }
+      if (pending.timestamp >= until) return;
+      await audio.add(pending);
+      pending.close();
+      pending = null;
+    }
+  };
+
+  /* the recording time each output frame shows; never decreasing, since clips play in order, so one decoding pass serves all */
+  const at = (i: number) => planAt(plan, i / fps);
+  const sourceTimes = function* () {
+    for (let i = 0; i < total; i++) {
+      const pos = tlToSrc(project.timeline, at(i).timeline);
+      yield (pos?.time ?? 0) + 1e-4;
+    }
+  };
+  const frames = new CanvasSink(videoTrack, { poolSize: 2 }).canvasesAtTimestamps(sourceTimes());
+  let last: OffscreenCanvas | HTMLCanvasElement | null = null;
+
+  try {
+    for (let i = 0; i < total; i++) {
+      if (job.cancelled()) throw new ExportCancelled();
+      const wrapped = (await frames.next()).value;
+      if (wrapped) last = wrapped.canvas;
+      if (!last) continue;
+      const t = i / fps;
+      const now = at(i);
+      const pos = tlToSrc(project.timeline, now.timeline);
+      const hold = now.hold;
+      const step = hold ? project.steps.find(s => s.id === hold.stepId) : undefined;
+      const look = step && hold ? holdLook(step, hold.t, hold.duration) : null;
+      const caption =
+        job.captions && step && hold && step.title.trim()
+          ? { text: step.title, alpha: clamp(Math.min(hold.t / 0.3, (hold.duration - hold.t) / 0.25), 0, 1) }
+          : null;
+      const scene = sceneFor(project, { frame: last, sourceTime: pos?.time ?? 0, step, look, annotations: !!step, assets: job.assets, caption, opaque: true });
+      composeScene(ctx, width, height, scene);
+      await video.add(t, 1 / fps);
+      await pumpAudio(t + 1 / fps);
+      if (i % 5 === 0) job.onProgress(i, total);
+    }
+    await pumpAudio(Infinity);
+    job.onProgress(total, total);
+    await output.finalize();
+  } catch (error) {
+    await frames.return(undefined);
+    await output.cancel();
+    throw error;
+  } finally {
+    (pending as AudioSample | null)?.close();
+  }
+  return { frames: total, videoCodec, audioCodec };
+}
+
 /** Renders and encodes the guide as a video. Throws `ExportCancelled` when `cancelled()` turns true. */
 export async function encodeMp4(job: Mp4Job): Promise<Mp4Result> {
   const { project, options } = job;
@@ -133,100 +246,31 @@ export async function encodeMp4(job: Mp4Job): Promise<Mp4Result> {
     const videoTrack = await input.getPrimaryVideoTrack();
     if (!videoTrack) throw new Error('The recording has no video.');
     const audioTrack = options.audio ? await input.getPrimaryAudioTrack() : null;
-
-    const plan = exportPlan(project);
     const [width, height] = outputSizeForHeight(project.frame, source.size, options.height);
-    const fps = options.fps;
-    const total = Math.max(1, Math.round(plan.duration * fps));
-
-    const videoCodec = await getFirstEncodableVideoCodec(['avc', 'vp9', 'av1'], { width, height });
-    if (!videoCodec) throw new Error(`This browser can't encode video at ${width} × ${height}. Try a smaller size.`);
-    const segments = audioTrack ? audioPlan(project, plan) : [];
-    const audible = segments.some(s => s.source);
-    const audioCodec = audible ? await getFirstEncodableAudioCodec(['aac', 'opus'], { numberOfChannels: CHANNELS, sampleRate: SAMPLE_RATE }) : null;
-
-    const canvas = new OffscreenCanvas(width, height);
-    const ctx = canvas.getContext('2d')!;
     const target = job.writable ? new StreamTarget(job.writable, { chunked: true }) : new BufferTarget();
-    const output = new Output({ format: new Mp4OutputFormat({ fastStart: job.writable ? false : 'in-memory' }), target });
-    const video = new CanvasSource(canvas, { codec: videoCodec, quality: QUALITY_HIGH, keyFrameInterval: 2 });
-    output.addVideoTrack(video, { frameRate: fps });
-    let audio: AudioSampleSource | null = null;
-    if (audioCodec) {
-      audio = new AudioSampleSource({ codec: audioCodec, quality: QUALITY_HIGH, transform: { sampleRate: SAMPLE_RATE, numberOfChannels: CHANNELS } });
-      output.addAudioTrack(audio);
-    }
-    output.setMetadataTags({ title: project.name });
-    await output.start();
-
-    const sound = audio && audioTrack ? soundtrack(segments, new AudioSampleSink(audioTrack), audioTrack.sampleRate, Math.min(CHANNELS, audioTrack.numberOfChannels)) : null;
-    let pending: AudioSample | null = null;
-    /** feeds sound up to output time `until`, so the tracks stay interleaved */
-    const pumpAudio = async (until: number) => {
-      if (!sound || !audio) return;
-      for (;;) {
-        if (!pending) {
-          const next = await sound.next();
-          if (next.done) return;
-          pending = next.value;
-        }
-        if (pending.timestamp >= until) return;
-        await audio.add(pending);
-        pending.close();
-        pending = null;
-      }
-    };
-
-    /* the recording time each output frame shows; never decreasing, since clips play in order, so one decoding pass serves all */
-    const at = (i: number) => planAt(plan, i / fps);
-    const sourceTimes = function* () {
-      for (let i = 0; i < total; i++) {
-        const pos = tlToSrc(project.timeline, at(i).timeline);
-        yield (pos?.time ?? 0) + 1e-4;
-      }
-    };
-    const frames = new CanvasSink(videoTrack, { poolSize: 2 }).canvasesAtTimestamps(sourceTimes());
-    let last: OffscreenCanvas | HTMLCanvasElement | null = null;
-
-    try {
-      for (let i = 0; i < total; i++) {
-        if (job.cancelled()) throw new ExportCancelled();
-        const wrapped = (await frames.next()).value;
-        if (wrapped) last = wrapped.canvas;
-        if (!last) continue;
-        const t = i / fps;
-        const now = at(i);
-        const pos = tlToSrc(project.timeline, now.timeline);
-        const hold = now.hold;
-        const step = hold ? project.steps.find(s => s.id === hold.stepId) : undefined;
-        const look = step && hold ? holdLook(step, hold.t, hold.duration) : null;
-        const caption =
-          options.captions && step && hold && step.title.trim()
-            ? { text: step.title, alpha: clamp(Math.min(hold.t / 0.3, (hold.duration - hold.t) / 0.25), 0, 1) }
-            : null;
-        const scene = sceneFor(project, { frame: last, sourceTime: pos?.time ?? 0, step, look, annotations: !!step, assets: job.assets, caption, opaque: true });
-        composeScene(ctx, width, height, scene);
-        await video.add(t, 1 / fps);
-        await pumpAudio(t + 1 / fps);
-        if (i % 5 === 0) job.onProgress(i, total);
-      }
-      await pumpAudio(Infinity);
-      job.onProgress(total, total);
-      await output.finalize();
-    } catch (error) {
-      await frames.return(undefined);
-      await output.cancel();
-      throw error;
-    } finally {
-      (pending as AudioSample | null)?.close();
-    }
+    const result = await encodePlan({
+      project,
+      videoTrack,
+      audioTrack,
+      plan: exportPlan(project),
+      width,
+      height,
+      fps: options.fps,
+      captions: options.captions,
+      assets: job.assets,
+      quality: QUALITY_HIGH,
+      target,
+      fastStart: job.writable ? false : 'in-memory',
+      onProgress: job.onProgress,
+      cancelled: job.cancelled,
+    });
     return {
       width,
       height,
-      duration: total / fps,
-      frames: total,
-      videoCodec,
-      audioCodec,
+      duration: result.frames / options.fps,
+      frames: result.frames,
+      videoCodec: result.videoCodec,
+      audioCodec: result.audioCodec,
       bytes: target instanceof BufferTarget ? (target.buffer ?? undefined) : undefined,
     };
   } finally {

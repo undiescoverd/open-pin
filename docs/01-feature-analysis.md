@@ -102,7 +102,7 @@ Phases are defined in [04-roadmap.md](04-roadmap.md). Libraries named below are 
   - The **"+ Pin step"** button at the top of the step list, which pins without a click marker.
 - Steps appear in the step list and as numbered markers on their own timeline lane. Drag a marker to re-time a step. Steps are always sorted by time.
 - **Segments:** segment *n* runs from step *n−1* (or the start) to step *n*. An optional outro segment runs after the last step.
-- **Published media per step:** `seg/<step-id>.mp4` (H.264, blur and background baked in, no annotations), `steps/<step-id>.webp` (the exact pinned frame, same treatment) and optional `audio/<step-id>.m4a`. The player draws annotations itself.
+- **Published media per step:** `seg/<step-id>.mp4` (H.264, blur, background and logo baked in, no annotations), `steps/<step-id>.webp` (the exact pinned frame with its blur burned in, without background or logo) and optional `audio/<step-id>.m4a`. The player draws the background, zoom, annotations and logo on the still itself, with the same renderer as the editor.
 - **Player:** play segment *n* → on `ended`, show still *n* (pixel-exact, no seek drift) → reveal annotations → wait for Next, a click or → → play segment *n+1*, which was preloaded.
 
 ## F4 — Step titles
@@ -201,7 +201,8 @@ connect-calendar/
   player.js              ← the web player
   guide.json             ← steps, annotations, branding
   guide.pdf              ← compressed PDF copy (F14)
-  steps/<step-id>.webp   seg/<step-id>.mp4   audio/<step-id>.m4a
+  embed.txt              ← the snippets below, with your address filled in
+  poster.webp   steps/<step-id>.webp   seg/<step-id>.mp4   audio/<step-id>.m4a   assets/   fonts/
 ```
 
 The two-line embed:

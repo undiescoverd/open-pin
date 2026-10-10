@@ -5,8 +5,8 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "pnpm --filter @waypost/player build && vite",
+    "build": "pnpm --filter @waypost/player build && vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc -p tsconfig.json",
     "test:e2e": "playwright test"
@@ -16,6 +16,7 @@
     "@waypost/core": "workspace:*",
     "@waypost/export": "workspace:*",
     "@waypost/media": "workspace:*",
+    "@waypost/player": "workspace:*",
     "@waypost/render": "workspace:*",
     "@waypost/ui": "workspace:*",
     "comlink": "^4.4.2",

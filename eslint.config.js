@@ -19,7 +19,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.{test,spec}.{ts,tsx}', '**/e2e/**', '**/*.config.{ts,js}', 'scripts/**'],
+    files: ['**/*.{test,spec}.{ts,tsx}', '**/e2e/**', '**/*.config.{ts,js}', 'scripts/**', '**/scripts/**'],
     languageOptions: { globals: globals.node },
     rules: { 'react-refresh/only-export-components': 'off' },
   },

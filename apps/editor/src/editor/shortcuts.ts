@@ -14,6 +14,7 @@ import {
   pinAtPlayhead,
   redo,
   selectLayer,
+  setPreviewOpen,
   splitAtPlayhead,
   setTool,
   stepFrames,
@@ -43,7 +44,7 @@ export function useShortcuts(): void {
       const key = e.key.toLowerCase(); /* by lowercase key, so shortcuts also work with Caps Lock on */
       const mod = e.metaKey || e.ctrlKey;
       const el = target instanceof HTMLElement ? target : null;
-      if (el instanceof HTMLButtonElement && (key === ' ' || key === 'enter')) return; /* the button gets its own press */
+      if (el instanceof HTMLButtonElement && !mod && (key === ' ' || key === 'enter')) return; /* the button gets its own press */
       if (el?.getAttribute('role') === 'tab' && key.startsWith('arrow')) return; /* tabs use the arrows to move between tabs */
       /* a slider or checkbox with focus: only the transport keys still work, so they keep working after dragging a slider */
       if (el instanceof HTMLInputElement && !TRANSPORT_KEYS.has(key)) return;
@@ -58,6 +59,7 @@ export function useShortcuts(): void {
         if (key === 's') return act(() => void saveWaypost());
         if (key === ',') return act(() => jumpToStart(true));
         if (key === '.') return act(jumpToEnd);
+        if (key === 'enter') return act(() => getEditor().phase === 'ready' && setPreviewOpen(true));
         return;
       }
       if (e.altKey) {

@@ -1,4 +1,4 @@
-import { newEffect, topLayer, type Blur, REVEAL_FADE, REVEAL_INTERVAL, ZOOM_IN, stepIntro, stepShown, usedGroups, type Annotation, type Project, type Step, type StepLook } from '@waypost/core';
+import { newEffect, topLayer, type Blur, stepIntro, stepShown, type Annotation, type Project, type Step, type StepLook } from '@waypost/core';
 import { getEditor, selectProject, stepAtPlayhead, type EditorState } from '../state/store';
 
 /* What the canvas shows right now (docs/03-design-system.md, "Editor layout"): Edit shows the step's annotations with handles;
@@ -20,12 +20,6 @@ export function isViewer(state: Pick<EditorState, 'view' | 'playback'>): boolean
 }
 
 const reducedMotion = (): boolean => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/** How long a step's entrance takes, so the canvas knows when to stop animating. */
-export function introLength(step: Step): number {
-  const groups = usedGroups(step).length;
-  return (step.zoom ? ZOOM_IN : 0) + Math.max(0, groups - 1) * REVEAL_INTERVAL + REVEAL_FADE + 0.05;
-}
 
 /** `elapsed` is the seconds since the playhead arrived on this frame, for the Viewer entrance. */
 export function presentation(elapsed: number): Presentation {

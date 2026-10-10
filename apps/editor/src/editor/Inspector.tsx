@@ -34,6 +34,7 @@ import {
   type EffectType,
   type GradientPreset,
   type LogoCorner,
+  type PlaybackMode,
   type Project,
   type Rect,
   type Source,
@@ -90,10 +91,12 @@ import {
   setClipSpeed,
   setFrame,
   setGap,
+  setGuide,
   setLogo,
   setStepHold,
   setStepText,
   setStepZoom,
+  setPreviewOpen,
   setView,
   sourceTimeAt,
   splitAtPlayhead,
@@ -748,7 +751,7 @@ function EffectPanel({ project, blur, source }: { project: Project; blur: Blur; 
   );
 }
 
-// ----- the Guide tab: framing and logo --------------------------------------------------------------------------------
+// ----- the Guide tab: framing, logo, player and call to action -------------------------------------------------------
 
 const ASPECT_LABEL: Record<Aspect, string> = { source: 'Same as the recording', '16:9': '16:9 widescreen', '4:3': '4:3', '1:1': '1:1 square', '4:5': '4:5 portrait' };
 const BACKGROUND_COLORS = [
@@ -888,6 +891,95 @@ function LogoSection({ project }: { project: Project }) {
   );
 }
 
+/* the accents offered for the player (docs/03-design-system.md); each reads with white or ink text, picked for contrast */
+const ACCENTS = [
+  { id: 'coral', name: 'Coral', value: '#D13A30' },
+  { id: 'lagoon', name: 'Lagoon', value: '#0B7568' },
+  { id: 'iris', name: 'Iris', value: '#4F4BD6' },
+  { id: 'marigold', name: 'Marigold', value: '#FFB020' },
+];
+const MODE_HELP: Record<PlaybackMode, string> = {
+  guided: 'Stops at every step until the viewer clicks Next.',
+  auto: 'Pauses on each step for its pause time, then carries on. Viewers can pause it.',
+  video: 'Plays straight through, with the steps marked on its progress bar in time.',
+};
+
+function PlayerSection({ project }: { project: Project }) {
+  const g = project.guide;
+  return (
+    <InspectorSection id="guide-player" title="Player">
+      <div className="flex flex-col gap-1">
+        <Segmented
+          label="Playback"
+          options={[
+            { value: 'guided', label: 'Guided' },
+            { value: 'auto', label: 'Auto' },
+            { value: 'video', label: 'Video' },
+          ]}
+          value={g.mode}
+          onChange={mode => setGuide({ mode }, 'Change playback mode')}
+        />
+        <Help>{MODE_HELP[g.mode]}</Help>
+      </div>
+      <ColorSwatchPicker label="Accent" colors={ACCENTS} value={g.accent} onChange={accent => setGuide({ accent }, 'Change accent')} />
+      <Segmented
+        label="Player colours"
+        options={[
+          { value: 'auto', label: 'Auto', title: "Light or dark, following the viewer's system" },
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ]}
+        value={g.chrome}
+        onChange={chrome => setGuide({ chrome }, 'Change player colours')}
+      />
+      <Switch label="Step counter" checked={g.controls.counter} onChange={counter => setGuide({ controls: { ...g.controls, counter } }, counter ? 'Show step counter' : 'Hide step counter')} />
+      <Switch label="Progress bar" checked={g.controls.progress} onChange={progress => setGuide({ controls: { ...g.controls, progress } }, progress ? 'Show progress bar' : 'Hide progress bar')} />
+      <Switch label="Fullscreen button" checked={g.controls.fullscreen} onChange={fullscreen => setGuide({ controls: { ...g.controls, fullscreen } }, fullscreen ? 'Show fullscreen button' : 'Hide fullscreen button')} />
+      <ButtonRow>
+        <Button size="sm" onClick={() => setPreviewOpen(true)}>
+          Preview guide
+        </Button>
+      </ButtonRow>
+    </InspectorSection>
+  );
+}
+
+function CtaSection({ project }: { project: Project }) {
+  const cta = project.guide.cta;
+  const session = useEditSession();
+  const url = cta?.url.trim() ?? '';
+  const urlProblem = cta && url !== '' && !/^https?:\/\/\S+$/i.test(url) ? 'Start the address with https:// so the button can open it.' : null;
+  const showAt = [{ value: 'end', label: 'On the end card' }, ...project.steps.map((s, i) => ({ value: s.id, label: `From step ${i + 1}${s.title.trim() ? `, ${s.title.trim()}` : ''}` }))];
+  return (
+    <InspectorSection id="guide-cta" title="Call to action">
+      <Switch
+        label="Show a button"
+        checked={!!cta}
+        onChange={on => setGuide({ cta: on ? { label: 'Try it yourself', url: '', newTab: true, showAt: 'end' } : null }, on ? 'Add call to action' : 'Remove call to action')}
+        hint={cta ? undefined : 'A button to a signup, booking or documentation page, in the accent colour.'}
+      />
+      {cta && (
+        <>
+          <div {...session.bind} className="flex flex-col gap-3">
+            <TextField label="Button text" value={cta.label} maxLength={40} onChange={e => setGuide({ cta: { ...cta, label: e.target.value } }, 'Change button text', session.key())} />
+            <TextField
+              label="Link"
+              type="url"
+              placeholder="https://example.com/signup"
+              value={cta.url}
+              maxLength={2000}
+              onChange={e => setGuide({ cta: { ...cta, url: e.target.value } }, 'Change button link', session.key())}
+              hint={urlProblem ?? (url ? undefined : 'The button appears once it has a link.')}
+            />
+          </div>
+          <SelectField label="Show it" value={showAt.some(o => o.value === cta.showAt) ? cta.showAt : 'end'} options={showAt} onChange={v => setGuide({ cta: { ...cta, showAt: v } }, 'Move call to action')} />
+          <Switch label="Open in a new tab" checked={cta.newTab} onChange={newTab => setGuide({ cta: { ...cta, newTab } }, 'Change call to action')} />
+        </>
+      )}
+    </InspectorSection>
+  );
+}
+
 function GuidePanel() {
   const project = useEditor(selectProject);
   const save = useEditor(s => s.save);
@@ -905,6 +997,8 @@ function GuidePanel() {
       <h3 className="m-0 mb-1 text-md font-semibold text-fg">Guide settings</h3>
       <FramingSection project={project} />
       <LogoSection project={project} />
+      <PlayerSection project={project} />
+      <CtaSection project={project} />
       <InspectorSection id="guide-recording" title="Recording">
         <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           <dt className="text-fg-muted">File</dt>

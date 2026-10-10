@@ -1,7 +1,10 @@
-import { formatTimecode, type Step } from '@waypost/core';
-import type { ExportJob, Mp4Options, PdfPage, StillFormat } from '@waypost/export';
+import { formatTimecode, guideSlug, parseGuide, planGuide, type Step } from '@waypost/core';
+import type { BundleFile, ExportJob, Mp4Options, PdfPage, StillFormat } from '@waypost/export';
 import figtree400 from '@fontsource/figtree/files/figtree-latin-400-normal.woff?url';
 import figtree600 from '@fontsource/figtree/files/figtree-latin-600-normal.woff?url';
+import figtree400woff2 from '@fontsource/figtree/files/figtree-latin-400-normal.woff2?url';
+import figtree600woff2 from '@fontsource/figtree/files/figtree-latin-600-normal.woff2?url';
+import playerUrl from '@waypost/player/player.js?url';
 import { readSource } from '../storage/opfs';
 import { downloadBlob } from '../storage/waypost-file';
 import { currentPlayback } from '../engine/session';
@@ -57,6 +60,13 @@ async function fontBytes(url: string): Promise<ArrayBuffer> {
   const response = await fetch(url);
   if (!response.ok) throw new Error("Couldn't load the font for the PDF.");
   return response.arrayBuffer();
+}
+
+/** A file the editor ships with (the player, the fonts), to copy into a guide. */
+async function appFile(url: string, what: string): Promise<Blob> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Couldn't load ${what}.`);
+  return response.blob();
 }
 
 export function exportPdfGuide(page: PdfPage): Promise<void> {
@@ -120,16 +130,14 @@ export async function exportMp4(options: Mp4Options): Promise<void> {
   let cancelled = false;
   const cancel = () => {
     cancelled = true;
-    exporter.cancelMp4();
+    exporter.cancelExport();
     patchEditor({ exporting: { label: 'Cancelling…', progress: getEditor().exporting?.progress ?? 0, detail: '', cancel } });
   };
   patchEditor({ exporting: { label: 'Exporting MP4…', progress: 0, detail: 'Starting', cancel } });
   const started = performance.now();
   try {
     const [recording, regular, semibold] = await Promise.all([readSource(project.id, source.file), fontBytes(figtree400), fontBytes(figtree600)]);
-    const assets = await Promise.all(
-      [...state.assetImages].filter(([id]) => project.logo?.asset === id || (project.frame.background.type === 'image' && project.frame.background.asset === id)).map(async ([id, image]) => [id, await createImageBitmap(image)] as [string, ImageBitmap]),
-    );
+    const assets = await workerAssets(project, state.assetImages);
     const file = `${exporter.safeFileName(project.name)}.mp4`;
     const result = await exporter.renderMp4({ project, recording, assets, fonts: { regular, semibold }, options, file }, (done, total) => {
       if (cancelled) return;
@@ -149,6 +157,110 @@ export async function exportMp4(options: Mp4Options): Promise<void> {
     notify(`Exported a ${result.width} × ${result.height} MP4 (${formatTimecode(result.duration)}, ${codecs}).${note}`);
   } catch (error) {
     notify(error instanceof Error ? `Couldn't export the video: ${error.message}` : "Couldn't export the video.", 'error');
+  } finally {
+    patchEditor({ exporting: null });
+  }
+}
+
+// ----- the interactive guide (F9, F11) ---------------------------------------------------------------------------------
+
+export interface GuideExportOptions {
+  /** a folder the person picked (on the click, before any slow work), or a zip download when left out */
+  dir?: FileSystemDirectoryHandle;
+  /** the PDF copy that goes in the guide, or none */
+  pdf: PdfPage | null;
+}
+
+/** The images a project draws with (logo and background), copied for the export worker, which takes ownership of them. */
+async function workerAssets(project: NonNullable<ReturnType<typeof selectProject>>, images: ReadonlyMap<string, ImageBitmap>): Promise<Array<[string, ImageBitmap]>> {
+  const used = (id: string) => project.logo?.asset === id || (project.frame.background.type === 'image' && project.frame.background.asset === id);
+  return Promise.all([...images].filter(([id]) => used(id)).map(async ([id, image]) => [id, await createImageBitmap(image)] as [string, ImageBitmap]));
+}
+
+/**
+ * Exports the interactive guide: the export worker renders each step's still and the motion between steps from the recording,
+ * then guide.json, the player, a standalone page, the fonts, the logo and background, a light PDF copy and the embed snippets join
+ * them, written into a folder or zipped (docs/02-architecture.md, "The published guide bundle").
+ */
+export async function exportGuide(options: GuideExportOptions): Promise<void> {
+  const state = getEditor();
+  const project = selectProject(state);
+  const source = project?.sources[0];
+  if (!project || !source || state.exporting) return;
+  const plan = planGuide(project, { pdf: !!options.pdf });
+  if (plan.guide.steps.length === 0) {
+    notify('Pin at least one step first (P), then export the guide.', 'error');
+    return;
+  }
+  currentPlayback()?.pause();
+  const exporter = await exporters();
+  let cancelled = false;
+  const cancel = () => {
+    cancelled = true;
+    exporter.cancelExport();
+    patchEditor({ exporting: { label: 'Cancelling…', progress: getEditor().exporting?.progress ?? 0, detail: '', cancel } });
+  };
+  const show = (label: string, progress: number, detail: string) => {
+    if (!cancelled) patchEditor({ exporting: { label, progress, detail, cancel } });
+  };
+  show('Exporting guide…', 0, 'Starting');
+  const slug = guideSlug(project.name);
+  try {
+    const guide = parseGuide(JSON.parse(JSON.stringify(plan.guide)));
+    const recording = await readSource(project.id, source.file);
+    const assets = await workerAssets(project, state.assetImages);
+    const media = await exporter.renderGuide({ project, plan: { stills: plan.stills, segments: plan.segments }, size: guide.size, recording, assets }, (done, total) =>
+      show('Exporting guide…', (done / total) * 0.9, `Rendering steps and motion · ${Math.round((done / total) * 100)}%`),
+    );
+    if (media.cancelled || cancelled) {
+      notify('Export cancelled.');
+      return;
+    }
+
+    show('Exporting guide…', 0.9, 'Adding the player and the PDF');
+    /* the PDF first: if it can't be made, guide.json and the page mustn't point at it */
+    let pdf: Blob | null = null;
+    if (options.pdf && guide.pdf && state.media) {
+      const decoder = state.media;
+      const [regular, semibold] = await Promise.all([fontBytes(figtree400), fontBytes(figtree600)]);
+      const made = await exporter.exportPdf(
+        { project: { ...project, steps: plan.stills.map(s => s.step) }, frameFor: step => decoder.frame(decoder.index.indexAt(step.anchor.time)), assets: state.assetImages },
+        { page: options.pdf, fonts: { regular, semibold }, imageWidth: 1200, quality: 0.72 },
+      );
+      pdf = made.blob;
+    }
+    if (!pdf) guide.pdf = null;
+    const files: BundleFile[] = [
+      { path: 'index.html', data: exporter.guideIndexHtml(guide) },
+      { path: 'guide.json', data: `${JSON.stringify(guide, null, 2)}\n` },
+      { path: 'player.js', data: await appFile(playerUrl, 'the player') },
+      { path: 'embed.txt', data: exporter.embedText(guide, slug, project.guide.address) },
+      { path: guide.fonts!.regular, data: await appFile(figtree400woff2, 'the font') },
+      { path: guide.fonts!.semibold, data: await appFile(figtree600woff2, 'the font') },
+      ...media.files.map(([path, file]) => ({ path, data: file })),
+    ];
+    if (pdf && guide.pdf) files.push({ path: guide.pdf, data: pdf });
+    for (const { file, asset } of plan.assets) {
+      const stored = project.assets.find(a => a.id === asset);
+      if (stored) files.push({ path: file, data: await readSource(project.id, stored.file) });
+    }
+    if (cancelled) {
+      notify('Export cancelled.');
+      return;
+    }
+
+    show('Exporting guide…', 0.97, options.dir ? 'Writing the folder' : 'Zipping');
+    const codecNote = media.videoCodec && media.videoCodec !== 'avc' ? " This browser couldn't encode H.264, so the motion between steps may not play in Safari. Export from Chrome or Edge on a Mac or PC for a guide that plays everywhere." : '';
+    const count = `${guide.steps.length} step${guide.steps.length === 1 ? '' : 's'}`;
+    if (options.dir) {
+      await exporter.writeBundle(await options.dir.getDirectoryHandle(slug, { create: true }), files);
+      notify(`Exported the guide (${count}) to the folder “${slug}”. Upload it to any web host.${codecNote}`);
+    } else {
+      downloadBlob(await exporter.zipBundle(files, slug), `${slug}.zip`);
+      notify(`Exported the guide (${count}) as ${slug}.zip. Unzip it and upload the folder to any web host.${codecNote}`);
+    }
+  } catch (error) {
+    notify(error instanceof Error ? `Couldn't export the guide: ${error.message}` : "Couldn't export the guide.", 'error');
   } finally {
     patchEditor({ exporting: null });
   }

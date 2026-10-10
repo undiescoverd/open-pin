@@ -18,7 +18,7 @@ describe('createProject and parseProject', () => {
   });
 
   it('refuses a project from a newer version and anything malformed, with a readable message', () => {
-    expect(() => parseProject({ ...fresh(), schema: 'waypost.project/3' })).toThrow(/newer version/);
+    expect(() => parseProject({ ...fresh(), schema: 'waypost.project/4' })).toThrow(/newer version/);
     expect(() => parseProject({ nope: true })).toThrow(ProjectParseError);
     const bad = { ...fresh(), steps: [{ id: 's', anchor: { source: 'src1', time: 1 }, title: '', body: '', annotations: [{ type: 'click', id: 'a', at: [2, 0], color: 'red' }] }] };
     expect(() => parseProject(bad)).toThrow(/valid Waypost project/);

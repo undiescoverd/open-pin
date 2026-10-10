@@ -1,5 +1,6 @@
 import { clamp } from './geometry';
-import { REVEAL_GROUPS, type Project, type Step } from './schema';
+import { REVEAL_GROUPS } from './constants';
+import type { Project, Step } from './schema';
 import { isOnTimeline, orderedSteps, srcToTl, timelineDuration } from './time';
 
 /* How a guide plays out in time once every step gets its pause (F13 "holds"; F5 zoom; F6 reveal order). The MP4 export walks
@@ -63,6 +64,30 @@ export function holdLook(step: Pick<Step, 'annotations' | 'zoom'>, t: number, du
   const zoom = !step.zoom ? 0 : Math.min(clamp(t / zoomIn, 0, 1), zoomOut > 0 ? clamp(left / zoomOut, 0, 1) : 1);
   const fade = clamp(left / OUTRO_FADE, 0, 1);
   return { zoom, reveal: groupAlphas(step, t, interval).map(a => a * fade) };
+}
+
+/** How long a step's entrance takes: easing into its zoom and revealing every group. */
+export function introLength(step: Pick<Step, 'annotations' | 'zoom'>): number {
+  const groups = usedGroups(step).length;
+  return (step.zoom ? ZOOM_IN : 0) + Math.max(0, groups - 1) * REVEAL_INTERVAL + REVEAL_FADE + 0.05;
+}
+
+/** How long the player stays on a step before moving on by itself (auto and video modes): its pause, and never less than the
+    entrance plus a moment to take in the last group. */
+export function guideHold(step: Pick<Step, 'annotations' | 'zoom' | 'minHold'>): number {
+  return Math.max(step.minHold, introLength(step) + 0.6);
+}
+
+/** How long a step takes to leave in the player: the annotations fade and the zoom eases back out to the whole frame, so the motion
+    that follows starts where the step's still left off. */
+export function outroLength(step: Pick<Step, 'zoom'>): number {
+  return step.zoom ? ZOOM_OUT : OUTRO_FADE;
+}
+
+/** How a step looks `t` seconds after the player starts leaving it. */
+export function stepOutro(step: Pick<Step, 'zoom'>, t: number): StepLook {
+  const fade = clamp(1 - t / OUTRO_FADE, 0, 1);
+  return { zoom: step.zoom ? clamp(1 - t / ZOOM_OUT, 0, 1) : 0, reveal: new Array<number>(REVEAL_GROUPS).fill(fade) };
 }
 
 export type PlanItem =

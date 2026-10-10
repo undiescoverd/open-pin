@@ -1,10 +1,10 @@
 import { canRedo, canUndo, redoLabel, undoLabel } from '@waypost/core';
 import { Button, Icon, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator } from '@waypost/ui';
-import { ChevronDown, ChevronLeft, ClipboardCopy, Download, Eye, FileArchive, FileText, Film, Image as ImageIcon, Redo2, Save, Search, Share, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ClipboardCopy, Download, Eye, FileArchive, FileText, Film, FolderDown, Image as ImageIcon, Redo2, Save, Search, Share, Undo2 } from 'lucide-react';
 import { ThemeButton } from '../ThemeButton';
 import { copyFrame, exportPdfGuide, exportScreenshots, saveFrame } from '../state/exporting';
 import { saveWaypost } from '../state/project';
-import { redo, renameProject, selectProject, setExportOpen, setProjectsOpen, undo, useEditor } from '../state/store';
+import { redo, renameProject, selectProject, setExportOpen, setPreviewOpen, setProjectsOpen, setShareOpen, undo, useEditor } from '../state/store';
 import { Logo } from './Logo';
 import { useEditSession } from './useEditSession';
 
@@ -40,7 +40,7 @@ export function TopBar() {
         <ThemeButton />
         <IconButton label="Search every action" shortcut={['mod', 'k']} icon={<Icon icon={Search} />} disabled />
         <span className="mx-1 h-5 w-px bg-line" aria-hidden="true" />
-        <Button icon={<Icon icon={Eye} />} disabled>
+        <Button icon={<Icon icon={Eye} />} disabled={!ready} onClick={() => setPreviewOpen(true)} title="See what viewers see (⌘↩)">
           Preview
         </Button>
         <Menu
@@ -51,6 +51,11 @@ export function TopBar() {
             </Button>
           }
         >
+          <MenuLabel>Interactive guide</MenuLabel>
+          <MenuItem icon={<Icon icon={FolderDown} />} onSelect={() => setShareOpen(true)}>
+            Guide folder for the web…
+          </MenuItem>
+          <MenuSeparator />
           <MenuLabel>PDF guide</MenuLabel>
           <MenuItem icon={<Icon icon={FileText} />} onSelect={() => void exportPdfGuide('a4')}>
             PDF · A4
@@ -87,7 +92,7 @@ export function TopBar() {
             MP4 video…
           </MenuItem>
         </Menu>
-        <Button variant="primary" icon={<Icon icon={Share} />} disabled>
+        <Button variant="primary" icon={<Icon icon={Share} />} disabled={!ready} onClick={() => setShareOpen(true)}>
           Share
         </Button>
       </div>

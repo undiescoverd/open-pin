@@ -1,13 +1,13 @@
 import { z } from 'zod';
+import { MAX_SPEED, MIN_SPEED, REVEAL_GROUPS, ZOOM_MAX, ZOOM_MIN } from './constants';
 import { separateLayers } from './effects';
+
+export { MAX_SPEED, MIN_SPEED, REVEAL_GROUPS, ZOOM_MAX, ZOOM_MIN };
 
 /* The project document (docs/02-architecture.md, "Data model"). Zod is the single source of truth: the types below are inferred
    from it, and `parseProject` validates anything read from disk. Geometry is normalised: 0 to 1 of the recording frame. */
 
-export const SCHEMA_VERSION = 'waypost.project/2';
-
-/** Reveal groups (F6): 0 appears with the step, 1 after it, and so on up to this many groups. */
-export const REVEAL_GROUPS = 4;
+export const SCHEMA_VERSION = 'waypost.project/3';
 
 const unit = z.number().min(0).max(1);
 /** A point on the recording frame, normalised. It may sit slightly outside while someone drags it. */
@@ -56,9 +56,6 @@ export const SourceSchema = z.object({
   fps: z.number().positive(),
 });
 
-export const MIN_SPEED = 0.25;
-export const MAX_SPEED = 8;
-
 /** A stretch of a source on the timeline. `gap` is empty timeline time before the clip. */
 export const ClipSchema = z.object({
   id,
@@ -71,10 +68,6 @@ export const ClipSchema = z.object({
   volume: z.number().min(0).max(1.5).default(1),
   muted: z.boolean().default(false),
 });
-
-/** Zoom box limits: a share of the frame, so 0.25 is 4× and 0.8 is 1.25× (docs/05-editor-interactions.md, section 2). */
-export const ZOOM_MIN = 0.25;
-export const ZOOM_MAX = 0.8;
 
 /** The part of the frame a step zooms into. Always the frame's own shape: width and height are the same share of the frame. */
 export const ZoomSchema = z.object({ rect: RectSchema });
@@ -184,6 +177,48 @@ export const LogoSchema = z.object({
 
 export const DEFAULT_FRAME: z.infer<typeof FrameSchema> = { aspect: 'source', padding: 0, background: { type: 'none' }, cornerRadius: 12, shadow: true };
 
+/** F9: how the interactive guide plays. Guided stops at every step until the viewer moves on; auto pauses on each step for its
+    pause time; video plays straight through, with step markers on its progress bar. */
+export const PLAYBACK_MODES = ['guided', 'auto', 'video'] as const;
+/** The player's own colours: light, dark, or following the viewer's system setting. */
+export const CHROMES = ['auto', 'light', 'dark'] as const;
+
+export const ControlsSchema = z.object({
+  counter: z.boolean().default(true),
+  progress: z.boolean().default(true),
+  fullscreen: z.boolean().default(true),
+});
+
+/** F10: a button to a signup, booking, documentation or other page. */
+export const CtaSchema = z.object({
+  label: z.string().max(40),
+  /** may be empty or unfinished while someone types it; the export only uses an http(s) address */
+  url: z.string().max(2000),
+  newTab: z.boolean().default(true),
+  /** on the end card, or on one step (by id) and every step after it */
+  showAt: z.string().min(1).default('end'),
+});
+
+export const GuideSettingsSchema = z.object({
+  mode: z.enum(PLAYBACK_MODES).default('guided'),
+  controls: ControlsSchema.default({ counter: true, progress: true, fullscreen: true }),
+  /** buttons and the progress bar; text on it is picked for contrast */
+  accent: colour.default('#D13A30'),
+  chrome: z.enum(CHROMES).default('auto'),
+  cta: CtaSchema.nullable().default(null),
+  /** where the guide's folder will be served from, for the embed snippets; empty until the person says */
+  address: z.string().max(500).default(''),
+});
+
+export const DEFAULT_GUIDE: z.infer<typeof GuideSettingsSchema> = {
+  mode: 'guided',
+  controls: { counter: true, progress: true, fullscreen: true },
+  accent: '#D13A30',
+  chrome: 'auto',
+  cta: null,
+  address: '',
+};
+
 export const ProjectSchema = z.object({
   schema: z.literal(SCHEMA_VERSION),
   id,
@@ -197,6 +232,7 @@ export const ProjectSchema = z.object({
   assets: z.array(AssetSchema).default([]),
   frame: FrameSchema.default(DEFAULT_FRAME),
   logo: LogoSchema.nullable().default(null),
+  guide: GuideSettingsSchema.default(DEFAULT_GUIDE),
 });
 
 export type Point = z.infer<typeof PointSchema>;
@@ -224,6 +260,11 @@ export type Background = z.infer<typeof BackgroundSchema>;
 export type Frame = z.infer<typeof FrameSchema>;
 export type LogoCorner = z.infer<typeof LogoCornerSchema>;
 export type Logo = z.infer<typeof LogoSchema>;
+export type PlaybackMode = (typeof PLAYBACK_MODES)[number];
+export type Chrome = (typeof CHROMES)[number];
+export type Controls = z.infer<typeof ControlsSchema>;
+export type Cta = z.infer<typeof CtaSchema>;
+export type GuideSettings = z.infer<typeof GuideSettingsSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
 
 export class ProjectParseError extends Error {
@@ -233,19 +274,22 @@ export class ProjectParseError extends Error {
   }
 }
 
+/** Versions this app can bring up to date. */
+const OLDER_VERSIONS = ['waypost.project/1', 'waypost.project/2'];
+
 /**
- * Brings an older document up to the current schema. Version 1 (Phase 1) had no blur, zoom, framing or logo; the schema's defaults
- * fill those in, so only the version string changes.
+ * Brings an older document up to the current schema. Version 1 (Phase 1) had no blur, zoom, framing or logo, and version 2
+ * (Phase 2) no player settings; the schema's defaults fill those in, so only the version string changes.
  */
 function migrate(value: Record<string, unknown>): Record<string, unknown> {
-  if (value.schema === 'waypost.project/1') return { ...value, schema: SCHEMA_VERSION };
+  if (typeof value.schema === 'string' && OLDER_VERSIONS.includes(value.schema)) return { ...value, schema: SCHEMA_VERSION };
   return value;
 }
 
 /** Reads a `project.json` value. Unknown future schema versions are refused with a message the person can act on. */
 export function parseProject(value: unknown): Project {
   const version = typeof value === 'object' && value !== null ? (value as { schema?: unknown }).schema : undefined;
-  if (typeof version === 'string' && version.startsWith('waypost.project/') && version !== SCHEMA_VERSION && version !== 'waypost.project/1') {
+  if (typeof version === 'string' && version.startsWith('waypost.project/') && version !== SCHEMA_VERSION && !OLDER_VERSIONS.includes(version)) {
     throw new ProjectParseError('This project was made by a newer version of Waypost. Update the app to open it.');
   }
   const result = ProjectSchema.safeParse(typeof value === 'object' && value !== null ? migrate(value as Record<string, unknown>) : value);

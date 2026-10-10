@@ -11,7 +11,13 @@ interface OpenFilePickerOptions {
   types?: FilePickerAcceptType[];
   multiple?: boolean;
 }
+interface DirectoryPickerOptions {
+  /** remembers the last folder per id */
+  id?: string;
+  mode?: 'read' | 'readwrite';
+}
 interface Window {
   showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<FileSystemFileHandle>;
   showOpenFilePicker?: (options?: OpenFilePickerOptions) => Promise<FileSystemFileHandle[]>;
+  showDirectoryPicker?: (options?: DirectoryPickerOptions) => Promise<FileSystemDirectoryHandle>;
 }
