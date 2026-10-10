@@ -66,8 +66,9 @@ pnpm tokens       # regenerate the CSS after editing design/tokens.json
 CI deploys to Cloudflare Pages once two repository secrets exist; until then the deploy step is skipped and everything else still runs.
 
 1. In Cloudflare, create an API token with the **Cloudflare Pages: Edit** permission, and note your account ID.
-2. Create the Pages project once: `pnpm dlx wrangler pages project create waypost --production-branch=claude/gracious-keller-073zo2` (use whichever branch is the repository's default).
-3. In GitHub, add the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (Settings → Secrets and variables → Actions).
+2. In GitHub, add the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (Settings → Secrets and variables → Actions).
+
+CI creates the `waypost` Pages project on its first deploy, with the repository's default branch as production.
 
 Pushes to the default branch then go to production, and every pull request branch gets its own preview URL.
 
