@@ -13,7 +13,7 @@ test.describe('editor shell', () => {
     await expect(page.getByRole('region', { name: 'Timeline' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Drop a screen recording' })).toBeVisible();
     await expect(page.getByRole('toolbar', { name: 'Tools' }).getByRole('button')).toHaveCount(8);
-    for (const lane of ['Video', 'Steps', 'Blur', 'Voice', 'Music']) await expect(page.getByLabel(`${lane} lane, empty`)).toBeVisible();
+    for (const lane of ['Steps', 'Video', 'Effects', 'Voice', 'Music']) await expect(page.getByLabel(`${lane} lane, empty`)).toBeVisible();
     await expect(page.getByText('0:00.000 / 0:00.000')).toBeVisible();
     expect(errors).toEqual([]);
   });
@@ -53,13 +53,14 @@ test.describe('editor shell', () => {
     await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('Zoom and Blur say they are coming rather than doing nothing', async ({ page }) => {
+  test('Z and X pick the Zoom and Blur tools', async ({ page }) => {
     await openRecording(page);
     const tools = page.getByRole('toolbar', { name: 'Tools' });
-    await expect(tools.getByRole('button', { name: 'Zoom' })).toBeDisabled();
-    await expect(tools.getByRole('button', { name: 'Blur' })).toBeDisabled();
+    await page.keyboard.press('z');
+    await expect(tools.getByRole('button', { name: 'Zoom' })).toHaveAttribute('aria-pressed', 'true');
     await page.keyboard.press('x');
-    await expect(page.getByRole('status').filter({ hasText: 'Blur: blur arrives' })).toBeVisible();
+    await expect(tools.getByRole('button', { name: 'Blur' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Escape');
     await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
   });
 

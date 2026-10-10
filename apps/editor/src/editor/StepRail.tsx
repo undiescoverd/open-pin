@@ -1,6 +1,6 @@
-import { formatTimecode, type Step } from '@waypost/core';
+import { formatTimecode, nativeOutputSize, stepShown, type Step } from '@waypost/core';
 import type { MediaHandle } from '@waypost/media';
-import { composeFrame } from '@waypost/render';
+import { composeScene, sceneFor } from '@waypost/render';
 import { Button, Icon, KeyCap, Surface, cx, focusRing } from '@waypost/ui';
 import { Plus } from 'lucide-react';
 import { useEffect, useRef } from 'react';
@@ -20,24 +20,31 @@ async function thumbFrame(media: MediaHandle, index: number): Promise<ImageBitma
   return bitmap;
 }
 
+/** The step as the guide shows it, framed, with its effects, zoom, annotations and logo. */
 function StepThumb({ step }: { step: Step }) {
   const media = useEditor(s => s.media);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const source = useEditor(s => selectProject(s)?.sources[0]);
+  const project = useEditor(selectProject);
+  const assets = useEditor(s => s.assetImages);
+  const source = project?.sources[0];
+  const native = source && project ? nativeOutputSize(project.frame, source.size) : [16, 10];
   const width = THUMB_WIDTH;
-  const height = source ? Math.round((width * source.size[1]) / source.size[0]) : 200;
+  const height = Math.round((width * native[1]!) / native[0]!);
+  const blurs = project?.blurs, frame = project?.frame, logo = project?.logo;
   useEffect(() => {
     const el = canvas.current;
-    if (!media || !el) return;
+    const p = selectProject(useEditor.getState());
+    if (!media || !el || !p) return;
     let cancelled = false;
     void thumbFrame(media, media.index.indexAt(step.anchor.time)).then(bitmap => {
       if (cancelled) return;
-      composeFrame(el.getContext('2d')!, bitmap, width, height, { annotations: step.annotations });
+      const scene = sceneFor(p, { frame: bitmap, sourceTime: step.anchor.time, step, look: stepShown(step), assets: useEditor.getState().assetImages });
+      composeScene(el.getContext('2d')!, width, height, scene);
     });
     return () => {
       cancelled = true;
     };
-  }, [media, step.anchor.time, step.annotations, width, height]);
+  }, [media, step, blurs, frame, logo, assets, width, height]);
   return <canvas ref={canvas} width={width} height={height} aria-hidden="true" className="block h-auto w-full rounded-sm bg-raised" />;
 }
 
@@ -67,7 +74,7 @@ export function StepRail() {
       ) : (
         <ol className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2 overflow-auto p-2">
           {steps.map((step, i) => {
-            const active = selection?.stepId === step.id;
+            const active = selection !== null && 'stepId' in selection && selection.stepId === step.id;
             return (
               <li key={step.id}>
                 <button

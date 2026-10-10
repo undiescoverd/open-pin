@@ -1,17 +1,18 @@
-import { formatTimecode } from '@waypost/core';
-import { composeFrame, loadRenderFonts } from '@waypost/render';
+import { formatTimecode, frameLayout, nativeOutputSize } from '@waypost/core';
+import { composeScene, loadRenderFonts, sceneFor } from '@waypost/render';
 import { useEffect, useRef } from 'react';
 import { Playback, type PlaybackHost } from '../engine/playback';
 import { currentPlayback, setPlayback } from '../engine/session';
-import { getEditor, selectProject, setPlaybackState, setSourceTime, useEditor } from '../state/store';
+import { getEditor, selectProject, setPlaybackState, setPlayhead, timelineTimeOf, useEditor } from '../state/store';
 import { AnnotationOverlay } from './AnnotationOverlay';
-import { visibleAnnotations } from './visible';
+import { introLength, presentation, projectForDrawing } from './visible';
 import { useFitSize } from './useFitSize';
 
-/** Preview frames are drawn at most this wide; exports use the recording's full size. */
+/** Preview frames are decoded at most this wide; exports use the recording's full size. */
 const MAX_PREVIEW_WIDTH = 1920;
 
-/** The recording frame on a canvas, with the playback that feeds it and the overlay that edits it. */
+/** The frame on a canvas (framed, blurred, zoomed and annotated as it will export), with the playback that feeds it and the
+    overlay that edits it. */
 export function CanvasView() {
   const media = useEditor(s => s.media);
   const videoUrl = useEditor(s => s.videoUrl);
@@ -22,24 +23,51 @@ export function CanvasView() {
   const video = useRef<HTMLVideoElement>(null);
   const source = project?.sources[0];
 
-  const aspect = source ? source.size[0] / source.size[1] : 16 / 10;
-  const width = source ? Math.min(source.size[0], MAX_PREVIEW_WIDTH) : 0;
-  const height = source ? Math.round((width * source.size[1]) / source.size[0]) : 0;
-  const fit = useFitSize(wrap, aspect);
+  /* the recording decodes at up to 1920 px wide; the canvas is the framed output at the same scale */
+  const decodeWidth = source ? Math.min(source.size[0], MAX_PREVIEW_WIDTH) : 0;
+  const scale = source ? decodeWidth / source.size[0] : 1;
+  const native: [number, number] = source && project ? nativeOutputSize(project.frame, source.size) : [16, 10];
+  const width = Math.max(2, Math.round(native[0] * scale));
+  const height = Math.max(2, Math.round(native[1] * scale));
+  const layout = source && project ? frameLayout(project.frame, source.size, [width, height]) : null;
+  const fit = useFitSize(wrap, width / height);
+
+  /* when the playhead arrived on this frame, for the Viewer entrance */
+  const arrival = useRef({ key: '', at: 0 });
 
   useEffect(() => {
     const el = canvas.current, videoEl = video.current;
-    if (!media || !videoUrl || !el || !videoEl || !width) return;
+    if (!media || !videoUrl || !el || !videoEl || !decodeWidth) return;
     const ctx = el.getContext('2d')!;
     videoEl.src = videoUrl;
     const host: PlaybackHost = {
-      pins: () => selectProject(getEditor())?.steps.map(s => ({ id: s.id, time: s.anchor.time })) ?? [],
-      draw: frame => composeFrame(ctx, frame, width, height, { annotations: visibleAnnotations() }),
-      onTime: setSourceTime,
+      clips: () => selectProject(getEditor())?.timeline ?? [],
+      pins: () => {
+        const p = selectProject(getEditor());
+        return p ? p.steps.map(s => ({ id: s.id, time: timelineTimeOf(p, s) })).sort((a, b) => a.time - b.time) : [];
+      },
+      draw: (frame, sourceTime) => {
+        const state = getEditor();
+        const p = selectProject(state);
+        if (!p) return;
+        const key = `${state.playhead}|${state.view}|${state.playback.stoppedAt}`;
+        if (arrival.current.key !== key) arrival.current = { key, at: performance.now() };
+        const shown = presentation((performance.now() - arrival.current.at) / 1000);
+        const scene = sceneFor(projectForDrawing(p, state), {
+          frame,
+          sourceTime,
+          step: shown.step,
+          look: shown.look,
+          annotationList: shown.annotations,
+          assets: state.assetImages,
+        });
+        composeScene(ctx, el.width, el.height, scene);
+      },
+      onTime: setPlayhead,
       onState: setPlaybackState,
       muted: () => getEditor().muted,
     };
-    const playback = new Playback(media, videoEl, width, host);
+    const playback = new Playback(media, videoEl, decodeWidth, host);
     setPlayback(playback);
     let cancelled = false;
     void loadRenderFonts().then(() => {
@@ -52,34 +80,59 @@ export function CanvasView() {
       videoEl.removeAttribute('src');
       videoEl.load();
     };
-  }, [media, videoUrl, width, height]);
+  }, [media, videoUrl, decodeWidth]);
 
   /* repaint when something that appears on the frame changes (the playback repaints by itself when the playhead moves) */
   const steps = project?.steps;
+  const blurs = project?.blurs;
+  const frame = project?.frame;
+  const logo = project?.logo;
   const selection = useEditor(s => s.selection);
   const draft = useEditor(s => s.draft);
+  const shapeDraft = useEditor(s => s.shapeDraft);
   const rate = useEditor(s => s.playback.rate);
+  const stoppedAt = useEditor(s => s.playback.stoppedAt);
+  const view = useEditor(s => s.view);
+  const assetImages = useEditor(s => s.assetImages);
   useEffect(() => {
     currentPlayback()?.redraw();
-  }, [steps, selection, draft, rate]);
+  }, [steps, blurs, frame, logo, selection, draft, shapeDraft, rate, view, assetImages, width, height]);
 
+  /* the Viewer entrance: keep repainting while the zoom eases in and the groups appear */
+  useEffect(() => {
+    if (rate !== 0) return;
+    const state = getEditor();
+    const p = selectProject(state);
+    const shown = presentation(0);
+    if (!p || !shown.viewer || !shown.step) return;
+    const until = performance.now() + introLength(shown.step) * 1000 + 100;
+    let raf = 0;
+    const tick = (now: number) => {
+      currentPlayback()?.redraw();
+      if (now < until) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playhead, rate, stoppedAt, view, steps]);
+
+  const inner = layout?.inner ?? [0, 0, width, height];
   return (
     <div ref={wrap} className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center">
       {/* the video element only feeds the canvas while playing forward; it is never shown */}
       <video ref={video} className="hidden" playsInline preload="auto" muted={false} />
       {/* always mounted, so the playback effect finds its canvas; it has no size until the space around it is measured */}
       {source && (
-        <div className="relative overflow-hidden rounded-md shadow-pop outline outline-1 outline-line" style={{ width: fit.width, height: fit.height }}>
-          <canvas
-            ref={canvas}
-            width={width}
-            height={height}
-            role="img"
-            aria-label={`Recording frame at ${formatTimecode(playhead)}`}
-            data-testid="frame-canvas"
-            className="block size-full"
-          />
-          <AnnotationOverlay width={width} height={height} cssWidth={fit.width} />
+        <div
+          className="relative overflow-hidden rounded-md shadow-pop outline outline-1 outline-line [background:repeating-conic-gradient(var(--wp-raised)_0_25%,var(--wp-panel)_0_50%)_0_0/16px_16px]"
+          style={{ width: fit.width, height: fit.height }}
+        >
+          <canvas ref={canvas} width={width} height={height} role="img" aria-label={`Recording frame at ${formatTimecode(playhead)}`} data-testid="frame-canvas" className="block size-full" />
+          <div
+            className="absolute"
+            style={{ left: `${(inner[0] / width) * 100}%`, top: `${(inner[1] / height) * 100}%`, width: `${(inner[2] / width) * 100}%`, height: `${(inner[3] / height) * 100}%` }}
+          >
+            <AnnotationOverlay width={inner[2]} height={inner[3]} cssWidth={(fit.width * inner[2]) / width} />
+          </div>
         </div>
       )}
     </div>

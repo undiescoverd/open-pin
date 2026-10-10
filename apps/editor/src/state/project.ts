@@ -1,10 +1,10 @@
-import { createHistory, createProject, newId, type Project } from '@waypost/core';
+import { commands, createHistory, createProject, newId, type Project } from '@waypost/core';
 import { MediaUnsupportedError, type MediaHandle } from '@waypost/media';
 import { mediaClient } from '../engine/session';
 import { entryFor, getEntry, lastProjectId, listProjects, putEntry, rememberLastProject, removeEntry, type LibraryEntry } from '../storage/library';
-import { deleteProjectFiles, loadProject, readSource, requestPersistence, saveProject, sourcePath, writeSource } from '../storage/opfs';
+import { assetPath, deleteProjectFiles, loadProject, readSource, requestPersistence, saveProject, sourcePath, writeSource } from '../storage/opfs';
 import { openWaypostFile, saveWaypostFile } from '../storage/waypost-file';
-import { getEditor, notify, patchEditor, resetEditor, selectProject, useEditor } from './store';
+import { getEditor, notify, patchEditor, resetEditor, run, selectProject, setAssetImage, useEditor } from './store';
 
 /* Opening, importing, saving and deleting projects: the glue between the store, OPFS, the project list and the media worker. */
 
@@ -49,6 +49,44 @@ async function present(project: Project): Promise<void> {
     busy: null,
   });
   rememberLastProject(project.id);
+  void loadAssetImages(project);
+}
+
+/** Decodes the project's logo and background images, so the canvas and exports can draw them. */
+async function loadAssetImages(project: Project): Promise<void> {
+  for (const asset of project.assets) {
+    try {
+      const image = await createImageBitmap(await readSource(project.id, asset.file));
+      if (selectProject(getEditor())?.id === project.id) setAssetImage(asset.id, image);
+      else image.close();
+    } catch {
+      /* a missing or unreadable image is left out; the guide still works without it */
+    }
+  }
+}
+
+const IMAGE_TYPES = /^image\/(png|jpeg|webp|svg\+xml|gif|avif)$/;
+
+/** Adds a logo or background image to the open project: copied into its folder, decoded, and put to use in one undo step. */
+export async function addImage(file: File, use: 'logo' | 'background'): Promise<void> {
+  const project = selectProject(getEditor());
+  if (!project) return;
+  if (!IMAGE_TYPES.test(file.type)) {
+    notify('Choose a PNG, JPEG, WebP, SVG or GIF image.', 'error');
+    return;
+  }
+  try {
+    const id = newId('img');
+    const path = assetPath(id, file.name);
+    const image = await createImageBitmap(file);
+    await writeSource(project.id, path, file);
+    setAssetImage(id, image);
+    const asset = { id, file: path, name: file.name, type: file.type, size: [Math.max(1, image.width), Math.max(1, image.height)] as [number, number] };
+    const logo = use === 'logo' ? { asset: id, corner: project.logo?.corner ?? 'br', size: project.logo?.size ?? 0.1, margin: project.logo?.margin ?? 0.03, opacity: project.logo?.opacity ?? 0.9 } : undefined;
+    run(commands.addAsset(asset, use === 'logo' ? { logo } : { background: true }, Date.now()));
+  } catch {
+    notify("Couldn't read that image.", 'error');
+  }
 }
 
 function resetStateFor(project: Project) {

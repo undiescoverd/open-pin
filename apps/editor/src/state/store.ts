@@ -1,30 +1,55 @@
 import {
   apply,
+  canDeleteClip,
   canPinAt,
   canRedo,
+  canSplit,
   canUndo,
+  clipCommands,
   commands,
   newId,
   redo as redoHistory,
+  spotAt,
+  clipLength,
+  clipStarts,
   srcToTl,
   stepAtTime,
   timelineDuration,
-  tlToSrc,
+  trimLimits,
   undo as undoHistory,
+  zoomBox,
+  MIN_REGION,
+  newEffect,
+  nextBlurName,
   type Annotation,
+  type EffectType,
+  type LayerMove,
+  type Blur,
+  type ClipEdge,
   type Command,
+  type Frame,
   type History,
+  type Logo,
   type Point,
   type Project,
+  type Rect,
   type Step,
 } from '@waypost/core';
 import type { MediaHandle } from '@waypost/media';
 import { create } from 'zustand';
 import { currentPlayback } from '../engine/session';
+import { timelineEdges } from '../editor/snapping';
 import type { PlaybackState } from '../engine/playback';
 import type { ToolId } from '../editor/tools';
 
-export type Selection = { kind: 'step'; stepId: string } | { kind: 'annotation'; stepId: string; id: string } | null;
+export type Selection =
+  | { kind: 'step'; stepId: string }
+  | { kind: 'annotation'; stepId: string; id: string }
+  | { kind: 'zoom'; stepId: string }
+  | { kind: 'clip'; clipId: string }
+  | { kind: 'gap'; clipId: string }
+  | { kind: 'blur'; blurId: string }
+  | null;
 
 export interface Message {
   id: number;
@@ -38,19 +63,36 @@ export interface Draft {
   annotation: Annotation;
 }
 
+/** A blur or zoom box being drawn or dragged on the frame. A blur draft with id 'new' is one being drawn. */
+export type ShapeDraft = { kind: 'blur'; blurId: string; rect: Rect } | { kind: 'zoom'; stepId: string; rect: Rect };
+
+/** A long export in progress: what it says, how far along (0 to 1), and how to stop it. */
+export interface ExportProgress {
+  label: string;
+  progress: number;
+  detail: string;
+  cancel: () => void;
+}
+
 export interface EditorState {
   phase: 'empty' | 'loading' | 'ready';
   /** shown over the stage while something slow runs ("Importing…") */
   busy: string | null;
+  exporting: ExportProgress | null;
   history: History<Project> | null;
   media: MediaHandle | null;
   videoUrl: string | null;
+  /** decoded logo and background images, by asset id */
+  assetImages: ReadonlyMap<string, ImageBitmap>;
   /** timeline seconds */
   playhead: number;
   playback: PlaybackState;
   selection: Selection;
   draft: Draft | null;
+  shapeDraft: ShapeDraft | null;
   tool: ToolId;
+  /** Edit shows every annotation with handles; Viewer shows a step as the guide will (zoom eased in, groups revealed in order) */
+  view: 'edit' | 'viewer';
   snap: boolean;
   ripple: boolean;
   /** timeline zoom, 1 (fit) to 8 */
@@ -59,19 +101,24 @@ export interface EditorState {
   message: Message | null;
   save: 'idle' | 'saving' | 'saved' | 'error';
   projectsOpen: boolean;
+  exportOpen: boolean;
 }
 
 const INITIAL: EditorState = {
   phase: 'empty',
   busy: null,
+  exporting: null,
   history: null,
   media: null,
   videoUrl: null,
+  assetImages: new Map(),
   playhead: 0,
   playback: { rate: 0, stoppedAt: null },
   selection: null,
   draft: null,
+  shapeDraft: null,
   tool: 'select',
+  view: 'edit',
   snap: true,
   ripple: true,
   zoom: 1,
@@ -79,6 +126,7 @@ const INITIAL: EditorState = {
   message: null,
   save: 'idle',
   projectsOpen: false,
+  exportOpen: false,
 };
 
 export const useEditor = create<EditorState>(() => INITIAL);
@@ -88,6 +136,8 @@ const set = useEditor.setState;
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 8;
 export const ZOOM_FACTOR = 1.5;
+/** A new zoom box covers half the frame (2×). */
+const DEFAULT_ZOOM_SIZE = 0.5;
 
 // ----- selectors ------------------------------------------------------------------------------------------------------
 
@@ -97,14 +147,25 @@ export function totalDuration(project: Project): number {
   return timelineDuration(project.timeline);
 }
 
-/** The recording time under the playhead. */
+/** The recording time under the playhead, or null in a gap. */
+export function sourceAt(project: Project, playhead: number): { source: string; time: number } | null {
+  const spot = spotAt(project.timeline, playhead);
+  if (!spot || spot.kind === 'gap') return null;
+  return { source: project.timeline[spot.index]!.source, time: spot.time };
+}
+
+/** The recording time under the playhead; in a gap, the frame held there. */
 export function sourceTimeAt(project: Project, playhead: number): number {
-  return tlToSrc(project.timeline, playhead)?.time ?? 0;
+  const spot = spotAt(project.timeline, playhead);
+  if (!spot) return 0;
+  if (spot.kind === 'clip') return spot.time;
+  const before = project.timeline[spot.index - 1];
+  return before ? before.out : project.timeline[spot.index]!.in;
 }
 
 /** The step pinned on the frame showing now, if any. */
 export function stepAtPlayhead(project: Project, playhead: number): Step | undefined {
-  const pos = tlToSrc(project.timeline, playhead);
+  const pos = sourceAt(project, playhead);
   return pos ? stepAtTime(project, pos.source, pos.time) : undefined;
 }
 
@@ -112,13 +173,28 @@ export function timelineTimeOf(project: Project, step: Step): number {
   return srcToTl(project.timeline, step.anchor.source, step.anchor.time);
 }
 
+/** The step a selection belongs to, if any. */
+export function selectionStepId(selection: Selection): string | undefined {
+  return selection && 'stepId' in selection ? selection.stepId : undefined;
+}
+
 export function selectedStep(project: Project | null, selection: Selection): Step | undefined {
-  return selection ? project?.steps.find(s => s.id === selection.stepId) : undefined;
+  const id = selectionStepId(selection);
+  return id ? project?.steps.find(s => s.id === id) : undefined;
 }
 
 export function selectedAnnotation(project: Project | null, selection: Selection): Annotation | undefined {
   if (selection?.kind !== 'annotation') return undefined;
   return selectedStep(project, selection)?.annotations.find(a => a.id === selection.id);
+}
+
+export function selectedBlur(project: Project | null, selection: Selection): Blur | undefined {
+  return selection?.kind === 'blur' ? project?.blurs.find(b => b.id === selection.blurId) : undefined;
+}
+
+/** Half a frame of the recording: how close two times must be to count as the same frame. */
+export function halfFrame(): number {
+  return 0.5 / (getEditor().media?.info.fps ?? 30);
 }
 
 // ----- messages -------------------------------------------------------------------------------------------------------
@@ -146,10 +222,32 @@ export function run(command: Command<Project>): void {
 /** Drops a selection that points at something an undo, redo or delete removed. */
 function validSelection(project: Project | null, selection: Selection): Selection {
   if (!project || !selection) return null;
-  const step = project.steps.find(s => s.id === selection.stepId);
-  if (!step) return null;
-  if (selection.kind === 'annotation' && !step.annotations.some(a => a.id === selection.id)) return { kind: 'step', stepId: step.id };
-  return selection;
+  switch (selection.kind) {
+    case 'clip':
+      return project.timeline.some(c => c.id === selection.clipId) ? selection : null;
+    case 'gap':
+      return project.timeline.some(c => c.id === selection.clipId && c.gap > 0) ? selection : null;
+    case 'blur':
+      return project.blurs.some(b => b.id === selection.blurId) ? selection : null;
+    default: {
+      const step = project.steps.find(s => s.id === selection.stepId);
+      if (!step) return null;
+      if (selection.kind === 'annotation' && !step.annotations.some(a => a.id === selection.id)) return { kind: 'step', stepId: step.id };
+      if (selection.kind === 'zoom' && !step.zoom) return { kind: 'step', stepId: step.id };
+      return selection;
+    }
+  }
+}
+
+/** Re-checks the selection after an edit that may have removed what it points at. */
+function revalidate(): void {
+  set(s => ({ selection: validSelection(selectProject(s), s.selection) }));
+}
+
+/** After the clips change, the playhead keeps its timeline time and the frame there is drawn again. */
+function refreshPlayhead(): void {
+  const playback = currentPlayback();
+  if (playback && playback.state.rate === 0) playback.seek(Math.min(getEditor().playhead, totalDuration(selectProject(getEditor())!)));
 }
 
 export function undo(): void {
@@ -158,6 +256,7 @@ export function undo(): void {
     const history = undoHistory(s.history);
     return { history, selection: validSelection(history.present, s.selection) };
   });
+  refreshPlayhead();
 }
 
 export function redo(): void {
@@ -166,6 +265,7 @@ export function redo(): void {
     const history = redoHistory(s.history);
     return { history, selection: validSelection(history.present, s.selection) };
   });
+  refreshPlayhead();
 }
 
 export function setTool(tool: ToolId): void {
@@ -177,12 +277,19 @@ export function toggleSnap(): void {
 }
 export function toggleRipple(): void {
   set(s => ({ ripple: !s.ripple }));
+  notify(getEditor().ripple ? 'Ripple trim on: trims close up the space.' : 'Ripple trim off: trims leave a gap.');
 }
 export function toggleMuted(): void {
   set(s => ({ muted: !s.muted }));
 }
+export function setView(view: EditorState['view']): void {
+  set({ view });
+}
 export function setProjectsOpen(open: boolean): void {
   set({ projectsOpen: open });
+}
+export function setExportOpen(open: boolean): void {
+  set({ exportOpen: open });
 }
 
 export function setZoom(zoom: number): void {
@@ -194,6 +301,9 @@ export function zoomBy(factor: number): void {
 
 export function setDraft(draft: Draft | null): void {
   set({ draft });
+}
+export function setShapeDraft(shapeDraft: ShapeDraft | null): void {
+  set({ shapeDraft });
 }
 
 export function renameProject(name: string, coalesceKey?: string): void {
@@ -215,14 +325,38 @@ export function selectAnnotation(stepId: string, id: string): void {
   set({ selection: { kind: 'annotation', stepId, id } });
 }
 
+export function selectZoom(stepId: string): void {
+  set({ selection: { kind: 'zoom', stepId } });
+}
+
+export function selectClip(clipId: string): void {
+  set({ selection: { kind: 'clip', clipId } });
+}
+
+export function selectGap(clipId: string): void {
+  set({ selection: { kind: 'gap', clipId } });
+}
+
+/** Selects a blur; from the timeline it also moves the playhead into the blur if it was outside it. */
+export function selectBlur(blurId: string, options: { seek?: boolean } = {}): void {
+  const project = selectProject(getEditor());
+  const blur = project?.blurs.find(b => b.id === blurId);
+  if (!project || !blur) return;
+  set({ selection: { kind: 'blur', blurId } });
+  if (options.seek) {
+    const now = sourceTimeAt(project, getEditor().playhead);
+    if (now < blur.start - 1e-6 || now > blur.end + 1e-6) seekSource(blur.start);
+  }
+}
+
 export function clearSelection(): void {
   set({ selection: null });
 }
 
-/** Esc steps an annotation selection back up to its step, then clears it. */
+/** Esc steps an annotation or zoom selection back up to its step, then clears it. */
 export function escapeSelection(): void {
   const { selection } = getEditor();
-  if (selection?.kind === 'annotation') set({ selection: { kind: 'step', stepId: selection.stepId } });
+  if (selection?.kind === 'annotation' || selection?.kind === 'zoom') set({ selection: { kind: 'step', stepId: selection.stepId } });
   else set({ selection: null });
 }
 
@@ -230,21 +364,19 @@ export function escapeSelection(): void {
 
 /** Moves to the frame showing at a recording time. */
 export function seekSource(time: number): void {
-  const playback = currentPlayback();
-  if (playback) playback.seek(time);
-  else {
-    const project = selectProject(getEditor());
-    const source = project?.sources[0];
-    if (project && source) set({ playhead: srcToTl(project.timeline, source.id, time) });
-  }
+  const project = selectProject(getEditor());
+  const source = project?.sources[0];
+  if (project && source) seekTimeline(srcToTl(project.timeline, source.id, time));
 }
 
 /** Moves to a timeline time (scrubbing the ruler). */
 export function seekTimeline(time: number): void {
   const project = selectProject(getEditor());
   if (!project) return;
-  const pos = tlToSrc(project.timeline, Math.min(Math.max(0, time), totalDuration(project)));
-  if (pos) seekSource(pos.time);
+  const t = Math.min(Math.max(0, time), totalDuration(project));
+  const playback = currentPlayback();
+  if (playback) playback.seek(t);
+  else set({ playhead: t });
 }
 
 export function stepFrames(count: number): void {
@@ -261,15 +393,90 @@ export function jumpStep(direction: 1 | -1): void {
   const state = getEditor();
   const project = selectProject(state);
   if (!project) return;
-  const times = project.steps.map(s => ({ id: s.id, tl: timelineTimeOf(project, s), src: s.anchor.time }));
-  const frame = 0.5 / (state.media?.info.fps ?? 30);
+  const times = project.steps.map(s => ({ id: s.id, tl: timelineTimeOf(project, s) }));
+  const frame = halfFrame();
   const target = direction > 0 ? times.find(t => t.tl > state.playhead + frame) : [...times].reverse().find(t => t.tl < state.playhead - frame);
   if (!target) {
     notify(direction > 0 ? 'No more steps ahead.' : 'No steps before this.');
     return;
   }
   set({ selection: { kind: 'step', stepId: target.id } });
-  seekSource(target.src);
+  seekTimeline(target.tl);
+}
+
+/** ⇧J / ⇧L: the previous or next edit: any pin, cut, gap edge, effect start or end, or an end of the guide. */
+export function jumpEdit(direction: 1 | -1): void {
+  const state = getEditor();
+  const project = selectProject(state);
+  if (!project) return;
+  const stops = timelineEdges(project);
+  const frame = halfFrame();
+  const target = direction > 0 ? stops.find(t => t > state.playhead + frame) : [...stops].reverse().find(t => t < state.playhead - frame);
+  if (target !== undefined) seekTimeline(target);
+}
+
+type LaneItem = { start: number; end: number; select: () => void };
+
+/** The timeline lanes, top to bottom, with what each holds as timeline spans (docs/05-editor-interactions.md, section 3). */
+function laneItems(project: Project): LaneItem[][] {
+  const starts = clipStarts(project.timeline);
+  const tl = (time: number) => srcToTl(project.timeline, project.sources[0]?.id ?? '', time);
+  return [
+    project.steps.map(s => {
+      const t = timelineTimeOf(project, s);
+      return { start: t, end: t, select: () => selectStep(s.id) };
+    }),
+    project.timeline.map((c, i) => ({ start: starts[i]!, end: starts[i]! + clipLength(c), select: () => selectClip(c.id) })),
+    project.blurs.map(b => ({ start: tl(b.start), end: tl(b.end), select: () => selectBlur(b.id, { seek: true }) })),
+    [],
+    [],
+  ];
+}
+
+function laneOf(selection: Selection): number {
+  if (!selection) return -1;
+  if (selection.kind === 'clip' || selection.kind === 'gap') return 1;
+  if (selection.kind === 'blur') return 2;
+  return 0;
+}
+
+/** The middle of the selection in timeline time. */
+function selectionMiddle(project: Project, selection: Selection): number {
+  if (!selection) return getEditor().playhead;
+  if (selection.kind === 'clip' || selection.kind === 'gap') {
+    const i = project.timeline.findIndex(c => c.id === selection.clipId);
+    const start = clipStarts(project.timeline)[i] ?? 0;
+    const clip = project.timeline[i];
+    if (!clip) return 0;
+    return selection.kind === 'gap' ? start - clip.gap / 2 : start + clipLength(clip) / 2;
+  }
+  if (selection.kind === 'blur') {
+    const b = project.blurs.find(x => x.id === selection.blurId);
+    return b ? (srcToTl(project.timeline, b.source, b.start) + srcToTl(project.timeline, b.source, b.end)) / 2 : 0;
+  }
+  const step = project.steps.find(s => s.id === selection.stepId);
+  return step ? timelineTimeOf(project, step) : 0;
+}
+
+/**
+ * ⇧K / ⇧I: selects in the next lane down or up that has anything in it, the item covering the middle of the selection, or the
+ * nearest. With nothing selected ⇧K starts at the top lane and ⇧I at the bottom. Stops at the ends.
+ */
+export function selectLayer(direction: 1 | -1): void {
+  const state = getEditor();
+  const project = selectProject(state);
+  if (!project) return;
+  currentPlayback()?.pause();
+  const lanes = laneItems(project);
+  const from = laneOf(state.selection);
+  const mid = selectionMiddle(project, state.selection);
+  for (let lane = from < 0 ? (direction > 0 ? 0 : lanes.length - 1) : from + direction; lane >= 0 && lane < lanes.length; lane += direction) {
+    const items = lanes[lane]!;
+    if (!items.length) continue;
+    const distance = (it: LaneItem) => (mid < it.start ? it.start - mid : mid > it.end ? mid - it.end : 0);
+    [...items].sort((a, b) => distance(a) - distance(b))[0]!.select();
+    return;
+  }
 }
 
 export function jumpToStart(play = false): void {
@@ -291,19 +498,18 @@ export function pinAtPlayhead(at?: Point): string | null {
   const playback = currentPlayback();
   const state = getEditor();
   const project = selectProject(state);
-  const source = project?.sources[0];
-  if (!project || !source || !playback) return null;
+  if (!project || !playback) return null;
   playback.pause();
-  const time = playback.time;
-  if (!canPinAt(project, source.id, time)) {
-    notify("That frame isn't in the edited guide, so it can't be pinned.", 'error');
+  const pos = sourceAt(project, playback.time);
+  if (!pos || !canPinAt(project, pos.source, pos.time)) {
+    notify("There's no frame of the recording here (it's a gap), so it can't be pinned.", 'error');
     return null;
   }
-  const existing = stepAtTime(project, source.id, time);
+  const existing = stepAtTime(project, pos.source, pos.time);
   const stepId = existing?.id ?? newId('s');
-  run(commands.pinStep({ stepId, annotationId: newId('a'), source: source.id, time, at, now: Date.now() }));
+  run(commands.pinStep({ stepId, annotationId: newId('a'), source: pos.source, time: pos.time, at, now: Date.now() }));
   set({ selection: { kind: 'step', stepId } });
-  if (!existing) notify(`Pinned step at ${formatSeconds(time)}.`);
+  if (!existing) notify(`Pinned step at ${formatSeconds(playback.time)}.`);
   return stepId;
 }
 
@@ -322,22 +528,27 @@ export function setStepText(stepId: string, text: { title?: string; body?: strin
 
 export function removeStep(stepId: string): void {
   run(commands.removeStep(stepId, Date.now()));
-  set(s => ({ selection: validSelection(selectProject(s), s.selection) }));
+  revalidate();
 }
 
 export function setStepHold(stepId: string, seconds: number, coalesceKey?: string): void {
-  const hold = Math.min(8, Math.max(1, seconds));
-  run({
-    label: 'Change pause',
-    coalesceKey,
-    run: d => {
-      const step = d.steps.find(s => s.id === stepId);
-      if (step && step.minHold !== hold) {
-        step.minHold = hold;
-        d.updatedAt = Date.now();
-      }
-    },
-  });
+  run(commands.setStepHold(stepId, seconds, Date.now(), coalesceKey));
+}
+
+// ----- zoom (F5) ------------------------------------------------------------------------------------------------------
+
+/** Sets the step's zoom box; a new one is centred on the step's click marker if it has one. */
+export function setStepZoom(stepId: string, rect: Rect | null, label?: string, coalesceKey?: string): void {
+  run(commands.setStepZoom(stepId, rect, Date.now(), label, coalesceKey));
+  if (rect) set({ selection: { kind: 'zoom', stepId } });
+  else revalidate();
+}
+
+export function addZoom(stepId: string): void {
+  const step = selectProject(getEditor())?.steps.find(s => s.id === stepId);
+  if (!step) return;
+  const click = step.annotations.find(a => a.type === 'click');
+  setStepZoom(stepId, zoomBox(click?.type === 'click' ? click.at : [0.5, 0.5], DEFAULT_ZOOM_SIZE), 'Add zoom');
 }
 
 // ----- annotations ----------------------------------------------------------------------------------------------------
@@ -362,15 +573,217 @@ export function updateAnnotation(stepId: string, id: string, patch: Partial<Anno
 
 export function removeAnnotation(stepId: string, id: string): void {
   run(commands.removeAnnotation(stepId, id, Date.now()));
-  set(s => ({ selection: validSelection(selectProject(s), s.selection) }));
+  revalidate();
 }
 
-/** Delete: removes the selected annotation, or the selected step. */
+// ----- clips (F2) -----------------------------------------------------------------------------------------------------
+
+/** R: splits the clip under the playhead at the frame showing. */
+export function splitAtPlayhead(): void {
+  const state = getEditor();
+  const project = selectProject(state);
+  if (!project) return;
+  currentPlayback()?.pause();
+  const spot = spotAt(project.timeline, getEditor().playhead);
+  if (!spot || spot.kind === 'gap') {
+    notify('Move the playhead onto a clip to split it.', 'error');
+    return;
+  }
+  const clip = project.timeline[spot.index]!;
+  const ok = canSplit(project, clip.id, spot.time);
+  if (ok !== true) {
+    notify(ok, 'error');
+    return;
+  }
+  const id = newId('c');
+  run(clipCommands.splitClip(clip.id, spot.time, id, Date.now()));
+  set({ selection: { kind: 'clip', clipId: id } });
+  notify('Split the clip. Drag an edge to trim, or set its speed in the Inspector.');
+}
+
+/**
+ * Moves a clip edge (source seconds). Returns a message when a pinned step stopped it, so the timeline can say why. A drag passes
+ * one coalesce key, so the whole drag is one undo step.
+ */
+export function trimClip(clipId: string, edge: ClipEdge, value: number, coalesceKey?: string): string | null {
+  const state = getEditor();
+  const project = selectProject(state);
+  if (!project) return null;
+  const limits = trimLimits(project, clipId, edge, state.ripple);
+  if (!limits) return null;
+  run(clipCommands.trimClip(clipId, edge, value, state.ripple, Date.now(), coalesceKey));
+  if ((limits.pinAtMax && value > limits.max + 1e-6) || (limits.pinAtMin && value < limits.min - 1e-6)) return 'A pinned step is in the way. Move or delete the step to trim past it.';
+  return null;
+}
+
+export function setClipSpeed(clipId: string, speed: number, coalesceKey?: string): void {
+  run(clipCommands.setClipSpeed(clipId, speed, Date.now(), coalesceKey));
+  refreshPlayhead();
+}
+
+export function setClipAudio(clipId: string, audio: { volume?: number; muted?: boolean }, coalesceKey?: string): void {
+  run(clipCommands.setClipAudio(clipId, audio, Date.now(), coalesceKey));
+}
+
+export function setGap(clipId: string, seconds: number, coalesceKey?: string): void {
+  run(clipCommands.setGap(clipId, seconds, Date.now(), coalesceKey));
+  revalidate();
+  refreshPlayhead();
+}
+
+export function deleteClip(clipId: string): void {
+  const project = selectProject(getEditor());
+  if (!project) return;
+  const ok = canDeleteClip(project, clipId);
+  if (ok !== true) {
+    notify(ok, 'error');
+    return;
+  }
+  run(clipCommands.deleteClip(clipId, getEditor().ripple, Date.now()));
+  revalidate();
+  refreshPlayhead();
+}
+
+// ----- effect regions (F7) ----------------------------------------------------------------------------------------------
+
+/** How many regions the lane's + button has added, to stagger them so repeated adds don't sit on top of each other. */
+let staggered = 0;
+
+/** A new effect region with one Pixelate effect, from the playhead to the end of the recording, on the lowest layer with room. */
+export function addBlurAtPlayhead(rect: Rect): void {
+  const state = getEditor();
+  const project = selectProject(state);
+  const source = project?.sources[0];
+  if (!project || !source) return;
+  currentPlayback()?.pause();
+  const start = Math.max(0, Math.min(sourceTimeAt(project, state.playhead), source.duration - MIN_REGION));
+  const blur: Blur = {
+    id: newId('b'),
+    name: nextBlurName(project.blurs),
+    source: source.id,
+    start,
+    end: source.duration,
+    layer: 0,
+    effects: [newEffect('pixelate', newId('f'))],
+    radius: 4,
+    opacity: 1,
+    fadeIn: 0,
+    fadeOut: 0,
+    keyframes: [{ time: start, rect }],
+  };
+  run(commands.addBlur(blur, Date.now()));
+  set({ selection: { kind: 'blur', blurId: blur.id }, tool: 'select' });
+  notify(`Added ${blur.name}. Scrub to where it should move and drag it there: it follows with a keyframe.`);
+}
+
+/** The + on the Effects lane: a region in the middle of the frame, staggered. */
+export function addBlurInMiddle(): void {
+  const k = staggered++ % 6;
+  addBlurAtPlayhead([0.38 + k * 0.025, 0.44 + k * 0.025, 0.24, 0.08]);
+}
+
+export function updateBlur(blurId: string, patch: Parameters<typeof commands.updateBlur>[1], label?: string, coalesceKey?: string): void {
+  run(commands.updateBlur(blurId, patch, Date.now(), label, coalesceKey));
+}
+
+/** Places a region in time (source seconds) and, from a drag in the Effects lane, on a row. */
+export function placeBlur(blurId: string, args: Parameters<typeof commands.placeBlur>[1], coalesceKey?: string): void {
+  run(commands.placeBlur(blurId, args, Date.now(), coalesceKey));
+}
+
+export function moveBlurLayer(blurId: string, how: LayerMove): void {
+  const before = getEditor().history;
+  run(commands.moveBlurLayer(blurId, how, Date.now()));
+  if (getEditor().history === before) notify(how === 'up' || how === 'front' ? 'Already on top.' : 'Already at the bottom.');
+}
+
+export function addEffect(blurId: string, type: EffectType): void {
+  run(commands.addEffect(blurId, newEffect(type, newId('f')), Date.now()));
+}
+
+export function updateEffect(blurId: string, effectId: string, patch: Parameters<typeof commands.updateEffect>[2], coalesceKey?: string): void {
+  run(commands.updateEffect(blurId, effectId, patch, Date.now(), coalesceKey));
+}
+
+export function moveEffect(blurId: string, effectId: string, delta: -1 | 1): void {
+  run(commands.moveEffect(blurId, effectId, delta, Date.now()));
+}
+
+export function removeEffect(blurId: string, effectId: string): void {
+  run(commands.removeEffect(blurId, effectId, Date.now()));
+}
+
+/** Places the blur at the frame showing, adding a keyframe if there isn't one on this frame. */
+export function setBlurRectHere(blurId: string, rect: Rect, label?: string, coalesceKey?: string): void {
+  const state = getEditor();
+  const project = selectProject(state);
+  const blur = project?.blurs.find(b => b.id === blurId);
+  if (!project || !blur) return;
+  const time = Math.min(blur.end, Math.max(blur.start, sourceTimeAt(project, state.playhead)));
+  const before = blur.keyframes.length;
+  run(commands.setBlurRect(blurId, time, rect, halfFrame(), Date.now(), label, coalesceKey));
+  const after = selectProject(getEditor())?.blurs.find(b => b.id === blurId)?.keyframes.length ?? before;
+  if (after > before) notify(`Added a keyframe at ${formatSeconds(time)}. The region now moves between its keyframes.`);
+}
+
+/** The region's keyframe on the frame showing, if it has one there. */
+export function blurKeyframeHere(blur: Blur): number | null {
+  const project = selectProject(getEditor());
+  if (!project) return null;
+  const now = sourceTimeAt(project, getEditor().playhead);
+  return blur.keyframes.find(k => Math.abs(k.time - now) <= halfFrame())?.time ?? null;
+}
+
+/** Stops a region moving: it keeps the place it has on the frame showing for its whole length. */
+export function flattenBlurHere(blurId: string): void {
+  const project = selectProject(getEditor());
+  if (project) run(commands.flattenBlur(blurId, sourceTimeAt(project, getEditor().playhead), Date.now()));
+}
+
+export function removeBlurKeyframeHere(blur: Blur): void {
+  const time = blurKeyframeHere(blur);
+  if (time !== null) run(commands.removeBlurKeyframe(blur.id, time, Date.now()));
+}
+
+export function removeBlur(blurId: string): void {
+  run(commands.removeBlur(blurId, Date.now()));
+  revalidate();
+}
+
+// ----- framing and logo (F18, F19) ------------------------------------------------------------------------------------
+
+export function setFrame(patch: Partial<Frame>, label?: string, coalesceKey?: string): void {
+  run(commands.setFrame(patch, Date.now(), label, coalesceKey));
+}
+
+export function setLogo(logo: Logo | null, label?: string, coalesceKey?: string): void {
+  run(commands.setLogo(logo, Date.now(), label, coalesceKey));
+}
+
+export function setAssetImage(id: string, image: ImageBitmap): void {
+  set(s => ({ assetImages: new Map(s.assetImages).set(id, image) }));
+}
+
+// ----- delete ---------------------------------------------------------------------------------------------------------
+
+/** Delete: removes whatever is selected. A gap is closed; a zoom is removed from its step. */
 export function deleteSelection(): void {
   const { selection } = getEditor();
   if (!selection) return;
-  if (selection.kind === 'annotation') removeAnnotation(selection.stepId, selection.id);
-  else removeStep(selection.stepId);
+  switch (selection.kind) {
+    case 'annotation':
+      return removeAnnotation(selection.stepId, selection.id);
+    case 'zoom':
+      return setStepZoom(selection.stepId, null);
+    case 'step':
+      return removeStep(selection.stepId);
+    case 'clip':
+      return deleteClip(selection.clipId);
+    case 'gap':
+      return setGap(selection.clipId, 0);
+    case 'blur':
+      return removeBlur(selection.blurId);
+  }
 }
 
 // ----- playback callbacks ---------------------------------------------------------------------------------------------
@@ -379,15 +792,15 @@ export function setPlaybackState(playback: PlaybackState): void {
   set({ playback });
 }
 
-/** The playback moved to a recording time. */
-export function setSourceTime(time: number): void {
-  const project = selectProject(getEditor());
-  const source = project?.sources[0];
-  if (project && source) set({ playhead: srcToTl(project.timeline, source.id, time) });
+/** The playback moved, in timeline seconds. */
+export function setPlayhead(time: number): void {
+  set({ playhead: time });
 }
 
 export function resetEditor(): void {
-  set({ ...INITIAL, tool: getEditor().tool, snap: getEditor().snap, ripple: getEditor().ripple, muted: getEditor().muted, zoom: 1 });
+  const s = getEditor();
+  for (const image of s.assetImages.values()) image.close();
+  set({ ...INITIAL, assetImages: new Map(), tool: s.tool, snap: s.snap, ripple: s.ripple, muted: s.muted, view: s.view, zoom: 1 });
 }
 
 export { INITIAL as INITIAL_EDITOR_STATE };

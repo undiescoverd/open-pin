@@ -28,14 +28,15 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 
 ### Phase 1 as built
 
-- **Export runs on the main thread**, not in an export worker. It yields between steps, the frames come from the media worker, and nothing else moves while the busy overlay shows. Moving it to a worker is a Phase 2 task, since MP4 needs one anyway. There is no cancel button yet for the same reason.
+- **Stills and the PDF export on the main thread**, not in an export worker. They yield between steps, the frames come from the media worker, and nothing else moves while the busy overlay shows. (MP4 export runs in a worker from Phase 2.)
 - **Recordings the browser can't decode** (for example ProRes) are refused with a message. The one-time H.264 editing proxy from the architecture doc isn't built.
-- **Zoom and Blur tools** are in the palette but disabled; their keys say they're coming. The Ripple trim button is a placeholder until clip trimming.
-- **Pause (`minHold`)** is stored and editable per step, but nothing uses it until the guide and MP4 exports.
+- Zoom, Blur, Ripple trim and the Pause setting were placeholders in Phase 1; Phase 2 made them work.
 - **The PDF** is checked for page count, size, title and an embedded image per page, and the PNG export is compared pixel for pixel with the canvas. The PDF's pages are not rasterised and compared, so its layout is checked by eye.
 - **Annotation snapshots** (`apps/editor/e2e/*-snapshots`) are Linux Chromium renders. Update them with `--update-snapshots` after an intended drawing change.
 
 ## Phase 2 — Edit and polish
+
+**Status: built.** The acceptance tests are in `apps/editor/e2e/phase2.spec.ts`. Differences from the plan are listed under [Phase 2 as built](#phase-2-as-built) below.
 
 - F2 timeline editing: trim, split (R), delete range, per-clip speed (⅓×–5×), with source-time anchoring and orphaned-step warnings. Fit-to-width timeline with zoom.
 - F7 effect regions with keyframes and an **Effects lane, as in DaVinci Resolve**: any number of regions, any number at once, each with a stack of effects of any length (pixelate, blur, darken, desaturate, tint, solid fill), on layers where higher ones draw on top (docs/05, section 4).
@@ -44,6 +45,18 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 - F13 MP4 export in a worker (H.264, up to 4K) with holds, animated reveals, captions, original audio; progress and cancel.
 
 **Done when** a 2-minute recording with cuts, a 2× section, 8 effect regions (at least 4 on screen at the same moment, on 4 layers, one with a stack of 3 effects), a gradient background and 10 steps exports to a 4K MP4 whose blur is present in every frame (checked by a frame-sampling test).
+
+### Phase 2 as built
+
+- **The acceptance export is smaller than planned.** The test builds the project the plan describes (cuts, a 2× section, 8 effect regions with 4 on screen at once on 4 layers, two stacks of 3 effects, a gradient background, 10 steps) on the 6-second test recording and exports it at 720p, then decodes every frame and checks each region's effects are there whenever the region is, and absent when it isn't. A 2-minute recording at 4K would take too long in CI with software encoding. 1440p and 4K use the same code with a bigger canvas; the Cancel test starts a 4K export.
+- **Codecs.** MP4 export uses H.264 and AAC where the browser can encode them (Chrome and Edge on Mac and Windows). Chromium on Linux, including the one the tests run in, can't, so the export falls back to VP9 and Opus in the same MP4 and says so: that file plays in browsers but may not in QuickTime. H.264 output hasn't been checked by an automated test for this reason.
+- **Sound in the MP4** is the recording's own audio under clips at normal speed, at each clip's volume. Sped-up and slowed clips are silent in the video (the preview plays them with the pitch kept); time-stretching without a pitch change is left for later. Pauses and gaps are silent.
+- **Only the MP4 export runs in the export worker.** It writes straight into the browser's private file system, so a long 4K video never has to fit in memory, and it has progress and Cancel. Stills and the PDF still render on the main thread.
+- **Delete range** is "split twice and delete the clip" (Delete or the Inspector's Delete clip). A clip holding a pinned step can't be deleted, and the only clip can't either. Clips can't be reordered.
+- **Orphaned steps are prevented, not warned about**, as in the mockup: trims and typed In and Out stop at a pinned step with a message.
+- **Effects** run in the editor with canvas filters and blend modes (blur, desaturate), which the editor's Chromium-based browsers all have. The Phase 3 player won't need them: the guide bundle bakes effects into its frames and segments.
+- **Images** (logo, background) are copied into the project's `assets/` folder and into `.waypost` files.
+- **Voice and Music lanes** are there, empty, until Phase 4.
 
 ## Phase 3 — Interactive guide
 

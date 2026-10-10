@@ -316,7 +316,7 @@ test.describe('transport', () => {
     expect(await playheadSeconds(page)).toBeCloseTo(2.5, 2);
     await page.keyboard.press('Space');
     await expect.poll(() => playheadSeconds(page), { timeout: 10_000 }).toBeCloseTo(6, 0); /* runs on to the end and pauses */
-    await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
   });
 
   test('J plays backward and stops at the previous step', async ({ page }) => {

@@ -91,6 +91,17 @@ jobs:
         with:
           name: editor-dist
           path: dist
+      - name: Create the Pages project if it does not exist yet
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          if out=$(npx --yes wrangler@3.90.0 pages project create waypost --production-branch="${{ github.event.repository.default_branch }}" 2>&1); then
+            echo "$out"
+          elif echo "$out" | grep -qi "already exists"; then
+            echo "The waypost Pages project already exists."
+          else
+            echo "$out"
+            exit 1
+          fi
       - uses: cloudflare/wrangler-action@v3
         if: steps.creds.outputs.ready == 'true'
         with:

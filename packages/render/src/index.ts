@@ -1,5 +1,18 @@
 /* @waypost/render: the canvas compositor shared by the editor, the player and every export. */
-export { composeFrame, loadRenderFonts, type ComposeOptions } from './compose';
+export {
+  GRADIENTS,
+  OPAQUE_FALLBACK,
+  composeScene,
+  loadRenderFonts,
+  makeCanvas,
+  registerWorkerFonts,
+  sceneFor,
+  type AnyCanvas,
+  type AssetImages,
+  type Scene,
+  type SceneBlur,
+  type SceneOptions,
+} from './compose';
 export { drawAnnotations, type DrawOptions } from './draw';
 export {
   FONT_FAMILY,
