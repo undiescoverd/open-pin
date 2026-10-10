@@ -13,12 +13,12 @@ const pin = (time: number, at?: [number, number]) =>
 describe('createProject and parseProject', () => {
   it('makes one clip covering the whole recording and round-trips through the schema', () => {
     const p = fresh();
-    expect(p.timeline).toEqual([{ id: 'c_src1', source: 'src1', in: 0, out: 10, speed: 1, gap: 0 }]);
+    expect(p.timeline).toEqual([{ id: 'c_src1', source: 'src1', in: 0, out: 10, speed: 1, gap: 0, volume: 1, muted: false }]);
     expect(parseProject(JSON.parse(JSON.stringify(p)))).toEqual(p);
   });
 
   it('refuses a project from a newer version and anything malformed, with a readable message', () => {
-    expect(() => parseProject({ ...fresh(), schema: 'waypost.project/2' })).toThrow(/newer version/);
+    expect(() => parseProject({ ...fresh(), schema: 'waypost.project/3' })).toThrow(/newer version/);
     expect(() => parseProject({ nope: true })).toThrow(ProjectParseError);
     const bad = { ...fresh(), steps: [{ id: 's', anchor: { source: 'src1', time: 1 }, title: '', body: '', annotations: [{ type: 'click', id: 'a', at: [2, 0], color: 'red' }] }] };
     expect(() => parseProject(bad)).toThrow(/valid Waypost project/);
