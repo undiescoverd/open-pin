@@ -156,7 +156,7 @@ An unselected zoom box is selected by its dashed outline only, so it never block
 ### 5.3 Other canvas rules
 
 - Dragging on the canvas, the timeline or the step rail must never select text. The Inspector's fields stay selectable.
-- **Edit** view shows every annotation with handles; **Viewer** view shows the step as the published guide would (zoom eased in, annotations revealing in group order). Timeline editing works in both. Playing always uses viewer rendering.
+- **Edit** view shows every annotation with handles; **Viewer** view shows the step as the published guide would (zoom eased in, annotations revealing in group order). Timeline editing works in both. Playing always uses viewer rendering. **Leaving a step the Viewer's way eases out, it never cuts:** pressing Continue, Play or Space from it, or switching back to Edit, returns the zoom to the whole frame over half a second while the annotations fade, as in the published guide and the MP4 (the same timings). Moving the playhead somewhere else (seeking, scrubbing, stepping a frame) cuts at once, and reduced motion cuts too.
 
 ## 6. Playback and transport
 

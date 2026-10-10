@@ -1,11 +1,11 @@
 import { formatTimecode, frameLayout, introLength, nativeOutputSize } from '@waypost/core';
 import { composeScene, loadRenderFonts, sceneFor } from '@waypost/render';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Playback, type PlaybackHost } from '../engine/playback';
 import { currentPlayback, setPlayback } from '../engine/session';
 import { getEditor, selectProject, setPlaybackState, setPlayhead, timelineTimeOf, useEditor } from '../state/store';
 import { AnnotationOverlay } from './AnnotationOverlay';
-import { presentation, projectForDrawing } from './visible';
+import { easeOutOf, leavingUntil, presentation, projectForDrawing, rememberViewer } from './visible';
 import { useFitSize } from './useFitSize';
 
 /** Preview frames are decoded at most this wide; exports use the recording's full size. */
@@ -13,7 +13,7 @@ const MAX_PREVIEW_WIDTH = 1920;
 
 /** The frame on a canvas (framed, blurred, zoomed and annotated as it will export), with the playback that feeds it and the
     overlay that edits it. */
-export function CanvasView() {
+export function CanvasView({ children }: { children?: ReactNode }) {
   const media = useEditor(s => s.media);
   const videoUrl = useEditor(s => s.videoUrl);
   const project = useEditor(selectProject);
@@ -53,6 +53,7 @@ export function CanvasView() {
         const key = `${state.playhead}|${state.view}|${state.playback.stoppedAt}`;
         if (arrival.current.key !== key) arrival.current = { key, at: performance.now() };
         const shown = presentation((performance.now() - arrival.current.at) / 1000);
+        rememberViewer(shown);
         const scene = sceneFor(projectForDrawing(p, state), {
           frame,
           sourceTime,
@@ -64,7 +65,11 @@ export function CanvasView() {
         composeScene(ctx, el.width, el.height, scene);
       },
       onTime: setPlayhead,
-      onState: setPlaybackState,
+      onState: next => {
+        /* Continue, Play or Space from a step shown the Viewer's way: ease out of it rather than cut */
+        easeOutOf({ view: getEditor().view, playback: next });
+        setPlaybackState(next);
+      },
       muted: () => getEditor().muted,
     };
     const playback = new Playback(media, videoEl, decodeWidth, host);
@@ -98,14 +103,15 @@ export function CanvasView() {
     currentPlayback()?.redraw();
   }, [steps, blurs, frame, logo, selection, draft, shapeDraft, rate, view, assetImages, width, height]);
 
-  /* the Viewer entrance: keep repainting while the zoom eases in and the groups appear */
+  /* while paused, keep repainting while something eases: the Viewer entrance (the zoom in, the groups appearing) or the exit
+     (switching back to Edit). Playing repaints with every frame by itself. */
   useEffect(() => {
     if (rate !== 0) return;
     const state = getEditor();
     const p = selectProject(state);
     const shown = presentation(0);
     if (!p || !shown.viewer || !shown.step) return;
-    const until = performance.now() + introLength(shown.step) * 1000 + 100;
+    const until = leavingUntil() || performance.now() + introLength(shown.step) * 1000 + 100;
     let raf = 0;
     const tick = (now: number) => {
       currentPlayback()?.redraw();
@@ -117,22 +123,30 @@ export function CanvasView() {
 
   const inner = layout?.inner ?? [0, 0, width, height];
   return (
-    <div ref={wrap} className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center">
-      {/* the video element only feeds the canvas while playing forward; it is never shown */}
-      <video ref={video} className="hidden" playsInline preload="auto" muted={false} />
-      {/* always mounted, so the playback effect finds its canvas; it has no size until the space around it is measured */}
-      {source && (
-        <div
-          className="relative overflow-hidden rounded-md shadow-pop outline outline-1 outline-line [background:repeating-conic-gradient(var(--wp-raised)_0_25%,var(--wp-panel)_0_50%)_0_0/16px_16px]"
-          style={{ width: fit.width, height: fit.height }}
-        >
-          <canvas ref={canvas} width={width} height={height} role="img" aria-label={`Recording frame at ${formatTimecode(playhead)}`} data-testid="frame-canvas" className="block size-full" />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center gap-2">
+      <div ref={wrap} className="relative flex min-h-0 w-full min-w-0 flex-1 items-start justify-center">
+        {/* the video element only feeds the canvas while playing forward; it is never shown */}
+        <video ref={video} className="hidden" playsInline preload="auto" muted={false} />
+        {/* always mounted, so the playback effect finds its canvas; it has no size until the space around it is measured */}
+        {source && (
           <div
-            className="absolute"
-            style={{ left: `${(inner[0] / width) * 100}%`, top: `${(inner[1] / height) * 100}%`, width: `${(inner[2] / width) * 100}%`, height: `${(inner[3] / height) * 100}%` }}
+            className="relative overflow-hidden rounded-md shadow-pop outline outline-1 outline-line [background:repeating-conic-gradient(var(--wp-raised)_0_25%,var(--wp-panel)_0_50%)_0_0/16px_16px]"
+            style={{ width: fit.width, height: fit.height }}
           >
-            <AnnotationOverlay width={inner[2]} height={inner[3]} cssWidth={(fit.width * inner[2]) / width} />
+            <canvas ref={canvas} width={width} height={height} role="img" aria-label={`Recording frame at ${formatTimecode(playhead)}`} data-testid="frame-canvas" className="block size-full" />
+            <div
+              className="absolute"
+              style={{ left: `${(inner[0] / width) * 100}%`, top: `${(inner[1] / height) * 100}%`, width: `${(inner[2] / width) * 100}%`, height: `${(inner[3] / height) * 100}%` }}
+            >
+              <AnnotationOverlay width={inner[2]} height={inner[3]} cssWidth={(fit.width * inner[2]) / width} />
+            </div>
           </div>
+        )}
+      </div>
+      {/* whatever sits under the frame (the dock) is as wide as the frame, and the frame gets the height that is left */}
+      {children && (
+        <div className="shrink-0" style={{ width: fit.width > 0 ? fit.width : '100%' }}>
+          {children}
         </div>
       )}
     </div>
