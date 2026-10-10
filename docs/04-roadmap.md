@@ -2,7 +2,7 @@
 
 Build order for the Waypost web app. Each phase ends with something usable, and later phases never block earlier ones. Feature IDs (F1–F22) refer to [01-feature-analysis.md](01-feature-analysis.md).
 
-> **Re-planned after Phase 3.** [06-simplify-plan.md](06-simplify-plan.md) adds a Simplify phase next and reorders Phases 4 to 6 around documentation and SOPs. Where the two disagree, that plan wins.
+> **Re-planned after Phase 3.** Waypost is for documentation and SOPs, so Phase 4 now makes the editor simple by default, and the old audio, publishing and "beyond FramePin" phases are reordered and trimmed. The design is in [06-simplify-plan.md](06-simplify-plan.md).
 
 ## Phase 0 — Scaffold
 
@@ -90,40 +90,70 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 - **On a phone**, annotation text scales with the picture like everything else, so a callout is small on a narrow screen. Its text is also read out through the live region.
 - **Cross-origin embeds:** when the page and the guide are on different sites, the guide's host must send `Access-Control-Allow-Origin` for the player to fetch `guide.json` and the fonts. GitHub Pages does; `embed.txt` says to use the iframe otherwise.
 
-## Phase 4 — Audio
+## Phase 4 — Simplify (next)
 
-- F8 narration: keep original audio; import a voice file; record per step in the browser; generate voiceover with Kokoro in a worker (model downloaded on first use, then cached; voice picker with previews).
-- Hold timing driven by narration length.
-- **Auto-ducking driven by speech detection**: music dips only while someone is actually speaking, detected in recorded and imported narration, in generated voice (Kokoro's output can be analysed, unlike the browser's speech engine), and in the recording's own audio when it's kept.
-- F20 background music lane, always the bottom lane, with volume, loop and fades.
-- Narration and music in the player ("Start guide" overlay to unlock sound) and in MP4.
+Make the editor simple by default, as designed in [06-simplify-plan.md](06-simplify-plan.md). Nothing is removed from the engine; precise controls move behind **Trim & edit video** and **Advanced** sections. Build it in this order, each item shippable on its own:
 
-**Done when** a guide with generated voiceover and background music plays in sync in the player and in the MP4.
+1. **Advanced section component** in PinKit: a collapsed disclosure with a one-line summary, used by every panel from here on.
+2. **Filmstrip timeline:** one strip with numbered pins, play, timecode, trim handles and tinted bars for hidden areas. **Trim & edit video** opens today's full timeline and **Done** closes it, remembered per project.
+3. **Step card in the Steps list:** title, note, "On this step" chips, a plain-words footer ("Waits for a click, or 2.5 s in a video"), Duplicate, and Advanced (pinned time, wait, reveal order). **+ Add step** at the top of the list.
+4. **Right panel, Add then adjust:** *Add to step N* with Callout, Arrow, Highlight, Zoom, Hide and Click; one click places the item on the frame, selected. Under it, the selected item's simple controls, its Advanced and Remove. The tool palette and the Edit / Viewer switch under the frame go; the frame takes their height.
+5. **Hide panel:** Blur, Pixelate or Cover (Cover by default), strength, and *This step only* / *From here to the end* / *The whole video*. Effect stacks, layers, fades and keyframes under Advanced. The Blur tool becomes Hide (X).
+6. **One Export dialog:** Interactive guide, Video, PDF, Images; *How it plays*; the end button; the link and embed code after saving; "Publish online, coming later". The Guide tab's player settings move here, and frame, background, logo and annotation style go under its Advanced.
+7. **Preview at the selected step**, with Esc back to that step.
+8. **Quick actions after a pin** (Add callout · Highlight · Zoom here) and **Duplicate step** (⌘D).
+9. **First run:** the full-window drop zone with *Add steps · Explain each one · Export*, and the one-line next-step hint under the frame.
+10. **Honest messages:** silent sped-up clips in the MP4 noted in the Export dialog; unsupported recordings say what to do.
+11. **Docs:** update 03-design-system and 05-editor-interactions to the new layout; update the HTML mockup or retire it in favour of the design canvas.
 
-## Phase 5 — Publishing and analytics
+**Done when**
 
-- "Share" publishing adapters: GitHub Pages (via a GitHub token you provide, kept in the browser), then S3-compatible storage (AWS S3, Cloudflare R2, Backblaze B2).
-- Stable per-step URLs for hosted WebP and PDF copies.
-- F12: player beacons (opt-in per guide), the reference Cloudflare Worker + D1 collector with daily-salt visitor hashing, and a per-step reach funnel in the editor.
-- Purchase and licence-key unlock (see the open questions below).
+- Someone who has never seen Waypost turns a 30-second recording into a five-step guide with titles, one callout, one zoom and one hidden area, then exports a PDF and an interactive guide, in under ten minutes without help. Run it with at least three people and note where they hesitate.
+- Every Phase 1 to 3 browser test still passes (moved to the new controls where needed), and new tests cover the filmstrip, the Add buttons, the Hide panel, Advanced sections and the Export dialog.
+- Projects saved before Phase 4 open unchanged, effect stacks and all.
 
-**Done when** "Share" produces a working public link and embed snippet, and the stats view shows drop-off for a test guide.
+## Phase 5 — Documents and phones
 
-## Phase 6 — Beyond FramePin
+- **SOP document export:** Markdown with a folder of step images, and a single HTML file with the images inside. Added to the Export dialog as *Document*.
+- **Phone layout in the player:** each step's title and note under the picture in readable text on narrow screens.
+- **Privacy check** before export: every hidden area at its first and last frame, and a warning if the recording's sound is on.
+- **Safari, Firefox and iPhone Safari** checked on real devices (owed from Phase 3).
 
-- Record the screen inside the app (`getDisplayMedia`).
-- Click-capture browser extension that proposes steps at each click.
-- Auto-redaction suggestions (OCR + patterns) and a blur tracking assist.
-- Auto step titles from OCR, with an optional LLM polish using your own API key.
-- Markdown/HTML SOP export.
-- PWA polish: offline, open `.waypost` files from Finder, "Install Waypost".
+**Done when** a guide exported as Markdown pastes into Notion and GitHub with its images, its HTML copy pastes into Confluence and Google Docs, and the interactive guide reads well on an iPhone.
+
+## Phase 6 — Sharing
+
+- **Publish online** in the Export dialog: connect a host once, then one click gives a link and an embed code. Republishing keeps the same link. Start with the one host that needs the fewest steps for someone non-technical (see the open questions).
+- Stable per-step links for the hosted pictures and PDF.
+- Purchase and licence-key unlock (see the open questions).
+
+**Done when** a non-technical tester publishes a guide and pastes its working link into a chat without touching a file.
+
+## Phase 7 — Narration
+
+- Record narration per step in the browser, and import an audio file per step.
+- Keep the recording's own sound, including in the interactive guide ("Start guide" tap to unlock sound), and in the MP4.
+- Step waits driven by the narration's length.
+
+**Done when** a guide with recorded narration plays in sync in the player and in the MP4.
+
+## Later
+
+Kept for when people ask for them, not planned:
+
+- Generated voiceover (Kokoro), background music and auto-ducking.
+- Viewer analytics (player beacons, a collector and a per-step funnel).
+- OCR title suggestions and auto-redaction suggestions.
+- Click-to-reveal annotations, time-stretched sound for sped-up clips, PDF visual regression tests, a ProRes editing proxy.
+- Record the screen inside the app, a click-capture browser extension, PWA polish.
 
 ## Open questions for the owner
 
-Decided: **Waypost** is the name, it's a **paid one-off purchase** (proprietary code), and the editor is hosted on **Cloudflare Pages**.
+Decided: **Waypost** is the name, it's a **paid one-off purchase** (proprietary code), and the editor is hosted on **Cloudflare Pages**. After Phase 3: Waypost is a **guide and SOP maker first**, simple by default, with precise controls behind **Advanced** sections and **Trim & edit video** ([06-simplify-plan.md](06-simplify-plan.md)).
 
 Still open:
-1. **Name checks:** trademark, domain and app-store searches for "Waypost" before designing the app mark.
-2. **Selling:** payment provider (Lemon Squeezy or Paddle issue licence keys and handle VAT; Stripe is cheaper per sale but leaves keys and tax to us), the price, and whether there's a free trial or a free tier.
-3. **Unlocking:** a licence key checked online once and then cached, so the editor keeps working offline. Needs a decision on what a locked copy can still do (for example, edit and preview but not export).
-4. **Repository visibility:** the repo is public; a paid product would normally make it private.
+1. **First publishing host** (Phase 6): Cloudflare Pages, Netlify or GitHub Pages. GitHub Pages needs a token and a repository, so test the other two against it first.
+2. **Name checks:** trademark, domain and app-store searches for "Waypost" before designing the app mark.
+3. **Selling:** payment provider (Lemon Squeezy or Paddle issue licence keys and handle VAT; Stripe is cheaper per sale but leaves keys and tax to us), the price, and whether there's a free trial or a free tier.
+4. **Unlocking:** a licence key checked online once and then cached, so the editor keeps working offline. Needs a decision on what a locked copy can still do (for example, edit and preview but not export).
+5. **Repository visibility:** the repo is public; a paid product would normally make it private.

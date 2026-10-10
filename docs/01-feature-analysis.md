@@ -109,7 +109,7 @@ Phases are defined in [04-roadmap.md](04-roadmap.md). Libraries named below are 
 
 **What it does.** Each step gets a short title. Titles also drive the generated voiceover (F8) and appear in MP4 (F13) and PDF (F14).
 
-**How Waypost does it.** `step.title` (one line) plus optional `step.body` (a longer note for PDF and Markdown export) and optional `step.narration.script` (defaults to the title). Edit inline in the step list or in the inspector. Phase 6 adds auto-suggested titles.
+**How Waypost does it.** `step.title` (one line) plus optional `step.body` (a longer note for PDF and Markdown export) and optional `step.narration.script` (defaults to the title). Edit inline in the step list or in the inspector. Auto-suggested titles are on the roadmap's Later list.
 
 ## F5 — Callouts, arrows, spotlights and zoom ("Focus Frame")
 
@@ -150,7 +150,7 @@ Phases are defined in [04-roadmap.md](04-roadmap.md). Libraries named below are 
 - **Editing:** Blur tool (X): draw a rect, scrub forward, move it, and a keyframe is added automatically. Blur regions show as bars on their own timeline lane. There's no limit on how many regions a project has or how many overlap at once.
 - **Rendering:** the compositor applies canvas `filter: blur()` (gaussian) or a downscale/upscale (pixelate) clipped to the rect. Pixelate and solid are the safest choices for sensitive text.
 - **Always baked:** stills, segments, MP4, PDF and screenshots are rendered from blurred frames. No output has an unblurred path, and the player never sees unblurred pixels.
-- **Phase 6 bonus:** a tracking assist (template matching in a worker) and auto-redaction suggestions using OCR (Tesseract.js, loaded only when used) with patterns for emails, API keys and card numbers.
+- **Later (roadmap):** a tracking assist (template matching in a worker) and auto-redaction suggestions using OCR (Tesseract.js, loaded only when used) with patterns for emails, API keys and card numbers.
 
 ## F8 — Narration ("Voice Over")
 
@@ -212,7 +212,7 @@ The two-line embed:
 <script src="https://you.github.io/guides/connect-calendar/player.js" async></script>
 ```
 
-An `<iframe src=".../index.html">` snippet is offered too, for CMSs that strip scripts. Phase 5 adds one-click publishing (GitHub Pages first, then S3-compatible storage).
+An `<iframe src=".../index.html">` snippet is offered too, for CMSs that strip scripts. Phase 6 adds one-click publishing to one host first (which one is an open question in the roadmap).
 
 ## F12 — Analytics
 

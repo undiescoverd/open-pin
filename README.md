@@ -2,7 +2,7 @@
 
 A web app that turns screen recordings into interactive, click-through product guides, with MP4, PDF and screenshot exports too. It's an alternative to [FramePin](https://framepin.com/) that you buy once instead of subscribing to.
 
-**Status:** Phases 1 to 3 of the [roadmap](docs/04-roadmap.md) are built: open a recording, edit it, pin and annotate steps, hide what needs hiding, frame it, and publish it as an interactive guide you can host anywhere and embed with two lines of HTML, or export a PDF, screenshots or an MP4. Audio and one-click publishing arrive in later phases. The interactive guide has been tested in Chromium; Safari, Firefox and iPhone still need a check on real devices. The full designed behaviour lives in the [clickable mockup](design/mockup/editor.html).
+**Status:** Phases 1 to 3 of the [roadmap](docs/04-roadmap.md) are built: open a recording, edit it, pin and annotate steps, hide what needs hiding, frame it, and publish it as an interactive guide you can host anywhere and embed with two lines of HTML, or export a PDF, screenshots or an MP4. Next, Phase 4 makes the editor simple by default (steps first, precise controls under Advanced; see [the simplify plan](docs/06-simplify-plan.md)), then SOP documents, one-click publishing and narration follow. The interactive guide has been tested in Chromium; Safari, Firefox and iPhone still need a check on real devices. The full designed behaviour lives in the [clickable mockup](design/mockup/editor.html).
 
 ## What works today
 
@@ -28,8 +28,8 @@ The editor needs Chrome, Edge, Brave or Arc on a computer (WebCodecs, private fi
 3. Click on the frame to pin a step, then add titles, callouts, arrows, spotlights and zoom.
 4. Blur sensitive information with regions that follow it as it moves.
 5. Put the recording on a styled background and add your logo.
-6. Add narration (keep the original audio, record your voice, or generate a free voiceover that runs in your browser) and background music.
-7. Export an interactive guide as a static folder you can host anywhere and embed with two lines of HTML, or export MP4 (up to 4K), PDF or PNG/WebP.
+6. Add narration: keep the recording's own sound, or record or import your voice for each step.
+7. Export an interactive guide as a static folder you can host anywhere and embed with two lines of HTML, or export MP4 (up to 4K), PDF, PNG/WebP or an SOP document (Markdown or HTML).
 
 Everything runs in your browser. It's a one-off purchase with no subscription and no server; you host guides on GitHub Pages, Cloudflare Pages, S3 or any static host.
 
