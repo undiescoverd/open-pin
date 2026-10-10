@@ -66,7 +66,16 @@ function drawBadge(page: PDFPage, font: PDFFont, number: number, x: number, y: n
   page.drawText(label, { x: x + size / 2 - font.widthOfTextAtSize(label, fontSize) / 2, y: y + size / 2 - fontSize * 0.35, size: fontSize, font, color: rgb(1, 1, 1) });
 }
 
-export async function exportPdf(job: ExportJob, options: { page: PdfPage; fonts: PdfFonts }): Promise<{ blob: Blob; name: string; count: number }> {
+export interface PdfOptions {
+  page: PdfPage;
+  fonts: PdfFonts;
+  /** smaller pictures for a lighter file, such as the copy that goes in a published guide */
+  imageWidth?: number;
+  /** JPEG quality, 0 to 1 */
+  quality?: number;
+}
+
+export async function exportPdf(job: ExportJob, options: PdfOptions): Promise<{ blob: Blob; name: string; count: number }> {
   const { project } = job;
   const spec = PAGES[options.page];
   const doc = await PDFDocument.create();
@@ -83,8 +92,8 @@ export async function exportPdf(job: ExportJob, options: { page: PdfPage; fonts:
   for (const [i, step] of project.steps.entries()) {
     throwIfCancelled(job.signal);
     job.onProgress?.(i, total);
-    const canvas = await renderStep(job, step, IMAGE_WIDTH, true);
-    const jpeg = new Uint8Array(await (await canvasToBlob(canvas, 'image/jpeg', 0.9)).arrayBuffer());
+    const canvas = await renderStep(job, step, options.imageWidth ?? IMAGE_WIDTH, true);
+    const jpeg = new Uint8Array(await (await canvasToBlob(canvas, 'image/jpeg', options.quality ?? 0.9)).arrayBuffer());
     const image = await doc.embedJpg(jpeg);
     const page = doc.addPage([spec.width, spec.height]);
     const title = printable(semibold, stepTitle(step, i));
