@@ -7,7 +7,7 @@ import { openSourceWriter, readSource, saveProject } from './opfs';
 
 export const WAYPOST_TYPE: FilePickerAcceptType = { description: 'Waypost project', accept: { 'application/zip': ['.waypost'] } };
 
-/** Streams `project.json` and the recording into `sink`. */
+/** Streams `project.json`, the recording and any images into `sink`. */
 async function zipProject(project: Project, sink: (chunk: Uint8Array) => Promise<void>): Promise<void> {
   const source = project.sources[0];
   if (!source) throw new Error('This project has no recording to save.');
@@ -32,6 +32,15 @@ async function zipProject(project: Project, sink: (chunk: Uint8Array) => Promise
     if (failure) throw failure;
   }
   entry.push(new Uint8Array(0), true);
+  for (const asset of project.assets) {
+    const bytes = await readSource(project.id, asset.file).then(f => f.arrayBuffer(), () => null);
+    if (!bytes) continue; /* an image that went missing: the project still opens without it */
+    const image = new ZipPassThrough(asset.file);
+    zip.add(image);
+    image.push(new Uint8Array(bytes), true);
+    await queue;
+    if (failure) throw failure;
+  }
   zip.end();
   await queue;
   if (failure) throw failure;
@@ -95,7 +104,7 @@ export async function openWaypostFile(file: Blob, newId: string): Promise<Projec
   unzip.register(UnzipInflate);
   unzip.onfile = entry => {
     const isJson = entry.name === 'project.json';
-    const isSource = entry.name.startsWith('sources/') && !entry.name.includes('..') && !entry.name.endsWith('/');
+    const isSource = /^(sources|assets)\/[^/]+$/.test(entry.name) && !entry.name.includes('..');
     if (!isJson && !isSource) return;
     if (isJson) {
       json = [];

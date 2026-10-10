@@ -7,38 +7,25 @@ import {
   escapeSelection,
   getEditor,
   jumpSeconds,
+  jumpEdit,
   jumpStep,
   jumpToEnd,
   jumpToStart,
-  notify,
   pinAtPlayhead,
   redo,
-  selectProject,
-  seekTimeline,
+  selectLayer,
+  splitAtPlayhead,
   setTool,
   stepFrames,
-  timelineTimeOf,
   toggleMuted,
   toggleRipple,
   toggleSnap,
-  totalDuration,
   undo,
   zoomBy,
   ZOOM_FACTOR,
 } from '../state/store';
 import { isTyping } from './keyboard';
 import { TOOLS } from './tools';
-
-/** The next or previous edit: for now, a pin or an end of the guide (cuts, blur and audio join in later phases). */
-function jumpEdit(direction: 1 | -1): void {
-  const state = getEditor();
-  const project = selectProject(state);
-  if (!project) return;
-  const stops = [0, ...project.steps.map(s => timelineTimeOf(project, s)), totalDuration(project)].sort((a, b) => a - b);
-  const frame = 0.5 / (state.media?.info.fps ?? 30);
-  const target = direction > 0 ? stops.find(t => t > state.playhead + frame) : [...stops].reverse().find(t => t < state.playhead - frame);
-  if (target !== undefined) seekTimeline(target);
-}
 
 /** Keys that keep working while a slider or checkbox has focus. */
 const TRANSPORT_KEYS = new Set(['j', 'k', 'l', '=', '+', '-']);
@@ -84,6 +71,8 @@ export function useShortcuts(): void {
         if (key === 'j') return act(() => jumpEdit(-1));
         if (key === 'l') return act(() => jumpEdit(1));
         if (key === 'p') return act(() => void pinAtPlayhead());
+        if (key === 'k') return act(() => selectLayer(1));
+        if (key === 'i') return act(() => selectLayer(-1));
         if (key === 'r') return act(toggleRipple);
         if (key === '+') return act(() => zoomBy(ZOOM_FACTOR));
         return;
@@ -97,6 +86,7 @@ export function useShortcuts(): void {
       if (key === '-') return act(() => zoomBy(1 / ZOOM_FACTOR));
       if (key === 'n') return act(toggleSnap);
       if (key === 'm') return act(toggleMuted);
+      if (key === 'r') return act(splitAtPlayhead);
       if (key === 'delete' || key === 'backspace') {
         if (getEditor().selection) return act(deleteSelection);
         return;
@@ -112,7 +102,6 @@ export function useShortcuts(): void {
       }
       const tool = TOOLS.find(t => t.key === key);
       if (tool && getEditor().phase === 'ready') {
-        if (tool.soon) return act(() => notify(`${tool.label}: ${tool.soon!.toLowerCase()}.`));
         return act(() => setTool(tool.id));
       }
     };

@@ -268,3 +268,79 @@ export function InspectorSection({ id, title, children }: InspectorSectionProps)
     </details>
   );
 }
+
+export interface SegmentedProps<T extends string> {
+  /** the group's accessible name; shown above unless `hideLabel` */
+  label: string;
+  hideLabel?: boolean;
+  options: ReadonlyArray<{ value: T; label: ReactNode; title?: string }>;
+  value: T | null;
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}
+
+/** A row of mutually exclusive buttons, such as speed presets or the Edit and Viewer views. */
+export function Segmented<T extends string>({ label, hideLabel, options, value, onChange, disabled }: SegmentedProps<T>) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-col gap-1">
+      {!hideLabel && <span className="text-sm font-medium text-fg-muted">{label}</span>}
+      <div className="flex rounded-md border border-line-strong bg-raised p-0.5">
+        {options.map(o => (
+          <button
+            key={o.value}
+            type="button"
+            title={o.title}
+            aria-pressed={o.value === value}
+            disabled={disabled}
+            onClick={() => onChange(o.value)}
+            className={cx(
+              'h-7 min-w-0 flex-1 rounded-sm px-2 text-sm whitespace-nowrap text-fg-muted hover:text-fg disabled:cursor-not-allowed disabled:text-fg-disabled',
+              'aria-pressed:bg-panel aria-pressed:font-semibold aria-pressed:text-fg aria-pressed:shadow-sm',
+              focusRing,
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export interface SwitchProps {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  hint?: string;
+  disabled?: boolean;
+}
+
+/** An on/off setting that applies at once. */
+export function Switch({ label, checked, onChange, hint, disabled }: SwitchProps) {
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="text-sm font-medium text-fg-muted select-none">
+          {label}
+        </label>
+        <button
+          id={id}
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          disabled={disabled}
+          onClick={() => onChange(!checked)}
+          className={cx(
+            'relative h-5 w-9 shrink-0 rounded-pill transition-colors disabled:opacity-50',
+            checked ? 'bg-sel' : 'bg-switch-off',
+            focusRing,
+          )}
+        >
+          <span className={cx('absolute top-0.5 size-4 rounded-pill bg-white shadow-sm transition-[left]', checked ? 'left-[18px]' : 'left-0.5')} />
+        </button>
+      </div>
+      {hint && <p className="m-0 text-sm text-fg-muted">{hint}</p>}
+    </div>
+  );
+}

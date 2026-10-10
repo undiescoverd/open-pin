@@ -10,6 +10,6 @@ export { detectPlatform, formatShortcut, type FormattedShortcut, type Platform }
 export { Surface, type SurfaceProps, type SurfaceVariant } from './Surface';
 export { Tooltip, TooltipProvider, type TooltipProps } from './Tooltip';
 export { Dialog, type DialogProps } from './Dialog';
-export { ColorSwatchPicker, Field, InspectorSection, ParamRow, SelectField, TextArea, TextField, TimecodeField } from './Fields';
-export type { FieldProps, InspectorSectionProps, ParamRowProps, SelectFieldProps, SwatchProps, TimecodeFieldProps } from './Fields';
+export { ColorSwatchPicker, Field, InspectorSection, ParamRow, Segmented, SelectField, Switch, TextArea, TextField, TimecodeField } from './Fields';
+export type { FieldProps, InspectorSectionProps, ParamRowProps, SegmentedProps, SelectFieldProps, SwatchProps, SwitchProps, TimecodeFieldProps } from './Fields';
 export { Menu, MenuItem, MenuLabel, MenuSeparator, type MenuItemProps, type MenuProps } from './Menu';

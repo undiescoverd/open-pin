@@ -10,6 +10,8 @@ import {
   newId,
   redo as redoHistory,
   spotAt,
+  clipLength,
+  clipStarts,
   srcToTl,
   stepAtTime,
   timelineDuration,
@@ -36,6 +38,7 @@ import {
 import type { MediaHandle } from '@waypost/media';
 import { create } from 'zustand';
 import { currentPlayback } from '../engine/session';
+import { timelineEdges } from '../editor/snapping';
 import type { PlaybackState } from '../engine/playback';
 import type { ToolId } from '../editor/tools';
 
@@ -401,6 +404,81 @@ export function jumpStep(direction: 1 | -1): void {
   seekTimeline(target.tl);
 }
 
+/** ⇧J / ⇧L: the previous or next edit: any pin, cut, gap edge, effect start or end, or an end of the guide. */
+export function jumpEdit(direction: 1 | -1): void {
+  const state = getEditor();
+  const project = selectProject(state);
+  if (!project) return;
+  const stops = timelineEdges(project);
+  const frame = halfFrame();
+  const target = direction > 0 ? stops.find(t => t > state.playhead + frame) : [...stops].reverse().find(t => t < state.playhead - frame);
+  if (target !== undefined) seekTimeline(target);
+}
+
+type LaneItem = { start: number; end: number; select: () => void };
+
+/** The timeline lanes, top to bottom, with what each holds as timeline spans (docs/05-editor-interactions.md, section 3). */
+function laneItems(project: Project): LaneItem[][] {
+  const starts = clipStarts(project.timeline);
+  const tl = (time: number) => srcToTl(project.timeline, project.sources[0]?.id ?? '', time);
+  return [
+    project.steps.map(s => {
+      const t = timelineTimeOf(project, s);
+      return { start: t, end: t, select: () => selectStep(s.id) };
+    }),
+    project.timeline.map((c, i) => ({ start: starts[i]!, end: starts[i]! + clipLength(c), select: () => selectClip(c.id) })),
+    project.blurs.map(b => ({ start: tl(b.start), end: tl(b.end), select: () => selectBlur(b.id, { seek: true }) })),
+    [],
+    [],
+  ];
+}
+
+function laneOf(selection: Selection): number {
+  if (!selection) return -1;
+  if (selection.kind === 'clip' || selection.kind === 'gap') return 1;
+  if (selection.kind === 'blur') return 2;
+  return 0;
+}
+
+/** The middle of the selection in timeline time. */
+function selectionMiddle(project: Project, selection: Selection): number {
+  if (!selection) return getEditor().playhead;
+  if (selection.kind === 'clip' || selection.kind === 'gap') {
+    const i = project.timeline.findIndex(c => c.id === selection.clipId);
+    const start = clipStarts(project.timeline)[i] ?? 0;
+    const clip = project.timeline[i];
+    if (!clip) return 0;
+    return selection.kind === 'gap' ? start - clip.gap / 2 : start + clipLength(clip) / 2;
+  }
+  if (selection.kind === 'blur') {
+    const b = project.blurs.find(x => x.id === selection.blurId);
+    return b ? (srcToTl(project.timeline, b.source, b.start) + srcToTl(project.timeline, b.source, b.end)) / 2 : 0;
+  }
+  const step = project.steps.find(s => s.id === selection.stepId);
+  return step ? timelineTimeOf(project, step) : 0;
+}
+
+/**
+ * ⇧K / ⇧I: selects in the next lane down or up that has anything in it, the item covering the middle of the selection, or the
+ * nearest. With nothing selected ⇧K starts at the top lane and ⇧I at the bottom. Stops at the ends.
+ */
+export function selectLayer(direction: 1 | -1): void {
+  const state = getEditor();
+  const project = selectProject(state);
+  if (!project) return;
+  currentPlayback()?.pause();
+  const lanes = laneItems(project);
+  const from = laneOf(state.selection);
+  const mid = selectionMiddle(project, state.selection);
+  for (let lane = from < 0 ? (direction > 0 ? 0 : lanes.length - 1) : from + direction; lane >= 0 && lane < lanes.length; lane += direction) {
+    const items = lanes[lane]!;
+    if (!items.length) continue;
+    const distance = (it: LaneItem) => (mid < it.start ? it.start - mid : mid > it.end ? mid - it.end : 0);
+    [...items].sort((a, b) => distance(a) - distance(b))[0]!.select();
+    return;
+  }
+}
+
 export function jumpToStart(play = false): void {
   seekTimeline(0);
   if (play) void currentPlayback()?.play(1);
@@ -646,6 +724,25 @@ export function setBlurRectHere(blurId: string, rect: Rect, label?: string, coal
   run(commands.setBlurRect(blurId, time, rect, halfFrame(), Date.now(), label, coalesceKey));
   const after = selectProject(getEditor())?.blurs.find(b => b.id === blurId)?.keyframes.length ?? before;
   if (after > before) notify(`Added a keyframe at ${formatSeconds(time)}. The region now moves between its keyframes.`);
+}
+
+/** The region's keyframe on the frame showing, if it has one there. */
+export function blurKeyframeHere(blur: Blur): number | null {
+  const project = selectProject(getEditor());
+  if (!project) return null;
+  const now = sourceTimeAt(project, getEditor().playhead);
+  return blur.keyframes.find(k => Math.abs(k.time - now) <= halfFrame())?.time ?? null;
+}
+
+/** Stops a region moving: it keeps the place it has on the frame showing for its whole length. */
+export function flattenBlurHere(blurId: string): void {
+  const project = selectProject(getEditor());
+  if (project) run(commands.flattenBlur(blurId, sourceTimeAt(project, getEditor().playhead), Date.now()));
+}
+
+export function removeBlurKeyframeHere(blur: Blur): void {
+  const time = blurKeyframeHere(blur);
+  if (time !== null) run(commands.removeBlurKeyframe(blur.id, time, Date.now()));
 }
 
 export function removeBlur(blurId: string): void {

@@ -4,6 +4,7 @@ import { parseProject, type Project } from '@waypost/core';
 
      waypost/projects/<id>/project.json
      waypost/projects/<id>/sources/<file>
+     waypost/projects/<id>/assets/<file>     logo and background images
 
    It is fast, large, and private to this app's origin. */
 
@@ -46,15 +47,25 @@ export function sourcePath(sourceId: string, originalName: string): string {
   return `sources/${sourceId}.${ext}`;
 }
 
-/** Opens a writer for a recording inside the project folder. */
+/** The folders a project file may live in. */
+const FOLDERS = new Set(['sources', 'assets']);
+
+function splitPath(path: string): [string, string] {
+  const [folder, name, ...rest] = path.split('/');
+  if (!folder || !name || rest.length || !FOLDERS.has(folder) || name === '..' || name === '.') throw new Error(`Not a project file: ${path}`);
+  return [folder, name];
+}
+
+/** Opens a writer for a file inside the project folder (`sources/…` or `assets/…`). */
 export async function openSourceWriter(projectId: string, path: string): Promise<FileSystemWritableFileStream> {
+  const [folderName, name] = splitPath(path);
   const dir = await projectDir(projectId, true);
-  const folder = await dir.getDirectoryHandle('sources', { create: true });
-  const handle = await folder.getFileHandle(path.split('/').pop()!, { create: true });
+  const folder = await dir.getDirectoryHandle(folderName, { create: true });
+  const handle = await folder.getFileHandle(name, { create: true });
   return handle.createWritable();
 }
 
-/** Streams a recording into the project folder without holding it in memory. */
+/** Streams a file into the project folder without holding it in memory. */
 export async function writeSource(projectId: string, path: string, data: Blob): Promise<void> {
   const writable = await openSourceWriter(projectId, path);
   try {
@@ -65,10 +76,17 @@ export async function writeSource(projectId: string, path: string, data: Blob): 
   }
 }
 
+/** Reads a file of the project folder (`sources/…` or `assets/…`). */
 export async function readSource(projectId: string, path: string): Promise<File> {
+  const [folderName, name] = splitPath(path);
   const dir = await projectDir(projectId);
-  const folder = await dir.getDirectoryHandle('sources');
-  return (await folder.getFileHandle(path.split('/').pop()!)).getFile();
+  const folder = await dir.getDirectoryHandle(folderName);
+  return (await folder.getFileHandle(name)).getFile();
+}
+
+/** A safe file name for an image: `assets/<assetId>.<extension>`. */
+export function assetPath(assetId: string, originalName: string): string {
+  return sourcePath(assetId, originalName).replace(/^sources\//, 'assets/');
 }
 
 export async function deleteProjectFiles(id: string): Promise<void> {

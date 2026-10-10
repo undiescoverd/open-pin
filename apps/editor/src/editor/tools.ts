@@ -10,12 +10,10 @@ export interface Tool {
   icon: LucideIcon;
   /** what to do with the tool, shown under the canvas while it is picked */
   hint: string;
-  /** set when the tool's phase of the roadmap hasn't landed yet */
-  soon?: string;
 }
 
 export const TOOLS: readonly Tool[] = [
-  { id: 'select', label: 'Select', key: 'v', icon: MousePointer2, hint: 'Click an annotation to select it; drag it or its handles to change it.' },
+  { id: 'select', label: 'Select', key: 'v', icon: MousePointer2, hint: 'Click anything on the frame to select it; drag it or its handles to change it.' },
   { id: 'pin', label: 'Pin', key: 'p', icon: MapPin, hint: 'Click where the viewer should click. This frame becomes a step.' },
   { id: 'callout', label: 'Callout', key: 'c', icon: MessageSquare, hint: 'Click where the note should point.' },
   { id: 'arrow', label: 'Arrow', key: 'a', icon: ArrowUpRight, hint: 'Drag from the tail to the tip.' },
