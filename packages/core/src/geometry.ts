@@ -1,4 +1,5 @@
-import { ZOOM_MAX, ZOOM_MIN, type Annotation, type Aspect, type Blur, type Frame, type Point, type Rect } from './schema';
+import { ZOOM_MAX, ZOOM_MIN } from './constants';
+import type { Annotation, Aspect, Blur, Frame, Point, Rect } from './schema';
 
 /* Pure geometry shared by the editor, the renderer and every export: where a blur sits at a time, what part of the frame a zoom
    shows, and where the recording sits on its background. Rects are [x, y, width, height]. */

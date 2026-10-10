@@ -1,11 +1,11 @@
-import { formatTimecode, frameLayout, nativeOutputSize } from '@waypost/core';
+import { formatTimecode, frameLayout, introLength, nativeOutputSize } from '@waypost/core';
 import { composeScene, loadRenderFonts, sceneFor } from '@waypost/render';
 import { useEffect, useRef } from 'react';
 import { Playback, type PlaybackHost } from '../engine/playback';
 import { currentPlayback, setPlayback } from '../engine/session';
 import { getEditor, selectProject, setPlaybackState, setPlayhead, timelineTimeOf, useEditor } from '../state/store';
 import { AnnotationOverlay } from './AnnotationOverlay';
-import { introLength, presentation, projectForDrawing } from './visible';
+import { presentation, projectForDrawing } from './visible';
 import { useFitSize } from './useFitSize';
 
 /** Preview frames are decoded at most this wide; exports use the recording's full size. */

@@ -4,6 +4,7 @@ import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, t
 import { blurRectAt } from './geometry';
 import {
   DEFAULT_FRAME,
+  DEFAULT_GUIDE,
   SCHEMA_VERSION,
   type Annotation,
   type Asset,
@@ -11,6 +12,7 @@ import {
   type Effect,
   type ClickAnnotation,
   type Frame,
+  type GuideSettings,
   type Logo,
   type Point,
   type Project,
@@ -49,6 +51,7 @@ export function createProject(args: { id: string; name: string; source: Source; 
     assets: [],
     frame: { ...DEFAULT_FRAME, background: { type: 'none' } },
     logo: null,
+    guide: structuredClone(DEFAULT_GUIDE),
   };
 }
 
@@ -178,6 +181,8 @@ export const commands = {
         const i = d.steps.findIndex(s => s.id === stepId);
         if (i < 0) return;
         d.steps.splice(i, 1);
+        /* a call to action shown from this step moves to the end card */
+        if (d.guide.cta?.showAt === stepId) d.guide.cta.showAt = 'end';
         touch(d, now);
       },
     };
@@ -494,6 +499,20 @@ export const commands = {
       run: d => {
         if (JSON.stringify(d.logo) === JSON.stringify(logo)) return;
         d.logo = logo;
+        touch(d, now);
+      },
+    };
+  },
+
+  /** Changes how the published guide plays and looks (F9, F10). */
+  setGuide(patch: Partial<GuideSettings>, now: number, label = 'Change player settings', coalesceKey?: string): Command<Project> {
+    return {
+      label,
+      coalesceKey,
+      run: d => {
+        const next = { ...d.guide, ...patch };
+        if (JSON.stringify(next) === JSON.stringify(d.guide)) return;
+        d.guide = next as GuideSettings;
         touch(d, now);
       },
     };
