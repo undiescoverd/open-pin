@@ -106,7 +106,8 @@ Onboarding.waypost  (zip)
     }
   ],
   "blurs": [
-    { "id": "b1", "style": "pixelate", "strength": 16,
+    { "id": "b1", "layer": 0,
+      "effects": [ { "type": "pixelate", "on": true, "amount": 45 }, { "type": "darken", "on": true, "amount": 25 } ],
       "keyframes": [ { "source": "src1", "time": 1.0, "rect": [0.93, 0.03, 0.05, 0.07] },
                      { "source": "src1", "time": 9.0, "rect": [0.93, 0.03, 0.05, 0.07] } ] }
   ],

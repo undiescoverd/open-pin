@@ -146,8 +146,8 @@ Phases are defined in [04-roadmap.md](04-roadmap.md). Libraries named below are 
 **How FramePin likely does it (inferred).** Rectangles with keyframes, interpolated per frame and burned into the pixels at export. It has to be burned in: a blur drawn as an overlay could be removed with dev tools.
 
 **How Waypost does it.**
-- `BlurRegion { keyframes: [{ sourceTime, rect }], style: "gaussian" | "pixelate" | "solid", strength }`. Rects interpolate linearly between keyframes; the region is active only inside its time range.
-- **Editing:** Blur tool (B): draw a rect, scrub forward, move it, and a keyframe is added automatically. Blur regions show as bars on their own timeline lane.
+- `EffectRegion { keyframes: [{ sourceTime, rect }], layer, effects: [{ type: "pixelate" | "blur" | "darken" | "desaturate" | "tint" | "solid", on, amount, color? }] }`. The effects apply in list order and higher layers draw on top, like effects and tracks in DaVinci Resolve. Rects interpolate linearly between keyframes; the region is active only inside its time range.
+- **Editing:** Blur tool (X): draw a rect, scrub forward, move it, and a keyframe is added automatically. Blur regions show as bars on their own timeline lane. There's no limit on how many regions a project has or how many overlap at once.
 - **Rendering:** the compositor applies canvas `filter: blur()` (gaussian) or a downscale/upscale (pixelate) clipped to the rect. Pixelate and solid are the safest choices for sensitive text.
 - **Always baked:** stills, segments, MP4, PDF and screenshots are rendered from blurred frames. No output has an unblurred path, and the player never sees unblurred pixels.
 - **Phase 6 bonus:** a tracking assist (template matching in a worker) and auto-redaction suggestions using OCR (Tesseract.js, loaded only when used) with patterns for emails, API keys and card numbers.
@@ -279,7 +279,7 @@ Waypost replaces all of it with one purchase: every feature, no plan limits, no 
 
 **What it does (from the screenshot).** An "ADD BACKGROUND AUDIO" timeline lane.
 
-**How Waypost does it.** A music lane with one audio file: volume, loop, fade in/out, and automatic **ducking** under narration. Mixed into MP4. In the player, music loops quietly while the guide is open, ducks during step narration, and stops when the viewer pauses or leaves.
+**How Waypost does it.** A music lane, always the bottom lane, with one audio file: volume, loop, fade in/out, and **auto-ducking**: speech is detected in the narration (and in the recording's own audio when it's kept), so the music dips only while someone is actually talking and comes back up in the pauses. Mixed into MP4. In the player, music loops quietly while the guide is open, ducks during step narration, and stops when the viewer pauses or leaves.
 
 ## F21 — Snapshot
 

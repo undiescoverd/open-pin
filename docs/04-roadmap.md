@@ -38,12 +38,12 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 ## Phase 2 — Edit and polish
 
 - F2 timeline editing: trim, split (R), delete range, per-clip speed (⅓×–5×), with source-time anchoring and orphaned-step warnings. Fit-to-width timeline with zoom.
-- F7 blur regions with keyframes (gaussian, pixelate, solid) and a Blur lane.
+- F7 effect regions with keyframes and an **Effects lane, as in DaVinci Resolve**: any number of regions, any number at once, each with a stack of effects of any length (pixelate, blur, darken, desaturate, tint, solid fill), on layers where higher ones draw on top (docs/05, section 4).
 - F5 zoom/focus per step; F6 reveal-order groups.
 - F18 background framing and presets; F19 logo.
 - F13 MP4 export in a worker (H.264, up to 4K) with holds, animated reveals, captions, original audio; progress and cancel.
 
-**Done when** a 2-minute recording with cuts, a 2× section, 2 blurred regions, a gradient background and 10 steps exports to a 4K MP4 whose blur is present in every frame (checked by a frame-sampling test).
+**Done when** a 2-minute recording with cuts, a 2× section, 8 effect regions (at least 4 on screen at the same moment, on 4 layers, one with a stack of 3 effects), a gradient background and 10 steps exports to a 4K MP4 whose blur is present in every frame (checked by a frame-sampling test).
 
 ## Phase 3 — Interactive guide
 
@@ -58,8 +58,9 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 ## Phase 4 — Audio
 
 - F8 narration: keep original audio; import a voice file; record per step in the browser; generate voiceover with Kokoro in a worker (model downloaded on first use, then cached; voice picker with previews).
-- Hold timing driven by narration length; ducking.
-- F20 background music lane with volume, loop, fades and ducking.
+- Hold timing driven by narration length.
+- **Auto-ducking driven by speech detection**: music dips only while someone is actually speaking, detected in recorded and imported narration, in generated voice (Kokoro's output can be analysed, unlike the browser's speech engine), and in the recording's own audio when it's kept.
+- F20 background music lane, always the bottom lane, with volume, loop and fades.
 - Narration and music in the player ("Start guide" overlay to unlock sound) and in MP4.
 
 **Done when** a guide with generated voiceover and background music plays in sync in the player and in the MP4.
