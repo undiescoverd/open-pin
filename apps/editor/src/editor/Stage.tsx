@@ -1,51 +1,21 @@
-import { Button, Icon, IconButton, KeyCap, Segmented, Surface, cx } from '@waypost/ui';
+import { Button, Icon, KeyCap, cx } from '@waypost/ui';
 import { Film, Loader2 } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
 import { currentPlayback } from '../engine/session';
 import { checkSupport } from '../engine/support';
 import { openFile } from '../state/project';
-import { selectProject, setTool, setView, useEditor } from '../state/store';
+import { selectProject, useEditor } from '../state/store';
 import { CanvasView } from './CanvasView';
 import { TOOLS } from './tools';
 
-/* The canvas column: the floating tool palette over the frame. With no recording open the frame is the drop zone. */
+/* The canvas column. Its top edge is the top edge of the Steps and Inspector panels, so the frame gets all the height there is.
+   With no recording open the frame is the drop zone. The tools live in the timeline's transport row (ToolPalette). */
 export function Stage() {
-  const tool = useEditor(s => s.tool);
   const phase = useEditor(s => s.phase);
   const busy = useEditor(s => s.busy);
-  const view = useEditor(s => s.view);
 
   return (
-    <main className="flex min-h-0 min-w-0 flex-col items-center gap-3 [grid-area:stage]" aria-label="Canvas">
-      <div className="flex max-w-full items-center gap-2">
-        <Surface variant="floating" role="toolbar" aria-label="Tools" className="flex max-w-full gap-0.5 overflow-x-auto p-1">
-          {TOOLS.map(t => (
-            <IconButton
-              key={t.id}
-              label={t.label}
-              shortcut={[t.key]}
-              icon={<Icon icon={t.icon} />}
-              pressed={tool === t.id}
-              disabled={phase !== 'ready'}
-              onClick={() => setTool(t.id)}
-              aria-label={t.label}
-            />
-          ))}
-        </Surface>
-        <Surface variant="floating" className="p-1">
-          <Segmented
-            label="View"
-            hideLabel
-            options={[
-              { value: 'edit', label: 'Edit', title: 'Every annotation, with handles' },
-              { value: 'viewer', label: 'Viewer', title: 'The step as the guide shows it: zoomed, groups appearing in order' },
-            ]}
-            value={view}
-            disabled={phase !== 'ready'}
-            onChange={setView}
-          />
-        </Surface>
-      </div>
+    <main className="flex min-h-0 min-w-0 flex-col [grid-area:stage]" aria-label="Canvas">
       {phase === 'ready' ? <Workspace /> : <DropZone loading={phase === 'loading'} />}
       {busy && <BusyOverlay text={busy} />}
       <ExportOverlay />

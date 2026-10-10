@@ -97,7 +97,6 @@ import {
   setStepText,
   setStepZoom,
   setPreviewOpen,
-  setView,
   sourceTimeAt,
   splitAtPlayhead,
   totalDuration,
@@ -108,6 +107,7 @@ import {
   useEditor,
 } from '../state/store';
 import { useEditSession } from './useEditSession';
+import { switchView } from './visible';
 
 const TABS = [
   { id: 'selection', label: 'Inspector' },
@@ -378,7 +378,7 @@ function ZoomPanel({ project, step }: { project: Project; step: Step }) {
           <Button size="sm" disabled={click?.type !== 'click'} onClick={() => click?.type === 'click' && setStepZoom(step.id, zoomBox(click.at, rect[2]), 'Centre zoom')}>
             Centre on the click
           </Button>
-          <Button size="sm" aria-pressed={view === 'viewer'} onClick={() => setView(view === 'viewer' ? 'edit' : 'viewer')}>
+          <Button size="sm" aria-pressed={view === 'viewer'} onClick={() => switchView(view === 'viewer' ? 'edit' : 'viewer')}>
             {view === 'viewer' ? 'Back to editing' : 'Preview zoomed'}
           </Button>
         </ButtonRow>

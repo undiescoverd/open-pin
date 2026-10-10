@@ -5,7 +5,7 @@ import { Playback, type PlaybackHost } from '../engine/playback';
 import { currentPlayback, setPlayback } from '../engine/session';
 import { getEditor, selectProject, setPlaybackState, setPlayhead, timelineTimeOf, useEditor } from '../state/store';
 import { AnnotationOverlay } from './AnnotationOverlay';
-import { presentation, projectForDrawing } from './visible';
+import { easeOutOf, leavingUntil, presentation, projectForDrawing, rememberViewer } from './visible';
 import { useFitSize } from './useFitSize';
 
 /** Preview frames are decoded at most this wide; exports use the recording's full size. */
@@ -53,6 +53,7 @@ export function CanvasView() {
         const key = `${state.playhead}|${state.view}|${state.playback.stoppedAt}`;
         if (arrival.current.key !== key) arrival.current = { key, at: performance.now() };
         const shown = presentation((performance.now() - arrival.current.at) / 1000);
+        rememberViewer(shown);
         const scene = sceneFor(projectForDrawing(p, state), {
           frame,
           sourceTime,
@@ -64,7 +65,11 @@ export function CanvasView() {
         composeScene(ctx, el.width, el.height, scene);
       },
       onTime: setPlayhead,
-      onState: setPlaybackState,
+      onState: next => {
+        /* Continue, Play or Space from a step shown the Viewer's way: ease out of it rather than cut */
+        easeOutOf({ view: getEditor().view, playback: next });
+        setPlaybackState(next);
+      },
       muted: () => getEditor().muted,
     };
     const playback = new Playback(media, videoEl, decodeWidth, host);
@@ -98,14 +103,15 @@ export function CanvasView() {
     currentPlayback()?.redraw();
   }, [steps, blurs, frame, logo, selection, draft, shapeDraft, rate, view, assetImages, width, height]);
 
-  /* the Viewer entrance: keep repainting while the zoom eases in and the groups appear */
+  /* while paused, keep repainting while something eases: the Viewer entrance (the zoom in, the groups appearing) or the exit
+     (switching back to Edit). Playing repaints with every frame by itself. */
   useEffect(() => {
     if (rate !== 0) return;
     const state = getEditor();
     const p = selectProject(state);
     const shown = presentation(0);
     if (!p || !shown.viewer || !shown.step) return;
-    const until = performance.now() + introLength(shown.step) * 1000 + 100;
+    const until = leavingUntil() || performance.now() + introLength(shown.step) * 1000 + 100;
     let raf = 0;
     const tick = (now: number) => {
       currentPlayback()?.redraw();
@@ -117,7 +123,7 @@ export function CanvasView() {
 
   const inner = layout?.inner ?? [0, 0, width, height];
   return (
-    <div ref={wrap} className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center">
+    <div ref={wrap} className="relative flex min-h-0 min-w-0 flex-1 items-start justify-center">
       {/* the video element only feeds the canvas while playing forward; it is never shown */}
       <video ref={video} className="hidden" playsInline preload="auto" muted={false} />
       {/* always mounted, so the playback effect finds its canvas; it has no size until the space around it is measured */}

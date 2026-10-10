@@ -72,5 +72,34 @@ export async function dragOnFrame(page: Page, from: [number, number], to: [numbe
   await page.mouse.up();
 }
 
+/**
+ * Watches the zoom on the canvas for `ms` milliseconds and returns one reading per animation frame. The fixture is vertical
+ * colour bars, so where yellow starts along a row, as a fraction of the canvas width, says how far in the frame is zoomed: about
+ * a third with the whole frame showing, and nearer the left edge the further in. The row is above the diagonal streak that
+ * crosses the lower part of the picture, whose yellow-green end would otherwise be taken for the bar.
+ */
+export function watchYellowEdge(page: Page, ms: number): Promise<number[]> {
+  return page.getByTestId('frame-canvas').evaluate(
+    (canvas: HTMLCanvasElement, duration: number) =>
+      new Promise<number[]>(resolve => {
+        const ctx = canvas.getContext('2d')!;
+        const readings: number[] = [];
+        const start = performance.now();
+        const read = () => {
+          const row = ctx.getImageData(0, Math.floor(canvas.height * 0.3), canvas.width, 1).data;
+          let edge = -1;
+          for (let x = 0; x < canvas.width && edge < 0; x++) {
+            if (row[x * 4]! > 200 && row[x * 4 + 1]! > 200 && row[x * 4 + 2]! < 90) edge = x;
+          }
+          readings.push(edge < 0 ? Number.NaN : edge / canvas.width);
+          if (performance.now() - start < duration) requestAnimationFrame(read);
+          else resolve(readings);
+        };
+        requestAnimationFrame(read);
+      }),
+    ms,
+  );
+}
+
 export const stepRail = (page: Page): Locator => page.getByRole('complementary', { name: /Steps/ });
 export const stepCards = (page: Page): Locator => stepRail(page).getByRole('listitem');

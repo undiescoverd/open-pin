@@ -5,7 +5,7 @@ import { commands, createProject } from './commands';
 import { GUIDE_SCHEMA } from './constants';
 import { guideSize, parseGuide, planGuide, stepFileIds } from './guide';
 import { apply, createHistory, type Command } from './history';
-import { OUTRO_FADE, ZOOM_OUT, guideHold, introLength, outroLength, stepOutro } from './plan';
+import { OUTRO_FADE, ZOOM_OUT, guideHold, introLength, outroFrom, outroLength, stepOutro } from './plan';
 import { DEFAULT_GUIDE, parseProject, SCHEMA_VERSION, type Project, type Source } from './schema';
 
 /* Phase 3 (docs/04-roadmap.md, "Phase 3 — Interactive guide"): player settings in the project, and the guide.json a project
@@ -60,6 +60,23 @@ describe('step timing in the player', () => {
     expect(stepOutro(zoomed, 0)).toEqual({ zoom: 1, reveal: [1, 1, 1, 1] });
     expect(stepOutro(zoomed, ZOOM_OUT)).toEqual({ zoom: 0, reveal: [0, 0, 0, 0] });
     expect(stepOutro({ zoom: null }, OUTRO_FADE / 2).reveal[0]).toBeCloseTo(0.5, 6);
+  });
+
+  it('eases out from wherever the entrance had got to, so leaving early never jumps', () => {
+    const zoomed = { zoom: { rect: [0, 0, 0.5, 0.5] as [number, number, number, number] } };
+    const partway = { zoom: 0.4, reveal: [1, 0.5, 0, 0] };
+    expect(outroFrom(partway, zoomed, 0)).toEqual(partway);
+    expect(outroFrom(partway, zoomed, ZOOM_OUT)).toEqual({ zoom: 0, reveal: [0, 0, 0, 0] });
+    /* never above where it started, and falling the whole way */
+    let last = outroFrom(partway, zoomed, 0);
+    for (let t = 0.05; t <= ZOOM_OUT; t += 0.05) {
+      const look = outroFrom(partway, zoomed, t);
+      expect(look.zoom).toBeLessThanOrEqual(last.zoom);
+      look.reveal.forEach((a, i) => expect(a).toBeLessThanOrEqual(last.reveal[i]!));
+      last = look;
+    }
+    /* a fully shown step leaves exactly as the player does */
+    expect(outroFrom({ zoom: 1, reveal: [1, 1, 1, 1] }, zoomed, 0.2)).toEqual(stepOutro(zoomed, 0.2));
   });
 });
 

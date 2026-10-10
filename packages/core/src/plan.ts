@@ -90,6 +90,13 @@ export function stepOutro(step: Pick<Step, 'zoom'>, t: number): StepLook {
   return { zoom: step.zoom ? clamp(1 - t / ZOOM_OUT, 0, 1) : 0, reveal: new Array<number>(REVEAL_GROUPS).fill(fade) };
 }
 
+/** `stepOutro` for a step that was only part-way through its entrance when it started to leave (the zoom at 40%, two groups
+    showing): the outro takes it from there rather than jumping to fully shown first. */
+export function outroFrom(from: StepLook, step: Pick<Step, 'zoom'>, t: number): StepLook {
+  const out = stepOutro(step, t);
+  return { zoom: from.zoom * out.zoom, reveal: from.reveal.map((a, i) => a * (out.reveal[i] ?? 0)) };
+}
+
 export type PlanItem =
   /** the recording plays timeline time `from` to `to` */
   | { kind: 'play'; start: number; duration: number; from: number; to: number }

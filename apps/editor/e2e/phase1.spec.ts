@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
 import { unzipSync } from 'fflate';
@@ -562,5 +562,37 @@ test.describe('layout', () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
     void frameBox;
+  });
+
+  for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 720 }]) {
+    test(`the frame starts level with the Steps and Inspector panels at ${size.width} px wide`, async ({ page }) => {
+      await page.setViewportSize(size);
+      await openRecording(page);
+      const frame = (await page.getByTestId('frame-canvas').boundingBox())!;
+      const steps = (await page.getByRole('complementary', { name: /Steps/ }).boundingBox())!;
+      const inspector = (await page.getByRole('complementary', { name: 'Inspector' }).boundingBox())!;
+      expect(Math.abs(frame.y - steps.y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(frame.y - inspector.y)).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test('the tools and the View switch sit just left of the transport controls, on the same row', async ({ page }) => {
+    await openRecording(page);
+    const box = async (loc: Locator) => (await loc.boundingBox())!;
+    const tools = await box(page.getByRole('toolbar', { name: 'Tools' }));
+    const view = await box(page.getByRole('group', { name: 'View' }));
+    const transport = await box(page.getByRole('group', { name: 'Transport' }));
+    const timeline = await box(page.getByRole('region', { name: 'Timeline' }));
+    expect(tools.x + tools.width).toBeLessThanOrEqual(view.x);
+    expect(view.x + view.width).toBeLessThanOrEqual(transport.x);
+    expect(Math.abs(tools.y + tools.height / 2 - (transport.y + transport.height / 2))).toBeLessThan(4);
+    /* they are part of the timeline's header, not above the canvas */
+    expect(tools.y).toBeGreaterThanOrEqual(timeline.y);
+    /* the selected option is bold; its label must still fit inside its button */
+    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Viewer' }).click();
+    for (const name of ['Edit', 'Viewer']) {
+      const fits = await page.getByRole('group', { name: 'View' }).getByRole('button', { name }).evaluate((el: HTMLElement) => el.scrollWidth <= el.clientWidth);
+      expect(fits, `${name} fits its button`).toBe(true);
+    }
   });
 });
