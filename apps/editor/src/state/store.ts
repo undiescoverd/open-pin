@@ -28,6 +28,7 @@ import {
   type ClipEdge,
   type Command,
   type Frame,
+  type GuideSettings,
   type History,
   type Logo,
   type Point,
@@ -102,6 +103,10 @@ export interface EditorState {
   save: 'idle' | 'saving' | 'saved' | 'error';
   projectsOpen: boolean;
   exportOpen: boolean;
+  /** the Share dialog: export the interactive guide and copy its embed snippets */
+  shareOpen: boolean;
+  /** the guide preview, playing in the real player */
+  previewOpen: boolean;
 }
 
 const INITIAL: EditorState = {
@@ -127,6 +132,8 @@ const INITIAL: EditorState = {
   save: 'idle',
   projectsOpen: false,
   exportOpen: false,
+  shareOpen: false,
+  previewOpen: false,
 };
 
 export const useEditor = create<EditorState>(() => INITIAL);
@@ -290,6 +297,19 @@ export function setProjectsOpen(open: boolean): void {
 }
 export function setExportOpen(open: boolean): void {
   set({ exportOpen: open });
+}
+export function setShareOpen(open: boolean): void {
+  set({ shareOpen: open });
+}
+/** Opens the guide preview (⌘↩), once there is a step to show. */
+export function setPreviewOpen(open: boolean): void {
+  const project = selectProject(getEditor());
+  if (open && !project?.steps.length) {
+    notify('Pin at least one step to preview the guide.');
+    return;
+  }
+  if (open) currentPlayback()?.pause();
+  set({ previewOpen: open });
 }
 
 export function setZoom(zoom: number): void {
@@ -758,6 +778,12 @@ export function setFrame(patch: Partial<Frame>, label?: string, coalesceKey?: st
 
 export function setLogo(logo: Logo | null, label?: string, coalesceKey?: string): void {
   run(commands.setLogo(logo, Date.now(), label, coalesceKey));
+}
+
+// ----- the interactive guide (F9, F10) -------------------------------------------------------------------------------
+
+export function setGuide(patch: Partial<GuideSettings>, label?: string, coalesceKey?: string): void {
+  run(commands.setGuide(patch, Date.now(), label, coalesceKey));
 }
 
 export function setAssetImage(id: string, image: ImageBitmap): void {

@@ -13,10 +13,10 @@ export interface DialogProps {
   description?: string;
   children: ReactNode;
   /** width of the panel */
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-const WIDTHS = { sm: 'w-[380px]', md: 'w-[560px]', lg: 'w-[760px]' };
+const WIDTHS = { sm: 'w-[380px]', md: 'w-[560px]', lg: 'w-[760px]', xl: 'w-[1080px]' };
 
 /** A modal panel. Focus is trapped inside while it is open, Esc closes it, and keyboard shortcuts in the app pause. */
 export function Dialog({ open, onOpenChange, title, description, children, size = 'md' }: DialogProps) {
@@ -26,7 +26,7 @@ export function Dialog({ open, onOpenChange, title, description, children, size 
         <RadixDialog.Overlay className="fixed inset-0 z-40 bg-scrim" />
         <RadixDialog.Content
           className={cx(
-            'fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] max-w-[94vw] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-panel shadow-pop outline-none',
+            'fixed top-1/2 left-1/2 z-50 flex max-h-[92vh] max-w-[94vw] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-panel shadow-pop outline-none',
             WIDTHS[size],
           )}
         >

@@ -2,7 +2,9 @@ import { useEffect } from 'react';
 import { openFile, restoreLastProject, startAutosave } from '../state/project';
 import { Inspector } from './Inspector';
 import { Mp4Dialog } from './Mp4Dialog';
+import { PreviewDialog } from './PreviewDialog';
 import { ProjectsDialog } from './ProjectsDialog';
+import { ShareDialog } from './ShareDialog';
 import { Stage } from './Stage';
 import { StepRail } from './StepRail';
 import { Timeline } from './Timeline';
@@ -46,6 +48,8 @@ export function EditorShell() {
       <Timeline />
       <ProjectsDialog />
       <Mp4Dialog />
+      <ShareDialog />
+      <PreviewDialog />
     </div>
   );
 }
