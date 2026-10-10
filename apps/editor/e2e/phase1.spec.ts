@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
 import { unzipSync } from 'fflate';
@@ -562,5 +562,83 @@ test.describe('layout', () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
     void frameBox;
+  });
+
+  for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 720 }]) {
+    test(`the frame starts level with the Steps and Inspector panels at ${size.width} px wide`, async ({ page }) => {
+      await page.setViewportSize(size);
+      await openRecording(page);
+      const frame = (await page.getByTestId('frame-canvas').boundingBox())!;
+      const steps = (await page.getByRole('complementary', { name: /Steps/ }).boundingBox())!;
+      const inspector = (await page.getByRole('complementary', { name: 'Inspector' }).boundingBox())!;
+      expect(Math.abs(frame.y - steps.y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(frame.y - inspector.y)).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test('the tools and the View switch are docked under the frame, and the timecode and transport have not moved', async ({ page }) => {
+    await openRecording(page);
+    const box = async (loc: Locator) => (await loc.boundingBox())!;
+    const toolbar = page.getByRole('toolbar', { name: 'Tools' });
+    const frame = await box(page.getByTestId('frame-canvas'));
+    const tools = await box(toolbar);
+    const view = await box(page.getByRole('group', { name: 'View' }));
+    const timeline = await box(page.getByRole('region', { name: 'Timeline' }));
+    const transport = await box(page.getByRole('group', { name: 'Transport' }));
+    const readout = await box(page.getByLabel('Playhead position and length'));
+    /* under the frame and above the timeline, inside the frame's width: tools at the left, the switch at the right */
+    expect(tools.y).toBeGreaterThanOrEqual(frame.y + frame.height);
+    expect(view.y + view.height).toBeLessThanOrEqual(timeline.y);
+    expect(tools.x).toBeGreaterThanOrEqual(frame.x);
+    expect(tools.x + tools.width).toBeLessThanOrEqual(view.x);
+    expect(view.x + view.width).toBeLessThanOrEqual(frame.x + frame.width + 1);
+    /* the timeline's header is as it was: the timecode at the left, the transport in the middle, both in the header */
+    expect(readout.x - timeline.x).toBeLessThan(40);
+    expect(readout.x + readout.width).toBeLessThan(transport.x);
+    expect(Math.abs(transport.x + transport.width / 2 - (timeline.x + timeline.width / 2))).toBeLessThan(2);
+    expect(transport.y).toBeGreaterThanOrEqual(timeline.y);
+    expect(readout.y).toBeGreaterThanOrEqual(timeline.y);
+
+    /* the picked tool says its name; the others are icons */
+    const select = toolbar.getByRole('button', { name: 'Select' });
+    await expect(select).toContainText('Select');
+    await expect(toolbar.getByRole('button', { name: 'Pin' })).not.toContainText('Pin');
+    await page.keyboard.press('p');
+    await expect(toolbar.getByRole('button', { name: 'Pin' })).toContainText('Pin');
+    await expect(select).not.toContainText('Select');
+
+    /* the selected option is bold; its label must still fit inside its button */
+    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Viewer' }).click();
+    for (const name of ['Edit', 'Viewer']) {
+      const fits = await page.getByRole('group', { name: 'View' }).getByRole('button', { name }).evaluate((el: HTMLElement) => el.scrollWidth <= el.clientWidth);
+      expect(fits, `${name} fits its button`).toBe(true);
+    }
+  });
+
+  test('a message in the dock never resizes the frame', async ({ page }) => {
+    await openRecording(page);
+    const before = (await page.getByTestId('frame-canvas').boundingBox())!;
+    await page.keyboard.press('z');
+    await expect(page.getByRole('status').filter({ hasText: 'Drag the part of the frame' })).toBeVisible();
+    const during = (await page.getByTestId('frame-canvas').boundingBox())!;
+    expect(during.height).toBe(before.height);
+    expect(during.width).toBe(before.width);
+    expect(during.y).toBe(before.y);
+  });
+
+  test('in a narrow window the dock wraps instead of overflowing', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 720 });
+    await openRecording(page);
+    const stage = (await page.getByRole('main', { name: 'Canvas' }).boundingBox())!;
+    const buttons = page.getByRole('toolbar', { name: 'Tools' }).getByRole('button');
+    await expect(buttons).toHaveCount(8);
+    for (let i = 0; i < 8; i++) {
+      const b = (await buttons.nth(i).boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(stage.x - 1);
+      expect(b.x + b.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
+    }
+    const view = (await page.getByRole('group', { name: 'View' }).boundingBox())!;
+    expect(view.x + view.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   });
 });
