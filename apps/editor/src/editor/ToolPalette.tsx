@@ -3,8 +3,7 @@ import { setTool, useEditor } from '../state/store';
 import { TOOLS } from './tools';
 import { switchView } from './visible';
 
-/* The tools and the Edit / Viewer switch, at the left of the timeline's transport row so they sit next to Play and the frame
-   controls they are used with (docs/03-design-system.md, "Editor layout"). */
+/* The tools and the Edit / Viewer switch, which sit in the dock under the frame (Dock.tsx). */
 
 export function ToolPalette() {
   const tool = useEditor(s => s.tool);
@@ -18,9 +17,11 @@ export function ToolPalette() {
           shortcut={[t.key]}
           icon={<Icon icon={t.icon} />}
           pressed={tool === t.id}
+          /* the picked tool says its name, when the dock is wide enough to spare the room */
+          showLabel={tool === t.id}
+          labelClassName="hidden @min-[720px]:inline"
           disabled={!ready}
           onClick={() => setTool(t.id)}
-          aria-label={t.label}
         />
       ))}
     </div>

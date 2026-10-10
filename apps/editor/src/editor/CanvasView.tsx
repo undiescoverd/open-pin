@@ -1,6 +1,6 @@
 import { formatTimecode, frameLayout, introLength, nativeOutputSize } from '@waypost/core';
 import { composeScene, loadRenderFonts, sceneFor } from '@waypost/render';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Playback, type PlaybackHost } from '../engine/playback';
 import { currentPlayback, setPlayback } from '../engine/session';
 import { getEditor, selectProject, setPlaybackState, setPlayhead, timelineTimeOf, useEditor } from '../state/store';
@@ -13,7 +13,7 @@ const MAX_PREVIEW_WIDTH = 1920;
 
 /** The frame on a canvas (framed, blurred, zoomed and annotated as it will export), with the playback that feeds it and the
     overlay that edits it. */
-export function CanvasView() {
+export function CanvasView({ children }: { children?: ReactNode }) {
   const media = useEditor(s => s.media);
   const videoUrl = useEditor(s => s.videoUrl);
   const project = useEditor(selectProject);
@@ -123,22 +123,30 @@ export function CanvasView() {
 
   const inner = layout?.inner ?? [0, 0, width, height];
   return (
-    <div ref={wrap} className="relative flex min-h-0 min-w-0 flex-1 items-start justify-center">
-      {/* the video element only feeds the canvas while playing forward; it is never shown */}
-      <video ref={video} className="hidden" playsInline preload="auto" muted={false} />
-      {/* always mounted, so the playback effect finds its canvas; it has no size until the space around it is measured */}
-      {source && (
-        <div
-          className="relative overflow-hidden rounded-md shadow-pop outline outline-1 outline-line [background:repeating-conic-gradient(var(--wp-raised)_0_25%,var(--wp-panel)_0_50%)_0_0/16px_16px]"
-          style={{ width: fit.width, height: fit.height }}
-        >
-          <canvas ref={canvas} width={width} height={height} role="img" aria-label={`Recording frame at ${formatTimecode(playhead)}`} data-testid="frame-canvas" className="block size-full" />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center gap-2">
+      <div ref={wrap} className="relative flex min-h-0 w-full min-w-0 flex-1 items-start justify-center">
+        {/* the video element only feeds the canvas while playing forward; it is never shown */}
+        <video ref={video} className="hidden" playsInline preload="auto" muted={false} />
+        {/* always mounted, so the playback effect finds its canvas; it has no size until the space around it is measured */}
+        {source && (
           <div
-            className="absolute"
-            style={{ left: `${(inner[0] / width) * 100}%`, top: `${(inner[1] / height) * 100}%`, width: `${(inner[2] / width) * 100}%`, height: `${(inner[3] / height) * 100}%` }}
+            className="relative overflow-hidden rounded-md shadow-pop outline outline-1 outline-line [background:repeating-conic-gradient(var(--wp-raised)_0_25%,var(--wp-panel)_0_50%)_0_0/16px_16px]"
+            style={{ width: fit.width, height: fit.height }}
           >
-            <AnnotationOverlay width={inner[2]} height={inner[3]} cssWidth={(fit.width * inner[2]) / width} />
+            <canvas ref={canvas} width={width} height={height} role="img" aria-label={`Recording frame at ${formatTimecode(playhead)}`} data-testid="frame-canvas" className="block size-full" />
+            <div
+              className="absolute"
+              style={{ left: `${(inner[0] / width) * 100}%`, top: `${(inner[1] / height) * 100}%`, width: `${(inner[2] / width) * 100}%`, height: `${(inner[3] / height) * 100}%` }}
+            >
+              <AnnotationOverlay width={inner[2]} height={inner[3]} cssWidth={(fit.width * inner[2]) / width} />
+            </div>
           </div>
+        )}
+      </div>
+      {/* whatever sits under the frame (the dock) is as wide as the frame, and the frame gets the height that is left */}
+      {children && (
+        <div className="shrink-0" style={{ width: fit.width > 0 ? fit.width : '100%' }}>
+          {children}
         </div>
       )}
     </div>

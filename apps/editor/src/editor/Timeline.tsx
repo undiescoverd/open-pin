@@ -65,7 +65,6 @@ import {
 } from '../state/store';
 import { releaseFocus } from './keyboard';
 import { nearestEdge, timelineEdges } from './snapping';
-import { ToolPalette, ViewSwitch } from './ToolPalette';
 
 /* The timeline (docs/05-editor-interactions.md, section 4). Lanes top to bottom: Steps, Video, Effects (one row per layer, the top
    layer in the top row), Voice, Music; picture over sound, as in DaVinci Resolve. Only the ruler moves the playhead. Dragging a
@@ -290,13 +289,10 @@ export function Timeline() {
 
   return (
     <Surface as="section" aria-label="Timeline" className="flex min-w-0 flex-col overflow-hidden [grid-area:tl]">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2">
-        <ToolPalette />
-        <ViewSwitch />
-        <span className="h-5 w-px bg-line" aria-hidden="true" />
-        <Transport />
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-line px-3 py-2">
         <Readout />
-        <div className="ml-auto flex items-center gap-1">
+        <Transport />
+        <div className="flex items-center justify-end gap-1">
           <IconButton label="Snapping" shortcut={['n']} size="sm" icon={<Icon icon={Magnet} />} pressed={snap} onClick={toggleSnap} />
           <IconButton label="Ripple trim" shortcut={['shift', 'r']} size="sm" icon={<Icon icon={StretchHorizontal} />} pressed={ripple} onClick={toggleRipple} />
           <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
