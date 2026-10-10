@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { openFile, restoreLastProject, startAutosave } from '../state/project';
+import { Filmstrip } from './Filmstrip';
 import { Inspector } from './Inspector';
 import { Mp4Dialog } from './Mp4Dialog';
 import { PreviewDialog } from './PreviewDialog';
@@ -10,10 +11,12 @@ import { StepRail } from './StepRail';
 import { Timeline } from './Timeline';
 import { TopBar } from './TopBar';
 import { useShortcuts } from './shortcuts';
+import { useEditor } from '../state/store';
 
-/* Steps rail | canvas | inspector, over a full-width timeline (docs/03-design-system.md, "Editor layout"). */
+/* Steps rail | canvas | inspector, over the full-width filmstrip (or the full timeline, behind Trim & edit video) (docs/03-design-system.md, "Editor layout"). */
 export function EditorShell() {
   useShortcuts();
+  const timelineView = useEditor(s => s.timelineView);
 
   useEffect(() => {
     const stop = startAutosave();
@@ -45,7 +48,7 @@ export function EditorShell() {
       <StepRail />
       <Stage />
       <Inspector />
-      <Timeline />
+      {timelineView === 'full' ? <Timeline /> : <Filmstrip />}
       <ProjectsDialog />
       <Mp4Dialog />
       <ShareDialog />

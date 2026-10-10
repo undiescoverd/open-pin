@@ -13,12 +13,17 @@ export function watchErrors(page: Page): string[] {
 }
 
 /** Opens the editor and drops in the 6 second test recording (640×400, 30 fps, VP9). */
-export async function openRecording(page: Page): Promise<void> {
+export async function openRecording(page: Page, options: { fullTimeline?: boolean } = {}): Promise<void> {
   await page.goto('/');
   await page.getByTestId('file-input').setInputFiles(FIXTURE);
   await expect(page.getByRole('img', { name: /Recording frame/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Pin step' })).toBeEnabled();
   await waitForFrame(page);
+  /* the Phase 1 to 3 specs drive the lanes, which live in the full timeline behind Trim & edit video */
+  if (options.fullTimeline ?? true) {
+    await page.getByRole('button', { name: 'Trim & edit video' }).click();
+    await expect(page.getByLabel('Ruler')).toBeVisible();
+  }
 }
 
 /** Waits until the canvas has pixels, which is when the first frame has been decoded and drawn. */

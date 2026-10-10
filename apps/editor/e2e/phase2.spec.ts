@@ -621,6 +621,7 @@ test.describe('Phase 2: MP4 export', () => {
     await page.goto('/');
     await page.getByTestId('file-input').setInputFiles('e2e/fixtures/demo-sound.webm');
     await waitForFrame(page);
+    await page.getByRole('button', { name: 'Trim & edit video' }).click();
     await seekTo(page, 1);
     await page.keyboard.press('Shift+P');
     const exportOnce = async (sound: boolean) => {

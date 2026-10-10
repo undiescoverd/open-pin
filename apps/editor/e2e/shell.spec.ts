@@ -10,10 +10,10 @@ test.describe('editor shell', () => {
     await expect(page.getByRole('complementary', { name: /Steps/ })).toBeVisible();
     await expect(page.getByRole('main', { name: 'Canvas' })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Timeline' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Filmstrip' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Drop a screen recording' })).toBeVisible();
     await expect(page.getByRole('toolbar', { name: 'Tools' }).getByRole('button')).toHaveCount(8);
-    for (const lane of ['Steps', 'Video', 'Effects', 'Voice', 'Music']) await expect(page.getByLabel(`${lane} lane, empty`)).toBeVisible();
+    for (const lane of ['Steps lane', 'Filmstrip']) await expect(page.getByLabel(`${lane}, empty`)).toBeVisible();
     await expect(page.getByText('0:00.000 / 0:00.000')).toBeVisible();
     expect(errors).toEqual([]);
   });
@@ -65,7 +65,7 @@ test.describe('editor shell', () => {
   });
 
   test('N toggles snapping and Shift+R toggles ripple trim', async ({ page }) => {
-    await page.goto('/');
+    await openRecording(page); /* the switches are in the full timeline */
     const snap = page.getByRole('button', { name: 'Snapping' });
     const ripple = page.getByRole('button', { name: 'Ripple trim' });
     await expect(snap).toHaveAttribute('aria-pressed', 'true');

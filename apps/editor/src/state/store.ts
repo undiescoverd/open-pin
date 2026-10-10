@@ -42,6 +42,7 @@ import { currentPlayback } from '../engine/session';
 import { timelineEdges } from '../editor/snapping';
 import type { PlaybackState } from '../engine/playback';
 import type { ToolId } from '../editor/tools';
+import { rememberTimelineView } from '../storage/library';
 
 export type Selection =
   | { kind: 'step'; stepId: string }
@@ -94,6 +95,8 @@ export interface EditorState {
   tool: ToolId;
   /** Edit shows every annotation with handles; Viewer shows a step as the guide will (zoom eased in, groups revealed in order) */
   view: 'edit' | 'viewer';
+  /** the filmstrip under the frame (the default), or the full timeline that Trim & edit video opens; remembered per project */
+  timelineView: 'strip' | 'full';
   snap: boolean;
   ripple: boolean;
   /** timeline zoom, 1 (fit) to 8 */
@@ -124,6 +127,7 @@ const INITIAL: EditorState = {
   shapeDraft: null,
   tool: 'select',
   view: 'edit',
+  timelineView: 'strip',
   snap: true,
   ripple: true,
   zoom: 1,
@@ -277,6 +281,13 @@ export function redo(): void {
 
 export function setTool(tool: ToolId): void {
   set({ tool });
+}
+
+/** Switches between the filmstrip and the full timeline, and remembers the choice for this project. */
+export function setTimelineView(timelineView: EditorState['timelineView']): void {
+  set({ timelineView });
+  const project = selectProject(getEditor());
+  if (project) rememberTimelineView(project.id, timelineView);
 }
 
 export function toggleSnap(): void {
