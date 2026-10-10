@@ -5,9 +5,20 @@
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./player.js": "./dist/player.js"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "build": "vite build && node scripts/size.mjs",
+    "size": "node scripts/size.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@waypost/core": "workspace:*",
+    "@waypost/render": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
   }
 }

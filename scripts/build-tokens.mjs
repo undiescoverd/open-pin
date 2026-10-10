@@ -2,6 +2,7 @@
 /* Turns design/tokens.json into the CSS the editor and player read:
  *   packages/ui/src/tokens.css  custom properties (--wp-*), light and dark, usable without Tailwind (the player)
  *   packages/ui/src/theme.css   Tailwind's @theme, mapping utilities such as bg-panel or text-fg-muted onto those properties
+ *   packages/player/src/tokens.ts  the roles the player uses, scoped to its root inside the Shadow DOM, as a string
  * `--check` rebuilds in memory and fails if the committed files are stale, so CI catches a forgotten `pnpm tokens`. */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -73,9 +74,23 @@ ${map('radius', Object.keys(tokens.radius), 'radius-')}
 }
 `;
 
+/* The player lives in a Shadow DOM on other people's pages, so its properties hang off its own root (`.wp`) rather than :root,
+   and its chrome follows the guide's setting: light, dark, or the viewer's system ("auto"). Only the roles it uses are carried. */
+const PLAYER_ROLES = ['app', 'panel', 'raised', 'line', 'line-strong', 'fg', 'fg-muted', 'fg-disabled', 'sel', 'scrim', 'inverse', 'on-inverse', 'shadow-pop'];
+const PLAYER_FIXED = ['font-brand', 'font-ui', 'text-sm', 'text-base', 'text-md', 'text-lg', 'text-xl', 'radius-sm', 'radius-md', 'radius-lg', 'radius-pill', 'motion-ui', 'motion-ease-out'];
+const pick = (entries, names) => names.map(n => entries.find(([k]) => k === n) ?? (() => { throw new Error(`player token ${n} is not defined`); })());
+const playerCss = `.wp{${pick(fixed, PLAYER_FIXED).map(([k, v]) => `--wp-${k}:${v}`).join(';')}}
+.wp,.wp[data-chrome=light]{color-scheme:light;${pick(light, PLAYER_ROLES).map(([k, v]) => `--wp-${k}:${v}`).join(';')}}
+.wp[data-chrome=dark]{color-scheme:dark;${pick(dark, PLAYER_ROLES).map(([k, v]) => `--wp-${k}:${v}`).join(';')}}
+@media (prefers-color-scheme:dark){.wp[data-chrome=auto]{color-scheme:dark;${pick(dark, PLAYER_ROLES).map(([k, v]) => `--wp-${k}:${v}`).join(';')}}}`;
+const playerTokens = `${HEADER.replace('/*', '//').replace(' */', '')}
+export const TOKENS_CSS = ${JSON.stringify(playerCss)};
+`;
+
 const outputs = {
   'packages/ui/src/tokens.css': tokensCss,
   'packages/ui/src/theme.css': themeCss,
+  'packages/player/src/tokens.ts': playerTokens,
 };
 
 if (process.argv.includes('--check')) {
@@ -89,5 +104,5 @@ if (process.argv.includes('--check')) {
   console.log('Design tokens are up to date.');
 } else {
   for (const [file, css] of Object.entries(outputs)) writeFileSync(join(root, file), css);
-  console.log(`Wrote ${Object.keys(outputs).join(' and ')}.`);
+  console.log(`Wrote ${Object.keys(outputs).join(', ')}.`);
 }

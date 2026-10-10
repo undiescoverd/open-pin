@@ -50,6 +50,9 @@ importers:
       '@waypost/media':
         specifier: workspace:*
         version: link:../../packages/media
+      '@waypost/player':
+        specifier: workspace:*
+        version: link:../../packages/player
       '@waypost/render':
         specifier: workspace:*
         version: link:../../packages/render
@@ -148,7 +151,18 @@ importers:
         specifier: ^1.61.3
         version: 1.61.3
 
-  packages/player: {}
+  packages/player:
+    dependencies:
+      '@waypost/core':
+        specifier: workspace:*
+        version: link:../core
+      '@waypost/render':
+        specifier: workspace:*
+        version: link:../render
+    devDependencies:
+      vite:
+        specifier: ^8.3.4
+        version: 8.3.4(@types/node@22.20.5)(jiti@2.7.0)
 
   packages/render:
     dependencies:
