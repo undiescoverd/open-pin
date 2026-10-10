@@ -121,6 +121,28 @@ One **Export** button, one dialog.
 | ProRes proxy conversion | **Left**: a clearer message instead |
 | PDF visual regression tests | **Later** |
 
+## Starting Phase 4
+
+For whoever (or whichever chat) builds this next.
+
+**Read first:** this file, the Phase 4 list in [04-roadmap.md](04-roadmap.md), then [03-design-system.md](03-design-system.md) and [05-editor-interactions.md](05-editor-interactions.md) for how the editor works today. Those two still describe the old layout. Updating them is the last Phase 4 item.
+
+**The screens:** the design canvas "Waypost simple editor" is the visual reference (boards 1 to 5, light and dark). It lives on claude.ai, not in this repository, and it's private to its owner: https://claude.ai/artifact/BUeKy3swhxrWXYrDdfaGgy. Its boards are drawn at 1440×900. If the canvas isn't available, the "The screens" section above describes every panel in words.
+
+**Branches:** build on top of the zoom ease-out and dock work in [open-pin#11](https://github.com/undiescoverd/open-pin/pull/11) (branch `improvements`), because Phase 4 reworks that dock. Merge #11 and then the PR carrying this plan before starting, or branch from both.
+
+**Run it:** `pnpm install`, `pnpm dev` for the editor, `pnpm check` for tokens, lint, typecheck, unit tests, build and the player size budget, and `pnpm test:e2e` for the browser tests (Chromium). Screenshot baselines in `apps/editor/e2e/*-snapshots` are Linux Chromium renders and will need regenerating where the layout changes on purpose (`--update-snapshots`, then check the new images by eye).
+
+**Where things are:** the editor shell is `apps/editor/src/editor/` (`EditorShell`, `Stage`, `Dock`, `ToolPalette`, `StepRail`, `Inspector`, `Timeline`, `TopBar`, `ShareDialog`), the project model and plans are in `packages/core`, shared controls in `packages/ui`, and tokens in `design/tokens.json`.
+
+**Rules for the work:**
+- Build one numbered item at a time and ship each as its own pull request. The editor must stay usable after every one.
+- Don't remove any engine feature. Move controls, don't delete them. Old `.waypost` files must open unchanged.
+- Move tests to the new controls rather than deleting them. Keep the Phase 1 to 3 acceptance specs passing.
+- The first-guide test in the roadmap is the real finish line, so schedule it once items 1 to 9 are in.
+
+**Decisions already made on the canvas, to treat as settled:** one Export button (no separate Share), the Edit / Viewer switch is removed, Cover is the default Hide look, exact pause length lives under the step's Advanced, and the tool palette under the frame is replaced by the Add buttons at the top of the right panel.
+
 ## Open questions for the owner
 
 1. **Which host for one-click publishing** first: Cloudflare Pages, Netlify or GitHub Pages?
