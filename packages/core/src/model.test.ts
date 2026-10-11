@@ -161,3 +161,42 @@ describe('commands and undo', () => {
     expect(h.present.steps).toHaveLength(0);
   });
 });
+
+describe('replaceAnnotation', () => {
+  it('swaps a spotlight for an outline in the same place, keeping its id, and undoes', () => {
+    let h = createHistory(fresh());
+    h = apply(h, commands.pinStep({ stepId: 'a', annotationId: 'a_click', source: 'src1', time: 1, at: [0.4, 0.4], now: 2 }));
+    h = apply(h, commands.addAnnotation('a', { id: 'h', type: 'spotlight', rect: [0.1, 0.1, 0.2, 0.2], reveal: 1 }, 3));
+    h = apply(h, commands.addAnnotation('a', { id: 'c', type: 'callout', anchor: [0.5, 0.5], text: 'Hi', placement: 'bottom', color: '#FF5A4E', reveal: 0 }, 4));
+    const after = apply(h, commands.replaceAnnotation('a', 'h', { id: 'other', type: 'box', rect: [0.1, 0.1, 0.2, 0.2], color: '#FF5A4E', reveal: 1 }, 5));
+    expect(after.present.steps[0]!.annotations.map(a => `${a.id}:${a.type}`)).toEqual(['a_click:click', 'h:box', 'c:callout']);
+    expect(undo(after).present.steps[0]!.annotations[1]!.type).toBe('spotlight');
+  });
+});
+
+describe('duplicateStep', () => {
+  const setup = () => {
+    let h = createHistory(fresh());
+    h = apply(h, commands.pinStep({ stepId: 'a', annotationId: 'a_click', source: 'src1', time: 1, at: [0.4, 0.4], now: 2 }));
+    h = apply(h, commands.setStepText('a', { title: 'Click Invite', body: 'Top right.' }, 3));
+    h = apply(h, commands.setStepZoom('a', [0.2, 0.2, 0.5, 0.5], 4));
+    return h;
+  };
+
+  it('copies words, pause, zoom and annotations onto the new frame, with new ids, in time order', () => {
+    const h = apply(setup(), commands.duplicateStep({ sourceStepId: 'a', stepId: 'b', annotationIds: ['b_click'], time: 0.5, now: 5 }));
+    const steps = h.present.steps;
+    expect(steps.map(s => s.id)).toEqual(['b', 'a']);
+    const copy = steps[0]!;
+    expect(copy).toMatchObject({ title: 'Click Invite', body: 'Top right.', anchor: { source: 'src1', time: 0.5 } });
+    expect(copy.annotations.map(a => a.id)).toEqual(['b_click']);
+    expect(copy.zoom).toEqual(steps[1]!.zoom);
+    expect(copy.zoom).not.toBeNull();
+  });
+
+  it('does nothing when a step already sits on that frame', () => {
+    const before = setup();
+    const after = apply(before, commands.duplicateStep({ sourceStepId: 'a', stepId: 'b', annotationIds: ['b_click'], time: 1, now: 5 }));
+    expect(after.present.steps).toHaveLength(1);
+  });
+});

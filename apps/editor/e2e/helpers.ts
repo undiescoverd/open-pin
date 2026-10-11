@@ -13,12 +13,17 @@ export function watchErrors(page: Page): string[] {
 }
 
 /** Opens the editor and drops in the 6 second test recording (640×400, 30 fps, VP9). */
-export async function openRecording(page: Page): Promise<void> {
+export async function openRecording(page: Page, options: { fullTimeline?: boolean } = {}): Promise<void> {
   await page.goto('/');
   await page.getByTestId('file-input').setInputFiles(FIXTURE);
   await expect(page.getByRole('img', { name: /Recording frame/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Pin step' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Add step' })).toBeEnabled();
   await waitForFrame(page);
+  /* the Phase 1 to 3 specs drive the lanes, which live in the full timeline behind Trim & edit video */
+  if (options.fullTimeline ?? true) {
+    await page.getByRole('button', { name: 'Trim & edit video' }).click();
+    await expect(page.getByLabel('Ruler')).toBeVisible();
+  }
 }
 
 /** Waits until the canvas has pixels, which is when the first frame has been decoded and drawn. */
@@ -103,3 +108,43 @@ export function watchYellowEdge(page: Page, ms: number): Promise<number[]> {
 
 export const stepRail = (page: Page): Locator => page.getByRole('complementary', { name: /Steps/ });
 export const stepCards = (page: Page): Locator => stepRail(page).getByRole('listitem');
+
+/** Opens the selected step's Advanced section (exact time, pause, appearing order) if it is closed. */
+export async function openStepAdvanced(page: Page): Promise<void> {
+  const position = stepRail(page).getByRole('textbox', { name: 'Position' });
+  if (!(await position.isVisible())) await stepRail(page).getByText('Advanced', { exact: true }).click();
+  await expect(position).toBeVisible();
+}
+
+export const inspector = (page: Page): Locator => page.getByRole('complementary', { name: 'Inspector' });
+
+/** One of the Add buttons at the top of the right panel (Callout, Arrow, Highlight, Zoom, Hide, Click). */
+export const addButton = (page: Page, name: string): Locator => page.getByRole('group', { name: /^Add to/ }).getByRole('button', { name, exact: true });
+
+/** A chip in the selected step's "On this step" row. */
+export const stepChip = (page: Page, name: string | RegExp): Locator => stepRail(page).getByRole('group', { name: 'On this step' }).getByRole('button', { name });
+
+/** Opens the Advanced section at the end of the selected item's panel (exact position, when it appears) if it is closed. */
+export async function openItemAdvanced(page: Page): Promise<void> {
+  const details = inspector(page).locator('details', { has: page.locator(':scope > summary', { hasText: /^Advanced/ }) });
+  if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator(':scope > summary').click();
+  await expect(details).toHaveAttribute('open', '');
+}
+
+/** The Export dialog. */
+export const exportDialog = (page: Page): Locator => page.getByRole('dialog', { name: 'Export' });
+
+/** Opens Export from the top bar and picks what to export: Interactive guide, Video, PDF or Images. */
+export async function openExport(page: Page, kind: 'Interactive guide' | 'Video' | 'PDF' | 'Images' = 'Interactive guide'): Promise<Locator> {
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const dialog = exportDialog(page);
+  await dialog.getByRole('group', { name: 'What to export' }).getByRole('button', { name: new RegExp(`^${kind}`) }).click();
+  return dialog;
+}
+
+/** Opens the Export dialog's Advanced section if it is closed. */
+export async function openExportAdvanced(page: Page): Promise<void> {
+  const details = exportDialog(page).locator('details', { has: page.locator(':scope > summary', { hasText: /^Advanced/ }) });
+  if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator(':scope > summary').click();
+  await expect(details).toHaveAttribute('open', '');
+}

@@ -2,7 +2,7 @@
 
 Waypost is for **documentation and SOPs**: someone records a process once and turns it into a step-by-step guide that people can follow. It isn't a video editor. Phases 1 to 3 made it powerful, but most of that power came from DaVinci Resolve (lanes, layers, J K L, ripple, keyframes), and a first-time user now meets all of it at once.
 
-This document is the design for making Waypost simple by default. It takes an outside product review (comparing Waypost with FramePin), keeps what makes the app easier and drops what would make it heavier. The build order is in [04-roadmap.md](04-roadmap.md), Phases 4 to 7.
+This document is the design for making Waypost simple by default. It takes an outside product review (comparing Waypost with FramePin), keeps what makes the app easier and drops what would make it heavier. The build order is in [04-roadmap.md](04-roadmap.md), Phases 4 to 8.
 
 **Design canvas:** "Waypost simple editor" (claude.ai design canvas, boards 1 to 5 in light and dark) is the reference for every screen below.
 
@@ -71,11 +71,11 @@ Everything else (layers, stacked effects, darken, desaturate, tint, fades, exact
 
 One **Export** button, one dialog.
 
-- **What to export:** *Interactive guide*, *Video*, *PDF*, *Images*, and *Document* (Markdown or HTML, Phase 5) when it's built.
+- **What to export:** *Interactive guide*, *Video*, *PDF*, *Images*, and *Document* (Markdown or HTML, Phase 6) when it's built.
 - **How it plays** (for the guide and the video): *Viewer clicks Next*, *Plays by itself* or *Plain video*.
 - **Button at the end:** a tick box, its text and its link.
 - The dialog doesn't ask for a web address up front. After an interactive guide is saved, it gives the link and the embed code, with plain-words help for GitHub Pages, Netlify and Cloudflare Pages.
-- **Publish online, coming later** sits at the bottom, so people know it's planned (Phase 6).
+- **Publish online, coming later** sits at the bottom, so people know it's planned (Phase 7).
 - These settings replace the Guide tab's Player section. Frame, background and logo move to the Export dialog's **Advanced**.
 
 ### 5. Preview

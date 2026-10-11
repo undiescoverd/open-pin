@@ -8,7 +8,7 @@ import { CanvasView } from './CanvasView';
 import { Dock } from './Dock';
 
 /* The canvas column. Its top edge is the top edge of the Steps and Inspector panels, so the frame gets all the height there is.
-   With no recording open the frame is the drop zone. The tools sit in the dock under the frame (Dock). */
+   With no recording open the frame is the drop zone. Under the frame is one line of status (Dock). */
 export function Stage() {
   const phase = useEditor(s => s.phase);
   const busy = useEditor(s => s.busy);
@@ -18,13 +18,7 @@ export function Stage() {
       {phase === 'ready' ? (
         <Workspace />
       ) : (
-        <>
-          <DropZone loading={phase === 'loading'} />
-          {/* the tools wait for a recording, in the same place */}
-          <div className="mt-2 shrink-0">
-            <Dock />
-          </div>
-        </>
+        <DropZone loading={phase === 'loading'} />
       )}
       {busy && <BusyOverlay text={busy} />}
       <ExportOverlay />
@@ -148,7 +142,7 @@ function DropZone({ loading }: { loading: boolean }) {
           1. Pin the moments that matter <KeyCap keys={['p']} />
         </li>
         <li>2. Point things out</li>
-        <li>3. Share</li>
+        <li>3. Export</li>
       </ol>
       <p className="m-0 text-sm text-fg-muted">Your recording stays in this browser. Nothing is uploaded.</p>
       <MessageLine />

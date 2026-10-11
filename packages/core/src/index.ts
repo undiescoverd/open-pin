@@ -11,4 +11,5 @@ export * from './history';
 export * from './clips';
 export * from './plan';
 export * from './effects';
+export * from './hide';
 export { DEFAULT_COLOR, MIN_REGION, canPinAt, clamp01, commands, createProject, newId, stepAtTime, stepIndex } from './commands';

@@ -26,7 +26,7 @@ import {
   ZOOM_FACTOR,
 } from '../state/store';
 import { isTyping } from './keyboard';
-import { TOOLS } from './tools';
+import { toolForKey } from './tools';
 
 /** Keys that keep working while a slider or checkbox has focus. */
 const TRANSPORT_KEYS = new Set(['j', 'k', 'l', '=', '+', '-']);
@@ -102,9 +102,9 @@ export function useShortcuts(): void {
           else clearSelection();
         });
       }
-      const tool = TOOLS.find(t => t.key === key);
+      const tool = toolForKey(key);
       if (tool && getEditor().phase === 'ready') {
-        return act(() => setTool(tool.id));
+        return act(() => setTool(tool));
       }
     };
     document.addEventListener('keydown', onKey);

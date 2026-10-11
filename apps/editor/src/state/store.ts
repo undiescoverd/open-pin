@@ -5,8 +5,10 @@ import {
   canRedo,
   canSplit,
   canUndo,
+  clamp01,
   clipCommands,
   commands,
+  DEFAULT_COLOR,
   newId,
   redo as redoHistory,
   spotAt,
@@ -19,10 +21,15 @@ import {
   undo as undoHistory,
   zoomBox,
   MIN_REGION,
+  hideEffect,
+  hideSpanFor,
   newEffect,
   nextBlurName,
+  stepSpanAt,
   type Annotation,
   type EffectType,
+  type HideLook,
+  type HideSpan,
   type LayerMove,
   type Blur,
   type ClipEdge,
@@ -41,7 +48,9 @@ import { create } from 'zustand';
 import { currentPlayback } from '../engine/session';
 import { timelineEdges } from '../editor/snapping';
 import type { PlaybackState } from '../engine/playback';
-import type { ToolId } from '../editor/tools';
+import { createAnnotation } from '../editor/annotationEdit';
+import type { AddKind, ToolId } from '../editor/tools';
+import { rememberTimelineView } from '../storage/library';
 
 export type Selection =
   | { kind: 'step'; stepId: string }
@@ -94,6 +103,8 @@ export interface EditorState {
   tool: ToolId;
   /** Edit shows every annotation with handles; Viewer shows a step as the guide will (zoom eased in, groups revealed in order) */
   view: 'edit' | 'viewer';
+  /** the filmstrip under the frame (the default), or the full timeline that Trim & edit video opens; remembered per project */
+  timelineView: 'strip' | 'full';
   snap: boolean;
   ripple: boolean;
   /** timeline zoom, 1 (fit) to 8 */
@@ -102,9 +113,8 @@ export interface EditorState {
   message: Message | null;
   save: 'idle' | 'saving' | 'saved' | 'error';
   projectsOpen: boolean;
-  exportOpen: boolean;
-  /** the Share dialog: export the interactive guide and copy its embed snippets */
-  shareOpen: boolean;
+  /** the Export dialog: closed, choosing what to export, or the link and embed code once a guide is saved */
+  exportDialog: 'closed' | 'choose' | 'saved';
   /** the guide preview, playing in the real player */
   previewOpen: boolean;
 }
@@ -124,6 +134,7 @@ const INITIAL: EditorState = {
   shapeDraft: null,
   tool: 'select',
   view: 'edit',
+  timelineView: 'strip',
   snap: true,
   ripple: true,
   zoom: 1,
@@ -131,8 +142,7 @@ const INITIAL: EditorState = {
   message: null,
   save: 'idle',
   projectsOpen: false,
-  exportOpen: false,
-  shareOpen: false,
+  exportDialog: 'closed',
   previewOpen: false,
 };
 
@@ -279,6 +289,13 @@ export function setTool(tool: ToolId): void {
   set({ tool });
 }
 
+/** Switches between the filmstrip and the full timeline, and remembers the choice for this project. */
+export function setTimelineView(timelineView: EditorState['timelineView']): void {
+  set({ timelineView });
+  const project = selectProject(getEditor());
+  if (project) rememberTimelineView(project.id, timelineView);
+}
+
 export function toggleSnap(): void {
   set(s => ({ snap: !s.snap }));
 }
@@ -295,11 +312,8 @@ export function setView(view: EditorState['view']): void {
 export function setProjectsOpen(open: boolean): void {
   set({ projectsOpen: open });
 }
-export function setExportOpen(open: boolean): void {
-  set({ exportOpen: open });
-}
-export function setShareOpen(open: boolean): void {
-  set({ shareOpen: open });
+export function setExportDialog(view: EditorState['exportDialog']): void {
+  set({ exportDialog: view });
 }
 /** Opens the guide preview (⌘↩), once there is a step to show. */
 export function setPreviewOpen(open: boolean): void {
@@ -538,6 +552,29 @@ function formatSeconds(t: number): string {
   return `${m}:${(t - m * 60).toFixed(2).padStart(5, '0')}`;
 }
 
+/** Copies a step onto the frame at the playhead: its words, pause, zoom and annotations. */
+export function duplicateStep(stepId: string): string | null {
+  const playback = currentPlayback();
+  const project = selectProject(getEditor());
+  if (!project || !playback) return null;
+  const from = project.steps.find(s => s.id === stepId);
+  if (!from) return null;
+  playback.pause();
+  const pos = sourceAt(project, playback.time);
+  if (!pos || !canPinAt(project, pos.source, pos.time)) {
+    notify("There's no frame of the recording here (it's a gap), so a step can't go here.", 'error');
+    return null;
+  }
+  if (stepAtTime(project, pos.source, pos.time)) {
+    notify('Move to the frame the copy should go on first. This frame already has a step.', 'error');
+    return null;
+  }
+  const id = newId('s');
+  run(commands.duplicateStep({ sourceStepId: stepId, stepId: id, annotationIds: from.annotations.map(() => newId('a')), time: pos.time, now: Date.now() }));
+  set({ selection: { kind: 'step', stepId: id } });
+  return id;
+}
+
 export function moveStep(stepId: string, sourceTime: number): void {
   run(commands.moveStep(stepId, sourceTime, Date.now()));
 }
@@ -585,6 +622,61 @@ export function addAnnotationAtPlayhead(annotation: Annotation): boolean {
   run(commands.addAnnotation(step.id, annotation, Date.now()));
   set({ selection: { kind: 'annotation', stepId: step.id, id: annotation.id }, tool: 'select' });
   return true;
+}
+
+const MIDDLE: Point = [0.5, 0.5];
+/** How far a second item of the same kind sits from the first, so repeated adds don't land on top of each other. */
+const STAGGER = 0.03;
+
+/**
+ * One click on an Add button (docs/06-simplify-plan.md, "Add, then adjust"): the item goes on the step at the playhead, selected,
+ * around the step's click when it has one and otherwise in the middle. With no step on this frame, the frame becomes one first.
+ * Hide isn't tied to a step: it starts at the playhead, in the middle of the frame.
+ */
+export function addToStep(kind: AddKind): void {
+  const playback = currentPlayback();
+  const project = selectProject(getEditor());
+  if (!project || !playback) return;
+  playback.pause();
+  set({ tool: 'select' });
+  if (kind === 'hide') return addBlurInMiddle();
+
+  const existing = stepAtPlayhead(project, playback.time);
+  const hasClick = !!existing?.annotations.some(a => a.type === 'click');
+  /* Click on a step without one gives it its marker in the middle, the way the Pin tool would */
+  const stepId = existing && !(kind === 'click' && !hasClick) ? existing.id : pinAtPlayhead(kind === 'click' ? MIDDLE : undefined);
+  const step = stepId ? selectProject(getEditor())?.steps.find(s => s.id === stepId) : undefined;
+  if (!step) return;
+  const click = step.annotations.find(a => a.type === 'click');
+
+  if (kind === 'click') {
+    if (click) set({ selection: { kind: 'annotation', stepId: step.id, id: click.id } });
+    if (click && hasClick) notify('This step already has its click. Drag it to where the viewer clicks.');
+    return;
+  }
+  if (kind === 'zoom') return step.zoom ? selectZoom(step.id) : addZoom(step.id);
+
+  const type = kind === 'highlight' ? 'spotlight' : kind;
+  const near = click?.type === 'click' ? click.at : MIDDLE;
+  const k = step.annotations.filter(a => a.type === type).length * STAGGER;
+  const at: Point = [clamp01(near[0] + k), clamp01(near[1] + k)];
+  let annotation = createAnnotation(type, at, at, DEFAULT_COLOR);
+  if (annotation.type === 'arrow') {
+    /* the tip on the point, the tail up and to the left, or the other way where there's no room */
+    const from: Point = [at[0] + (at[0] < 0.15 ? 0.12 : -0.12), at[1] + (at[1] < 0.15 ? 0.1 : -0.1)];
+    annotation = { ...annotation, from, to: at };
+  }
+  if (annotation.type === 'callout' && step.title.trim()) annotation = { ...annotation, text: step.title.trim().slice(0, 300) };
+  run(commands.addAnnotation(step.id, annotation, Date.now()));
+  set({ selection: { kind: 'annotation', stepId: step.id, id: annotation.id } });
+}
+
+/** A highlight is a spotlight (the rest of the frame dimmed) or an outline (a box around it); switching keeps its place. */
+export function setHighlightKind(stepId: string, id: string, kind: 'spotlight' | 'box'): void {
+  const a = selectProject(getEditor())?.steps.find(s => s.id === stepId)?.annotations.find(x => x.id === id);
+  if (!a || (a.type !== 'spotlight' && a.type !== 'box') || a.type === kind) return;
+  const next: Annotation = kind === 'box' ? { id, type: 'box', rect: a.rect, color: DEFAULT_COLOR, reveal: a.reveal } : { id, type: 'spotlight', rect: a.rect, reveal: a.reveal };
+  run(commands.replaceAnnotation(stepId, id, next, Date.now(), kind === 'box' ? 'Change to outline' : 'Change to spotlight'));
 }
 
 export function updateAnnotation(stepId: string, id: string, patch: Partial<Annotation>, label?: string, coalesceKey?: string): void {
@@ -669,22 +761,28 @@ export function deleteClip(clipId: string): void {
 /** How many regions the lane's + button has added, to stagger them so repeated adds don't sit on top of each other. */
 let staggered = 0;
 
-/** A new effect region with one Pixelate effect, from the playhead to the end of the recording, on the lowest layer with room. */
+/**
+ * A new hidden area (Hide, the X tool, or the Effects lane's +): a Cover, for the step on screen (docs/06-simplify-plan.md,
+ * "Hiding something"). Past the last step, or with no steps, it lasts from the playhead to the end of the recording.
+ */
 export function addBlurAtPlayhead(rect: Rect): void {
   const state = getEditor();
   const project = selectProject(state);
   const source = project?.sources[0];
   if (!project || !source) return;
   currentPlayback()?.pause();
-  const start = Math.max(0, Math.min(sourceTimeAt(project, state.playhead), source.duration - MIN_REGION));
+  const here = sourceTimeAt(project, state.playhead);
+  const span = hideSpanFor(project, source.id, 'step', here) ?? hideSpanFor(project, source.id, 'rest', here)!;
+  const start = Math.max(0, Math.min(span.start, span.end - MIN_REGION, source.duration - MIN_REGION));
+  const end = Math.min(source.duration, Math.max(span.end, start + MIN_REGION));
   const blur: Blur = {
     id: newId('b'),
     name: nextBlurName(project.blurs),
     source: source.id,
     start,
-    end: source.duration,
+    end,
     layer: 0,
-    effects: [newEffect('pixelate', newId('f'))],
+    effects: [hideEffect('cover', newId('f'))],
     radius: 4,
     opacity: 1,
     fadeIn: 0,
@@ -693,13 +791,30 @@ export function addBlurAtPlayhead(rect: Rect): void {
   };
   run(commands.addBlur(blur, Date.now()));
   set({ selection: { kind: 'blur', blurId: blur.id }, tool: 'select' });
-  notify(`Added ${blur.name}. Scrub to where it should move and drag it there: it follows with a keyframe.`);
+  const step = stepSpanAt(project, source.id, here);
+  notify(step && end < source.duration ? `Hidden during step ${project.steps.indexOf(step.step) + 1}. Drag it over what should be hidden.` : 'Hidden from here to the end. Drag it over what should be hidden.');
 }
 
 /** The + on the Effects lane: a region in the middle of the frame, staggered. */
 export function addBlurInMiddle(): void {
   const k = staggered++ % 6;
   addBlurAtPlayhead([0.38 + k * 0.025, 0.44 + k * 0.025, 0.24, 0.08]);
+}
+
+/** Hide's Look: the region becomes one Cover, Pixelate or Blur, replacing whatever stack it had. */
+export function setHideLook(blurId: string, look: HideLook): void {
+  run(commands.setBlurEffects(blurId, [hideEffect(look, newId('f'))], Date.now(), `Hide with ${look === 'cover' ? 'a cover' : look}`));
+}
+
+/** Hide's How long, judged from the frame on screen: this step only, from the start of this step to the end, or the whole video. */
+export function setHideSpan(blurId: string, span: HideSpan): void {
+  const state = getEditor();
+  const project = selectProject(state);
+  const blur = project?.blurs.find(b => b.id === blurId);
+  if (!project || !blur) return;
+  const where = hideSpanFor(project, blur.source, span, sourceTimeAt(project, state.playhead));
+  if (!where) return notify('Move to a step first: this one is past the last step.', 'error');
+  run(commands.setBlurSpan(blurId, where.start, where.end, Date.now()));
 }
 
 export function updateBlur(blurId: string, patch: Parameters<typeof commands.updateBlur>[1], label?: string, coalesceKey?: string): void {

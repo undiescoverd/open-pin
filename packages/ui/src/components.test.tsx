@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { Advanced } from './Advanced';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { KeyCap } from './KeyCap';
@@ -80,6 +81,36 @@ describe('Surface', () => {
     render(<Surface as="aside" variant="floating" aria-label="Tools" />);
     const el = screen.getByRole('complementary', { name: 'Tools' });
     expect(el.className).toContain('backdrop-blur');
+  });
+});
+
+describe('Advanced', () => {
+  it('starts closed with a one-line summary of what is inside', () => {
+    render(
+      <Advanced id="t-closed" summary="Exact position, size">
+        <button type="button">Width</button>
+      </Advanced>,
+    );
+    expect(screen.getByText('Advanced')).toBeVisible();
+    expect(screen.getByText('Exact position, size')).toBeInTheDocument();
+    expect(screen.getByText('Advanced').closest('details')).not.toHaveAttribute('open');
+  });
+
+  it('opens on click and remembers it across remounts', async () => {
+    const view = render(
+      <Advanced id="t-remember" summary="Exact box">
+        <button type="button">Corner radius</button>
+      </Advanced>,
+    );
+    await userEvent.click(screen.getByText('Advanced'));
+    expect(screen.getByRole('button', { name: 'Corner radius' })).toBeVisible();
+    view.unmount();
+    render(
+      <Advanced id="t-remember" summary="Exact box">
+        <button type="button">Corner radius</button>
+      </Advanced>,
+    );
+    expect(screen.getByText('Advanced').closest('details')).toHaveAttribute('open');
   });
 });
 

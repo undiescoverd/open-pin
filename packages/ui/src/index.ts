@@ -1,7 +1,8 @@
 /* PinKit: Waypost's components. Import the CSS once in the app:
      @import '@waypost/ui/tokens.css';  (custom properties, light and dark)
      @import '@waypost/ui/theme.css';   (Tailwind theme mapped onto them)  */
-export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
+export { Advanced, type AdvancedProps } from './Advanced';
+export { Button,type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
 export { cx, focusRing } from './cx';
 export { Icon, type IconProps } from './Icon';
 export { IconButton, type IconButtonProps } from './IconButton';

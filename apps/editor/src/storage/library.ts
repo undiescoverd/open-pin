@@ -88,3 +88,20 @@ export function lastProjectId(): string | null {
     return null;
   }
 }
+
+/** Whether a project was last edited in the filmstrip or the full timeline. Per project, kept in this browser only (not in the file). */
+const timelineViewKey = (id: string) => `waypost.timelineView.${id}`;
+export function rememberTimelineView(id: string, view: 'strip' | 'full'): void {
+  try {
+    localStorage.setItem(timelineViewKey(id), view);
+  } catch {
+    /* ignore */
+  }
+}
+export function timelineViewFor(id: string): 'strip' | 'full' {
+  try {
+    return localStorage.getItem(timelineViewKey(id)) === 'full' ? 'full' : 'strip';
+  } catch {
+    return 'strip';
+  }
+}

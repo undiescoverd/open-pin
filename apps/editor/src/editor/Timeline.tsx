@@ -11,7 +11,7 @@ import {
   type Project,
   type Step,
 } from '@waypost/core';
-import { Icon, IconButton, Surface, Tooltip, cx, focusRing } from '@waypost/ui';
+import { Button, Icon, IconButton, Surface, Tooltip, cx, focusRing } from '@waypost/ui';
 import {
   ChevronLeft,
   ChevronRight,
@@ -51,6 +51,7 @@ import {
   selectGap,
   selectProject,
   selectStep,
+  setTimelineView,
   setZoom,
   stepAtPlayhead,
   stepFrames,
@@ -63,6 +64,7 @@ import {
   zoomBy,
   type Selection,
 } from '../state/store';
+import { follow, nextDragKey } from './drag';
 import { releaseFocus } from './keyboard';
 import { nearestEdge, timelineEdges } from './snapping';
 
@@ -75,7 +77,6 @@ const LABEL_W = 96;
 const ROW_H = 26;
 const MAX_ROWS = 4;
 const SNAP_PIXELS = 8;
-const DRAG_PIXELS = 3;
 
 /** A readable tick spacing for the ruler: the smallest "nice" step that leaves 70 px between labels. */
 function tickStep(pixelsPerSecond: number): number {
@@ -95,7 +96,7 @@ function speedLabel(speed: number): string {
   return `${Math.round(speed * 100) / 100}×`;
 }
 
-function Readout() {
+export function Readout() {
   const playhead = useEditor(s => s.playhead);
   const project = useEditor(selectProject);
   const duration = project ? totalDuration(project) : 0;
@@ -106,7 +107,7 @@ function Readout() {
   );
 }
 
-function Transport() {
+export function Transport() {
   const phase = useEditor(s => s.phase);
   const playing = useEditor(s => s.playback.rate !== 0);
   const off = phase !== 'ready';
@@ -143,33 +144,6 @@ export interface Geometry {
   showSnap: (t: number | null) => void;
   /** a drag in progress: the view stops following the playhead, and a clip trim freezes the scale */
   setDragging: (on: boolean, freeze?: boolean) => void;
-}
-
-let dragCounter = 0;
-
-/**
- * Follows a pointer from a press on a bar until it is released. `move` gets the horizontal distance in pixels once the pointer
- * has moved at least 3 px (or 6 px up or down); `end` says whether it ever did. Window listeners, so a bar that re-renders
- * elsewhere (another layer) keeps the drag.
- */
-function follow(e: ReactPointerEvent, handlers: { move: (dx: number, ev: PointerEvent) => void; end: (moved: boolean) => void }): void {
-  releaseFocus();
-  const x0 = e.clientX, y0 = e.clientY;
-  let moved = false;
-  const onMove = (ev: PointerEvent) => {
-    if (!moved && Math.abs(ev.clientX - x0) < DRAG_PIXELS && Math.abs(ev.clientY - y0) < 6) return;
-    moved = true;
-    handlers.move(ev.clientX - x0, ev);
-  };
-  const onUp = () => {
-    window.removeEventListener('pointermove', onMove);
-    window.removeEventListener('pointerup', onUp);
-    window.removeEventListener('pointercancel', onUp);
-    handlers.end(moved);
-  };
-  window.addEventListener('pointermove', onMove);
-  window.addEventListener('pointerup', onUp);
-  window.addEventListener('pointercancel', onUp);
 }
 
 /** Clicking empty space in a lane selects the step at the playhead, or nothing. It never moves the playhead. */
@@ -309,6 +283,9 @@ export function Timeline() {
             className={cx('h-4 w-20 accent-[var(--wp-sel)]', focusRing)}
           />
           <IconButton label="Zoom timeline in" shortcut={['=']} size="sm" icon={<Icon icon={Plus} />} disabled={phase !== 'ready' || zoom >= MAX_ZOOM} onClick={() => zoomBy(ZOOM_FACTOR)} />
+          <Button size="sm" variant="secondary" className="ml-2" onClick={() => setTimelineView('strip')}>
+            Done
+          </Button>
         </div>
       </div>
       <div ref={scroller} className="relative min-w-0 overflow-x-auto overflow-y-hidden select-none">
@@ -372,10 +349,10 @@ function EmptyLane({ label, note }: { label: string; note: string }) {
   );
 }
 
-function PlayheadLine({ x }: { x: (t: number) => number }) {
+export function PlayheadLine({ x, offset = LABEL_W }: { x: (t: number) => number; offset?: number }) {
   const playhead = useEditor(s => s.playhead);
   return (
-    <div className="pointer-events-none absolute inset-y-0 z-20 w-0" style={{ left: LABEL_W + x(playhead) }} data-testid="playhead">
+    <div className="pointer-events-none absolute inset-y-0 z-20 w-0" style={{ left: offset + x(playhead) }} data-testid="playhead">
       <div className="absolute top-1 -left-[5px] h-0 w-0 border-x-[5px] border-t-[7px] border-x-transparent border-t-sel" />
       <div className="absolute inset-y-1 -left-px w-0.5 bg-sel" />
     </div>
@@ -407,7 +384,7 @@ function Edges({ onDown }: { onDown: (e: ReactPointerEvent, edge: 'l' | 'r') => 
 
 // ----- Steps ----------------------------------------------------------------------------------------------------------
 
-function StepsLane({ project, geometry }: { project: Project | null; geometry: Geometry }) {
+export function StepsLane({ project, geometry }: { project: Project | null; geometry: Geometry }) {
   const selection = useEditor(s => s.selection);
   const media = useEditor(s => s.media);
   const [drag, setDrag] = useState<{ id: string; tl: number } | null>(null);
@@ -415,8 +392,10 @@ function StepsLane({ project, geometry }: { project: Project | null; geometry: G
   const down = (e: ReactPointerEvent<HTMLButtonElement>, step: Step) => {
     if (e.button !== 0 || !project || !media) return;
     e.preventDefault();
-    selectStep(step.id);
+    /* selecting a step leaves the playhead where it is; a drag shows the frame under the marker, then puts the playhead back */
+    selectStep(step.id, { seek: false });
     const start = timelineTimeOf(project, step);
+    const playheadBefore = getEditor().playhead;
     let last = step.anchor.time;
     follow(e, {
       move: (dx, ev) => {
@@ -436,7 +415,9 @@ function StepsLane({ project, geometry }: { project: Project | null; geometry: G
       end: moved => {
         geometry.setDragging(false);
         setDrag(null);
-        if (moved) moveStep(step.id, last); /* one undo step for the whole drag */
+        if (!moved) return;
+        moveStep(step.id, last); /* one undo step for the whole drag */
+        seekTimeline(playheadBefore);
       },
     });
   };
@@ -455,7 +436,7 @@ function StepsLane({ project, geometry }: { project: Project | null; geometry: G
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       e.stopPropagation();
-      selectStep(step.id);
+      selectStep(step.id, { seek: false });
     }
   };
 
@@ -472,6 +453,7 @@ function StepsLane({ project, geometry }: { project: Project | null; geometry: G
             aria-pressed={active}
             data-step-marker={step.id}
             onPointerDown={e => down(e, step)}
+            onDoubleClick={() => selectStep(step.id)}
             onKeyDown={e => key(e, step)}
             className={cx(
               'absolute top-0.5 z-10 grid size-6 -translate-x-1/2 cursor-grab touch-none place-items-center rounded-pill border-2 text-xs font-semibold',
@@ -518,7 +500,7 @@ function VideoLane({ project, geometry }: { project: Project | null; geometry: G
     const edge: ClipEdge = side === 'l' ? 'in' : 'out';
     const from = clip[edge];
     const pps = geometry.pps;
-    const key = `trim-${++dragCounter}`;
+    const key = nextDragKey();
     let blocked: string | null = null;
     follow(e, {
       move: (dx, ev) => {
@@ -700,10 +682,10 @@ function EffectsLane({ blurs, layers, geometry }: { blurs: readonly Blur[]; laye
     if (e.button !== 0 || !project) return;
     e.preventDefault();
     e.stopPropagation();
-    selectBlur(blur.id, { seek: true });
+    selectBlur(blur.id);
     const s0 = tl(blur.start), e0 = tl(blur.end);
     const y0 = e.clientY;
-    const key = `blur-${++dragCounter}`;
+    const key = nextDragKey('blur');
     follow(e, {
       move: (dx, ev) => {
         geometry.setDragging(true);
@@ -761,11 +743,12 @@ function EffectsLane({ blurs, layers, geometry }: { blurs: readonly Blur[]; laye
             onPointerDown={e => {
               if (!(e.target as HTMLElement).dataset.edge) down(e, blur, 'move');
             }}
+            onDoubleClick={() => selectBlur(blur.id, { seek: true })}
             onKeyDown={e => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 e.stopPropagation();
-                selectBlur(blur.id, { seek: true });
+                selectBlur(blur.id);
               }
             }}
             className={cx(

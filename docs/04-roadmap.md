@@ -82,7 +82,7 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 - **Segments are silent.** Muted, inline video plays everywhere without a tap, iPhone included. Sound in the guide (narration, music, the recording's own audio) comes with Phase 4, along with the "Start guide" tap that unlocks it.
 - **Reveal groups appear on a timer** (0.6 s apart, as in the editor's Viewer view), not one per click.
 - **Auto and video modes** stay on each step for its pause (and never less than its entrance plus 0.6 s). Both have a pause button. Video mode's progress bar fills in time, with the steps marked where they come.
-- **Call to action** shows on the end card, or in the control bar from a chosen step onward and on the end card. It is outlined in the accent colour in the bar, so Next stays the main button. Click events for analytics come with Phase 5.
+- **Call to action** shows on the end card, or in the control bar from a chosen step onward and on the end card. It is outlined in the accent colour in the bar, so Next stays the main button. Click events for analytics are on the Later list.
 - **Fullscreen** is the player's element going fullscreen. iPhone has no element fullscreen, so the button hides there.
 - **Preview** runs the same player with the same stills, but the motion between steps is the recording drawn live on the player's canvas, as the editor plays it, rather than the encoded segment files. That lets it open at once without encoding anything.
 - **Folder export** uses the File System Access API (Chromium), writing a `<guide-name>` folder inside the folder you pick and clearing old stills and segments there. Other browsers get a zip. Playwright can't drive the folder picker, so only the zip path has an automated test.
@@ -112,7 +112,24 @@ Make the editor simple by default, as designed in [06-simplify-plan.md](06-simpl
 - Every Phase 1 to 3 browser test still passes (moved to the new controls where needed), and new tests cover the filmstrip, the Add buttons, the Hide panel, Advanced sections and the Export dialog.
 - Projects saved before Phase 4 open unchanged, effect stacks and all.
 
-## Phase 5 — Documents and phones
+## Phase 5 — Click capture
+
+Pinning every click by hand is the slowest part of making a guide. Capture the clicks while recording, so a guide starts with a step at each one, already in the right place. A web page can't see clicks outside its own tab, so this needs a small browser extension (Chrome first). It is always optional: anyone who doesn't want it skips it in one click and works exactly as in Phase 4.
+
+- **Record in the app:** *Record a tab* records a browser tab straight into a new project (`getDisplayMedia` + `MediaRecorder`). Recording in the app keeps the clicks and the video on one clock, so every click lands on the right frame.
+- **Waypost click-capture extension:** while recording, it logs each click in the recorded tab with its time, its position in the page and the label of what was clicked (button text, link text or `aria-label`). The clicks go to the editor and never leave the browser. It only runs while a recording is going and says so in its icon.
+- **A step at every click:** when recording stops, the editor proposes a step at each click, with a click marker where the click was and a title from the label ("Click Invite"). A short review list lets you keep, merge or drop them, then **Add steps**. Proposed steps are ordinary steps afterwards: move, retitle or delete them as usual.
+- **Easy to skip, at every point:**
+  - *Drop a recording* stays the main action on the first-run screen; *Record a tab* sits beside it, never in front of it.
+  - Recording without the extension just works. The offer to install it is one quiet line with **Not now**, and it stops asking once dismissed.
+  - Before recording, a *Suggest a step at each click* switch (on when the extension is installed) turns capture off for that recording.
+  - The review list has **Skip, I'll add my own**, which keeps the recording and drops every suggestion. Esc does the same.
+  - Each choice is remembered, so someone who never wants suggestions turns them off once and doesn't see them again.
+- **Without the extension** everything works as today: the Pin tool and **+ Add step** stay the way to make steps by hand, and recordings made elsewhere import as before.
+
+**Done when** someone records a five-click task in a browser tab with the extension on and gets five steps, each with its click marker on what was clicked and a sensible title, without pinning anything by hand; and someone who skips it, at the install offer or at the review list, ends up with the plain recording and no extra steps or prompts.
+
+## Phase 6 — Documents and phones
 
 - **SOP document export:** Markdown with a folder of step images, and a single HTML file with the images inside. Added to the Export dialog as *Document*.
 - **Phone layout in the player:** each step's title and note under the picture in readable text on narrow screens.
@@ -121,7 +138,7 @@ Make the editor simple by default, as designed in [06-simplify-plan.md](06-simpl
 
 **Done when** a guide exported as Markdown pastes into Notion and GitHub with its images, its HTML copy pastes into Confluence and Google Docs, and the interactive guide reads well on an iPhone.
 
-## Phase 6 — Sharing
+## Phase 7 — Sharing
 
 - **Publish online** in the Export dialog: connect a host once, then one click gives a link and an embed code. Republishing keeps the same link. Start with the one host that needs the fewest steps for someone non-technical (see the open questions).
 - Stable per-step links for the hosted pictures and PDF.
@@ -129,7 +146,7 @@ Make the editor simple by default, as designed in [06-simplify-plan.md](06-simpl
 
 **Done when** a non-technical tester publishes a guide and pastes its working link into a chat without touching a file.
 
-## Phase 7 — Narration
+## Phase 8 — Narration
 
 - Record narration per step in the browser, and import an audio file per step.
 - Keep the recording's own sound, including in the interactive guide ("Start guide" tap to unlock sound), and in the MP4.
@@ -145,14 +162,14 @@ Kept for when people ask for them, not planned:
 - Viewer analytics (player beacons, a collector and a per-step funnel).
 - OCR title suggestions and auto-redaction suggestions.
 - Click-to-reveal annotations, time-stretched sound for sped-up clips, PDF visual regression tests, a ProRes editing proxy.
-- Record the screen inside the app, a click-capture browser extension, PWA polish.
+- Recording a whole screen or window inside the app (Phase 5 records a browser tab), click capture in desktop apps, PWA polish.
 
 ## Open questions for the owner
 
 Decided: **Waypost** is the name, it's a **paid one-off purchase** (proprietary code), and the editor is hosted on **Cloudflare Pages**. After Phase 3: Waypost is a **guide and SOP maker first**, simple by default, with precise controls behind **Advanced** sections and **Trim & edit video** ([06-simplify-plan.md](06-simplify-plan.md)).
 
 Still open (the options for 1, 3 and 4 are laid out in [07-business-model.md](07-business-model.md)):
-1. **First publishing host** (Phase 6): Cloudflare Pages, Netlify or GitHub Pages. GitHub Pages needs a token and a repository, so test the other two against it first.
+1. **First publishing host** (Phase 7): Cloudflare Pages, Netlify or GitHub Pages. GitHub Pages needs a token and a repository, so test the other two against it first.
 2. **Name checks:** trademark, domain and app-store searches for "Waypost" before designing the app mark.
 3. **Selling:** payment provider (Lemon Squeezy or Paddle issue licence keys and handle VAT; Stripe is cheaper per sale but leaves keys and tax to us), the price, and whether there's a free trial or a free tier.
 4. **Unlocking:** a licence key checked online once and then cached, so the editor keeps working offline. Needs a decision on what a locked copy can still do (for example, edit and preview but not export).

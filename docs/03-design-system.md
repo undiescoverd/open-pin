@@ -169,6 +169,7 @@ React components built on Radix primitives (for keyboard, focus and screen-reade
 ### Content
 - `StepCard`: number badge, thumbnail, title, orphaned-step badge; drag handle; coral tint when selected.
 - `InspectorSection`: collapsible titled group with aligned label/control rows.
+- `Advanced`: collapsed disclosure at the end of a panel; closed it is one line saying what's inside ("Advanced · Exact position, size"), open it shows the precise controls. The house pattern for anything rarely needed (see 06-simplify-plan.md).
 - `EmptyState`: icon, headline, body, actions.
 - `Badge`, `Chip`, `Toast` ("Exported 12 screenshots"), `ProgressDialog` (export/publish progress with cancel).
 

@@ -1,10 +1,8 @@
 import { canRedo, canUndo, redoLabel, undoLabel } from '@waypost/core';
-import { Button, Icon, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator } from '@waypost/ui';
-import { ChevronDown, ChevronLeft, ClipboardCopy, Download, Eye, FileArchive, FileText, Film, FolderDown, Image as ImageIcon, Redo2, Save, Search, Share, Undo2 } from 'lucide-react';
+import { Button, Icon, IconButton } from '@waypost/ui';
+import { ChevronLeft, Download, Eye, Redo2, Search, Undo2 } from 'lucide-react';
 import { ThemeButton } from '../ThemeButton';
-import { copyFrame, exportPdfGuide, exportScreenshots, saveFrame } from '../state/exporting';
-import { saveWaypost } from '../state/project';
-import { redo, renameProject, selectProject, setExportOpen, setPreviewOpen, setProjectsOpen, setShareOpen, undo, useEditor } from '../state/store';
+import { redo, renameProject, selectProject, setExportDialog, setPreviewOpen, setProjectsOpen, undo, useEditor } from '../state/store';
 import { Logo } from './Logo';
 import { useEditSession } from './useEditSession';
 
@@ -43,57 +41,8 @@ export function TopBar() {
         <Button icon={<Icon icon={Eye} />} disabled={!ready} onClick={() => setPreviewOpen(true)} title="See what viewers see (⌘↩)">
           Preview
         </Button>
-        <Menu
-          trigger={
-            <Button icon={<Icon icon={Download} />} disabled={!ready}>
-              Export
-              <Icon icon={ChevronDown} size={14} />
-            </Button>
-          }
-        >
-          <MenuLabel>Interactive guide</MenuLabel>
-          <MenuItem icon={<Icon icon={FolderDown} />} onSelect={() => setShareOpen(true)}>
-            Guide folder for the web…
-          </MenuItem>
-          <MenuSeparator />
-          <MenuLabel>PDF guide</MenuLabel>
-          <MenuItem icon={<Icon icon={FileText} />} onSelect={() => void exportPdfGuide('a4')}>
-            PDF · A4
-          </MenuItem>
-          <MenuItem icon={<Icon icon={FileText} />} onSelect={() => void exportPdfGuide('letter')}>
-            PDF · Letter
-          </MenuItem>
-          <MenuItem icon={<Icon icon={FileText} />} onSelect={() => void exportPdfGuide('slide')}>
-            PDF · 16:9 slides
-          </MenuItem>
-          <MenuSeparator />
-          <MenuLabel>Screenshots</MenuLabel>
-          <MenuItem icon={<Icon icon={FileArchive} />} onSelect={() => void exportScreenshots('png')}>
-            PNG images (zip)
-          </MenuItem>
-          <MenuItem icon={<Icon icon={FileArchive} />} onSelect={() => void exportScreenshots('webp')}>
-            WebP images (zip)
-          </MenuItem>
-          <MenuSeparator />
-          <MenuLabel>This frame</MenuLabel>
-          <MenuItem icon={<Icon icon={ClipboardCopy} />} onSelect={() => void copyFrame()}>
-            Copy frame
-          </MenuItem>
-          <MenuItem icon={<Icon icon={ImageIcon} />} onSelect={() => void saveFrame()}>
-            Save frame as PNG
-          </MenuItem>
-          <MenuSeparator />
-          <MenuItem icon={<Icon icon={Save} />} shortcut={['mod', 's']} onSelect={() => void saveWaypost()}>
-            Save project file (.waypost)
-          </MenuItem>
-          <MenuSeparator />
-          <MenuLabel>Video</MenuLabel>
-          <MenuItem icon={<Icon icon={Film} />} onSelect={() => setExportOpen(true)}>
-            MP4 video…
-          </MenuItem>
-        </Menu>
-        <Button variant="primary" icon={<Icon icon={Share} />} disabled={!ready} onClick={() => setShareOpen(true)}>
-          Share
+        <Button variant="primary" icon={<Icon icon={Download} />} disabled={!ready} onClick={() => setExportDialog('choose')}>
+          Export
         </Button>
       </div>
     </header>

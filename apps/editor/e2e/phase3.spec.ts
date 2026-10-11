@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
-import { clickFrame, openRecording, seekTo, stepCards, watchErrors } from './helpers';
+import { addButton, clickFrame, exportDialog, openExport, openExportAdvanced, openRecording, seekTo, stepCards, watchErrors } from './helpers';
 import { serveStatic, type StaticHost } from './static-server';
 
 /** The Phase 3 acceptance tests (docs/04-roadmap.md, "Phase 3 — Interactive guide"): the player settings, the in-editor preview,
@@ -34,16 +34,20 @@ async function makeGuide(page: Page): Promise<void> {
   await pin(page, 1, [0.3, 0.3], 'Open the menu');
   await page.keyboard.press('c');
   await clickFrame(page, 0.6, 0.6);
-  await page.getByRole('textbox', { name: 'Text' }).fill('Start here');
+  await page.getByRole('textbox', { name: 'Words' }).fill('Start here');
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await pin(page, 2.5, [0.5, 0.5], 'Pick a colour');
-  await page.getByRole('button', { name: 'Zoom in on this step' }).click();
+  await addButton(page, 'Zoom').click();
   await pin(page, 4, [0.7, 0.4], 'Save it');
   await expect(stepCards(page)).toHaveCount(3);
 }
 
-async function openGuideTab(page: Page): Promise<void> {
-  await page.getByRole('tab', { name: 'Guide' }).click();
+/** Sets how the guide plays in the Export dialog, then closes it. */
+async function setHowItPlays(page: Page, name: 'Viewer clicks Next' | 'Plays by itself' | 'Plain video'): Promise<void> {
+  const dialog = await openExport(page);
+  await dialog.getByRole('group', { name: 'How it plays' }).getByRole('button', { name }).click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
 }
 
 /** The project as autosaved in the browser's private file system. */
@@ -89,38 +93,43 @@ async function pixel(canvas: Locator, fx: number, fy: number): Promise<[number, 
 const isCoral = ([r, g, b]: [number, number, number]) => r > 200 && g < 140 && b < 130;
 
 test.describe('Phase 3: player settings and preview', () => {
-  test('the Guide tab sets the playback mode, accent, controls and call to action, each one undoable', async ({ page }) => {
+  test('Export sets how the guide plays, the player and the end button, each one undoable once the dialog is closed', async ({ page }) => {
     const errors = watchErrors(page);
     await openRecording(page);
-    await openGuideTab(page);
-    await page.getByRole('group', { name: 'Playback' }).getByRole('button', { name: 'Auto' }).click();
-    await page.getByRole('button', { name: 'Marigold' }).click();
-    await page.getByRole('switch', { name: 'Step counter' }).click();
-    await page.getByRole('switch', { name: 'Show a button' }).click();
-    await page.getByRole('textbox', { name: 'Button text' }).fill('Start free trial');
-    await page.getByRole('textbox', { name: 'Link' }).fill('example.com/signup');
-    await expect(page.getByText('Start the address with https://')).toBeVisible();
-    await page.getByRole('textbox', { name: 'Link' }).fill('https://example.com/signup');
+    const dialog = await openExport(page);
+    await dialog.getByRole('group', { name: 'How it plays' }).getByRole('button', { name: 'Plays by itself' }).click();
+    await expect(dialog.getByText('Pauses on each step for its pause time')).toBeVisible();
+    await openExportAdvanced(page);
+    await dialog.getByRole('button', { name: 'Marigold' }).click();
+    await dialog.getByRole('switch', { name: 'Step counter' }).click();
+    await dialog.getByRole('checkbox', { name: 'Show a button' }).check();
+    await dialog.getByRole('textbox', { name: 'Button text' }).fill('Start free trial');
+    await dialog.getByRole('textbox', { name: 'Link' }).fill('example.com/signup');
+    await expect(dialog.getByText('Start the address with https://')).toBeVisible();
+    await dialog.getByRole('textbox', { name: 'Link' }).fill('https://example.com/signup');
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    /* the end button's extras are under Advanced */
+    await expect(dialog.getByRole('combobox', { name: 'Show it' })).toHaveValue('end');
 
     const saved = await savedProject(page);
     expect(saved.guide).toMatchObject({ mode: 'auto', accent: '#FFB020', controls: { counter: false, progress: true, fullscreen: true } });
     expect(saved.guide.cta).toEqual({ label: 'Start free trial', url: 'https://example.com/signup', newTab: true, showAt: 'end' });
 
     /* typing in a field is one undo step until the field loses focus */
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
     await page.keyboard.press('Control+z');
-    await expect(page.getByRole('textbox', { name: 'Link' })).toHaveValue('');
     await page.keyboard.press('Control+z');
-    await expect(page.getByRole('textbox', { name: 'Button text' })).toHaveValue('Try it yourself');
-    await page.keyboard.press('Control+z');
-    await expect(page.getByRole('switch', { name: 'Show a button' })).toHaveAttribute('aria-checked', 'false');
-    await expect(page.getByRole('switch', { name: 'Step counter' })).toHaveAttribute('aria-checked', 'false');
-    await page.keyboard.press('Control+z');
-    await expect(page.getByRole('switch', { name: 'Step counter' })).toHaveAttribute('aria-checked', 'true');
-    await page.keyboard.press('Control+z');
-    await expect(page.getByRole('button', { name: 'Coral' })).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('Control+z');
-    await expect(page.getByRole('group', { name: 'Playback' }).getByRole('button', { name: 'Guided' })).toHaveAttribute('aria-pressed', 'true');
+    await openExport(page);
+    await expect(dialog.getByRole('textbox', { name: 'Link' })).toHaveValue('');
+    await expect(dialog.getByRole('textbox', { name: 'Button text' })).toHaveValue('Try it yourself');
+    await page.keyboard.press('Escape');
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Control+z');
+    await openExport(page);
+    await expect(dialog.getByRole('checkbox', { name: 'Show a button' })).not.toBeChecked();
+    await expect(dialog.getByRole('group', { name: 'How it plays' }).getByRole('button', { name: 'Viewer clicks Next' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(dialog.getByRole('switch', { name: 'Step counter' })).toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByRole('button', { name: 'Coral' })).toHaveAttribute('aria-pressed', 'true');
     expect(errors).toEqual([]);
   });
 
@@ -178,12 +187,11 @@ test.describe('Phase 3: player settings and preview', () => {
     test.setTimeout(90_000);
     const errors = watchErrors(page);
     await makeGuide(page);
-    await openGuideTab(page);
     const dialog = page.getByRole('dialog', { name: 'Preview' });
     const p = player(dialog.getByTestId('preview-player'));
 
     await test.step('Auto: each step stays for its pause, then the guide carries on; Pause holds it', async () => {
-      await page.getByRole('group', { name: 'Playback' }).getByRole('button', { name: 'Auto' }).click();
+      await setHowItPlays(page, 'Plays by itself');
       await page.keyboard.press('Control+Enter');
       await p.start.click();
       await expectState(dialog, 'step-1');
@@ -197,7 +205,7 @@ test.describe('Phase 3: player settings and preview', () => {
     });
 
     await test.step('Video: the bar fills in time, with each step marked where it comes', async () => {
-      await page.getByRole('group', { name: 'Playback' }).getByRole('button', { name: 'Video' }).click();
+      await setHowItPlays(page, 'Plain video');
       await page.keyboard.press('Control+Enter');
       /* 1 s of motion, then 2.5 s on each step, 1.5 s between steps and a 2 s outro: step 1 is at 1 s of 13.5 */
       const first = await dialog.getByRole('button', { name: /^Go to step 1/ }).evaluate(el => parseFloat((el as HTMLElement).style.left));
@@ -233,24 +241,32 @@ test.describe('Phase 3: the published guide', () => {
     const errors = watchErrors(page);
     await makeGuide(page);
 
-    await test.step('a call to action, and the address the folder will live at', async () => {
-      await openGuideTab(page);
-      await page.getByRole('switch', { name: 'Show a button' }).click();
-      await page.getByRole('textbox', { name: 'Button text' }).fill('Start free trial');
-      await page.getByRole('textbox', { name: 'Link' }).fill('https://example.com/signup');
+    await test.step('an end button, and the address the folder will live at, given before exporting', async () => {
+      const dialog = await openExport(page);
+      await dialog.getByRole('checkbox', { name: 'Show a button' }).check();
+      await dialog.getByRole('textbox', { name: 'Button text' }).fill('Start free trial');
+      await dialog.getByRole('textbox', { name: 'Link' }).fill('https://example.com/signup');
+      await dialog.getByRole('button', { name: 'Already online? Get the link and embed code' }).click();
+      const saved = page.getByRole('dialog', { name: 'Link and embed code' });
+      await saved.getByRole('textbox', { name: 'Guide address' }).fill('https://me.github.io/guides/demo');
+      await saved.getByRole('button', { name: 'Back to Export' }).click();
     });
 
-    const zip = await test.step('Share › Export guide as a zip, with an A4 PDF copy', async () => {
-      await page.getByRole('button', { name: 'Share' }).click();
-      const share = page.getByRole('dialog', { name: 'Share guide' });
-      await share.getByRole('textbox', { name: 'Guide address' }).fill('https://me.github.io/guides/demo');
-      await expect(share.getByRole('textbox', { name: 'Embed code' })).toHaveValue(
-        '<div data-waypost="https://me.github.io/guides/demo/guide.json"></div>\n<script src="https://me.github.io/guides/demo/player.js" async></script>',
-      );
-      await share.getByRole('button', { name: 'Zip file' }).click();
-      const [download] = await Promise.all([page.waitForEvent('download', { timeout: 120_000 }), share.getByRole('button', { name: 'Export guide' }).click()]);
+    const zip = await test.step('Export › Interactive guide as a zip, with an A4 PDF copy; then the link and embed code', async () => {
+      const dialog = exportDialog(page);
+      await openExportAdvanced(page);
+      await dialog.getByRole('group', { name: 'Save as' }).getByRole('button', { name: 'Zip file' }).click();
+      await expect(dialog.getByRole('combobox', { name: 'PDF copy' })).toHaveValue('a4');
+      const [download] = await Promise.all([page.waitForEvent('download', { timeout: 120_000 }), dialog.getByRole('button', { name: 'Export guide' }).click()]);
       expect(download.suggestedFilename()).toBe('demo.zip');
       await expect(page.getByRole('status').filter({ hasText: /Exported the guide \(3 steps\) as demo\.zip/ })).toBeVisible();
+      const saved = page.getByRole('dialog', { name: 'Link and embed code' });
+      await expect(saved.getByRole('textbox', { name: 'Embed code' })).toHaveValue(
+        '<div data-waypost="https://me.github.io/guides/demo/guide.json"></div>\n<script src="https://me.github.io/guides/demo/player.js" async></script>',
+      );
+      await expect(saved.getByText('Netlify', { exact: true })).toBeVisible();
+      await saved.getByRole('button', { name: 'Done' }).click();
+      await expect(saved).toBeHidden();
       return readFile((await download.path())!);
     });
 

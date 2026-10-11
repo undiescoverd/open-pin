@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { blurAlphaAt, blurRectAt, exportPlan, frameLayout, parseProject, planAt, tlToSrc, type Project } from '@waypost/core';
 import { readFile } from 'node:fs/promises';
-import { dragOnFrame, frameBox, openRecording, playheadSeconds, seekTo, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
+import { dragOnFrame, frameBox, openExport, openExportAdvanced, openItemAdvanced, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepChip, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
 
 /** The Phase 2 acceptance tests (docs/04-roadmap.md, "Phase 2 — Edit and polish"; the checks in docs/05-editor-interactions.md,
     section 10). The fixture is 6 seconds long, 640 × 400, at 30 fps. */
@@ -12,6 +12,15 @@ const clips = (page: Page) => page.locator('[data-clip]');
 const bars = (page: Page) => effectsLane(page).locator('[data-blur]');
 const addRegion = (page: Page) => page.getByRole('button', { name: 'Add an effect region at the playhead' });
 const addEffect = (page: Page) => page.getByLabel('Add an effect', { exact: true });
+
+/** Draws a hidden area with the X tool, then gives it the Pixelate look, which is how the Phase 2 regions started, and opens its
+    Advanced (the stack, layer and timing). */
+async function drawPixelated(page: Page, from: [number, number], to: [number, number]): Promise<void> {
+  await page.keyboard.press('x');
+  await dragOnFrame(page, from, to);
+  await page.getByRole('group', { name: 'Look' }).getByRole('button', { name: 'Pixelate' }).click();
+  await openItemAdvanced(page);
+}
 
 /** The guide's length in seconds, from the readout. */
 async function guideLength(page: Page): Promise<number> {
@@ -152,7 +161,7 @@ test.describe('Phase 2: timeline editing', () => {
       await page.getByRole('group', { name: 'Speed presets' }).getByRole('button', { name: '2×' }).click();
       expect(await guideLength(page)).toBeCloseTo(before - 1.5, 1);
       await expect(clips(page).nth(1)).toContainText('2×');
-      await page.getByRole('button', { name: /^Step 1/ }).click();
+      await page.getByRole('button', { name: /^Step 1/ }).dblclick(); /* a double-click goes to the pin */
       await expect.poll(() => playheadSeconds(page)).toBeCloseTo(before - 1.5 - 0.75, 1);
     });
     expect(errors).toEqual([]);
@@ -207,8 +216,8 @@ test.describe('Phase 2: effect regions', () => {
     await seekTo(page, 1);
     const area: [number, number, number, number] = [0.15, 0.15, 0.3, 0.2];
     const bare = await canvasHash(page, area);
-    await page.keyboard.press('x');
-    await dragOnFrame(page, [0.1, 0.1], [0.5, 0.4]);
+    await drawPixelated(page, [0.1, 0.1], [0.5, 0.4]);
+    await expect(page.locator('[data-effect]')).toHaveAttribute('data-effect', 'pixelate');
     await expect.poll(() => canvasHash(page, area)).not.toBe(bare);
     const hashes = [await canvasHash(page, area)];
     for (const type of ['tint', 'desaturate', 'solid', 'blur']) {
@@ -253,27 +262,28 @@ test.describe('Phase 2: effect regions', () => {
     for (let i = 0; i < 5; i++) await addRegion(page).click();
     const layerOf = async (name: string) => Number(/layer (\d+)/.exec((await bars(page).filter({ hasText: name }).getAttribute('aria-label'))!)![1]);
     const layers = async () => (await bars(page).evaluateAll(els => els.map(e => Number(/layer (\d+)/.exec(e.getAttribute('aria-label')!)![1])))).sort((a, b) => a - b);
-    await bars(page).filter({ hasText: 'Blur 3' }).click();
+    await bars(page).filter({ hasText: 'Hidden area 3' }).click();
+    await openItemAdvanced(page);
     await page.getByRole('button', { name: 'Send to back' }).click();
-    expect(await layerOf('Blur 3')).toBe(1);
+    expect(await layerOf('Hidden area 3')).toBe(1);
     expect(await layers()).toEqual([1, 2, 3, 4, 5]);
     await page.getByRole('button', { name: 'Bring to front' }).click();
-    expect(await layerOf('Blur 3')).toBe(5);
+    expect(await layerOf('Hidden area 3')).toBe(5);
     await page.getByRole('button', { name: 'Send backward' }).click();
-    expect(await layerOf('Blur 3')).toBe(4);
+    expect(await layerOf('Hidden area 3')).toBe(4);
     expect(await layers()).toEqual([1, 2, 3, 4, 5]);
 
     /* two regions on one layer: a bar dragged into its neighbour stops at it */
-    await bars(page).filter({ hasText: 'Blur 1' }).click();
+    await bars(page).filter({ hasText: 'Hidden area 1' }).click();
     await typeInto(page.getByLabel('End', { exact: true }), '2');
     await seekTo(page, 3);
     await addRegion(page).click();
-    expect(await layerOf('Blur 6')).toBe(1);
-    const bar = bars(page).filter({ hasText: 'Blur 6' });
+    expect(await layerOf('Hidden area 6')).toBe(1);
+    const bar = bars(page).filter({ hasText: 'Hidden area 6' });
     const from = await middleOf(bar);
     await drag(page, from, { x: from.x - (await timeX(page, 2.5, 6)) + (await timeX(page, 0, 6)), y: from.y });
     await expect(page.getByLabel('Start', { exact: true })).toHaveValue('0:02.00');
-    expect(await layerOf('Blur 6')).toBe(1);
+    expect(await layerOf('Hidden area 6')).toBe(1);
   });
 
   test('bars: an edge trims one end, the body moves both, and edges snap to pins unless Alt is held (checks 2 and 3)', async ({ page }) => {
@@ -282,6 +292,7 @@ test.describe('Phase 2: effect regions', () => {
     await page.keyboard.press('Shift+P');
     await seekTo(page, 3);
     await addRegion(page).click();
+    await openItemAdvanced(page);
     const bar = bars(page).first();
     await drag(page, await edgeOf(bar, 'l'), { x: await timeX(page, 3.6, 6), y: (await edgeOf(bar, 'l')).y }, true);
     await expect(page.getByLabel('End', { exact: true })).toHaveValue('0:06.00');
@@ -318,7 +329,7 @@ test.describe('Phase 2: effect regions', () => {
     await page.keyboard.press('Shift+K');
     await expect(page.getByRole('heading', { name: 'Clip 1' })).toBeVisible();
     await page.keyboard.press('Shift+K');
-    await expect(page.getByRole('heading', { name: /^Blur \d/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Hide' })).toBeVisible();
     await page.keyboard.press('Shift+I');
     await expect(page.getByRole('heading', { name: 'Clip 1' })).toBeVisible();
   });
@@ -327,6 +338,7 @@ test.describe('Phase 2: effect regions', () => {
     await openRecording(page);
     await page.keyboard.press('x');
     await dragOnFrame(page, [0.1, 0.1], [0.3, 0.3]);
+    await openItemAdvanced(page);
     await seekTo(page, 4);
     await dragOnFrame(page, [0.2, 0.2], [0.6, 0.6]);
     await expect(page.getByRole('status').filter({ hasText: 'Added a keyframe at 0:04.00' })).toBeVisible();
@@ -337,7 +349,7 @@ test.describe('Phase 2: effect regions', () => {
 });
 
 test.describe('Phase 2: zoom, framing and logo', () => {
-  test('a zoom box keeps the frame shape, owns its area, and the Viewer view eases into it (checks 8 and 9)', async ({ page }) => {
+  test('a zoom box keeps the frame shape, owns its area, and See it zoomed eases into it (checks 8 and 9)', async ({ page }) => {
     await openRecording(page);
     await seekTo(page, 2);
     await page.keyboard.press('p');
@@ -351,13 +363,13 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     expect(before.width / before.height).toBeCloseTo(1.6, 1);
 
     /* check 9: dragging the right edge in shrinks it, keeps its left edge and its shape, and raises the amount */
-    const amount = Number(await page.getByLabel('Amount', { exact: true }).inputValue());
+    const amount = Number(await page.getByLabel('How close', { exact: true }).inputValue());
     await drag(page, { x: before.x + before.width - 2, y: before.y + before.height / 2 }, { x: before.x + before.width * 0.75, y: before.y + before.height / 2 });
     const after = (await box.boundingBox())!;
     expect(after.x).toBeCloseTo(before.x, 0);
     expect(after.width).toBeLessThan(before.width);
     expect(after.width / after.height).toBeCloseTo(1.6, 1);
-    expect(Number(await page.getByLabel('Amount', { exact: true }).inputValue())).toBeGreaterThan(amount);
+    expect(Number(await page.getByLabel('How close', { exact: true }).inputValue())).toBeGreaterThan(amount);
 
     /* check 8: dragging inside the selected box, over the click marker, moves the box and leaves the marker */
     await drag(page, { x: after.x + after.width / 2, y: after.y + after.height / 2 }, { x: after.x + after.width / 2 - 40, y: after.y + after.height / 2 - 20 });
@@ -365,11 +377,12 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     expect(moved.x).toBeLessThan(after.x - 20);
     await expect(page.getByRole('heading', { name: 'Zoom' })).toBeVisible();
     await page.getByRole('button', { name: /^Step 1/ }).click();
-    await expect(page.getByRole('button', { name: 'Delete Click marker' })).toBeVisible();
+    await expect(stepChip(page, 'Click marker')).toBeVisible();
 
-    /* the Viewer view shows the step zoomed */
+    /* See it zoomed shows the step as the guide will */
+    await stepChip(page, 'Zoom').click();
     const edit = await canvasHash(page, [0, 0, 1, 1]);
-    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Viewer' }).click();
+    await page.getByRole('button', { name: 'See it zoomed' }).click();
     await expect.poll(() => canvasHash(page, [0, 0, 1, 1])).not.toBe(edit);
   });
 
@@ -383,7 +396,7 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     await page.keyboard.press('z');
     await dragOnFrame(page, [0.3, 0.3], [0.75, 0.75]);
     await expect(page.getByRole('heading', { name: 'Zoom' })).toBeVisible();
-    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Viewer' }).click();
+    await page.getByRole('button', { name: 'See it zoomed' }).click();
     /* the entrance has finished once the yellow bar sits near the left edge (it is a third of the way across when not zoomed) */
     await expect.poll(async () => (await watchYellowEdge(page, 60)).at(-1)!, { timeout: 5000 }).toBeLessThan(0.12);
   }
@@ -397,10 +410,10 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     for (let i = 1; i < edges.length; i++) expect(edges[i]!).toBeGreaterThanOrEqual(edges[i - 1]! - 0.01);
   }
 
-  test('switching from the Viewer back to Edit eases out of the zoom instead of cutting', async ({ page }) => {
+  test('Back to editing eases out of the zoom instead of cutting', async ({ page }) => {
     await zoomedViewerStep(page);
     const watching = watchYellowEdge(page, 900);
-    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: 'Back to editing' }).click();
     expectEasedOut(await watching);
   });
 
@@ -425,7 +438,8 @@ test.describe('Phase 2: zoom, framing and logo', () => {
 
   test('framing changes the output; a logo is stored with the project and comes back after a reload', async ({ page }) => {
     await openRecording(page);
-    await page.getByRole('tab', { name: 'Guide' }).click();
+    await openExport(page);
+    await openExportAdvanced(page);
     await page.getByLabel('Shape').selectOption('16:9');
     await typeInto(page.getByLabel('Padding', { exact: true }), '10');
     await page.getByRole('group', { name: 'Background' }).getByRole('button', { name: 'Gradient' }).click();
@@ -446,6 +460,7 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     });
     await page.locator('input[type=file][aria-label="Add a logo…"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(logo, 'base64') });
     await expect(page.getByText('logo.png in a corner of every frame')).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect.poll(() => canvasHash(page, corner)).not.toBe(plain);
     const withLogo = await canvasHash(page, corner);
 
@@ -475,8 +490,7 @@ test.describe('Phase 2: MP4 export', () => {
       for (const [from, to] of [[0, 2.5], [3, 6]] as const) {
         await seekTo(page, from);
         for (const spot of SPOTS) {
-          await page.keyboard.press('x');
-          await dragOnFrame(page, [spot.rect[0], spot.rect[1]], [spot.rect[0] + spot.rect[2], spot.rect[1] + spot.rect[3]]);
+          await drawPixelated(page, [spot.rect[0], spot.rect[1]], [spot.rect[0] + spot.rect[2], spot.rect[1] + spot.rect[3]]);
           for (const type of spot.effects) await addEffect(page).selectOption(type);
           if (spot.check === 'coral') await page.getByRole('group', { name: 'Solid fill colour' }).getByRole('button', { name: 'Coral' }).click();
           if (spot.check === 'lagoon') {
@@ -497,6 +511,7 @@ test.describe('Phase 2: MP4 export', () => {
       for (const t of [0.3, 0.8, 1.3, 2.2, 2.7, 3.2, 3.9, 4.6, 5.2, 5.7]) {
         await seekTo(page, t);
         await page.keyboard.press('Shift+P');
+        await openStepAdvanced(page);
         await typeInto(page.getByLabel('Pause', { exact: true }), '1');
         await page.getByLabel('Title').fill(`Step at ${t}`);
         await leaveField(page);
@@ -516,10 +531,12 @@ test.describe('Phase 2: MP4 export', () => {
     });
 
     await test.step('a gradient background', async () => {
-      await page.getByRole('tab', { name: 'Guide' }).click();
+      await openExport(page, 'Video');
+      await openExportAdvanced(page);
       await typeInto(page.getByLabel('Padding', { exact: true }), '6');
       await page.getByRole('group', { name: 'Background' }).getByRole('button', { name: 'Gradient' }).click();
       await leaveField(page);
+      await page.keyboard.press('Escape');
     });
 
     const project = await savedProject(page);
@@ -527,10 +544,9 @@ test.describe('Phase 2: MP4 export', () => {
     expect(project.steps).toHaveLength(10);
 
     const file = await test.step('export the MP4', async () => {
-      await page.getByRole('button', { name: 'Export' }).click();
-      await page.getByRole('menuitem', { name: 'MP4 video…' }).click();
-      await page.getByRole('group', { name: 'Size' }).getByRole('button', { name: '720p' }).click();
-      const [download] = await Promise.all([page.waitForEvent('download', { timeout: 200_000 }), page.getByRole('dialog').getByRole('button', { name: 'Export', exact: true }).click()]);
+      const dialog = await openExport(page, 'Video');
+      await dialog.getByRole('group', { name: 'Size' }).getByRole('button', { name: '720p' }).click();
+      const [download] = await Promise.all([page.waitForEvent('download', { timeout: 200_000 }), dialog.getByRole('button', { name: 'Export video' }).click()]);
       expect(download.suggestedFilename()).toBe('demo.mp4');
       await expect(page.getByRole('status').filter({ hasText: /Exported a \d+ × 720 MP4/ })).toBeVisible();
       return readFile((await download.path())!);
@@ -621,15 +637,15 @@ test.describe('Phase 2: MP4 export', () => {
     await page.goto('/');
     await page.getByTestId('file-input').setInputFiles('e2e/fixtures/demo-sound.webm');
     await waitForFrame(page);
+    await page.getByRole('button', { name: 'Trim & edit video' }).click();
     await seekTo(page, 1);
     await page.keyboard.press('Shift+P');
     const exportOnce = async (sound: boolean) => {
-      await page.getByRole('button', { name: 'Export' }).click();
-      await page.getByRole('menuitem', { name: 'MP4 video…' }).click();
-      await page.getByRole('group', { name: 'Size' }).getByRole('button', { name: '720p' }).click();
-      const toggle = page.getByRole('switch', { name: "The recording's own sound" });
+      const dialog = await openExport(page, 'Video');
+      await dialog.getByRole('group', { name: 'Size' }).getByRole('button', { name: '720p' }).click();
+      const toggle = dialog.getByRole('switch', { name: "The recording's own sound" });
       if ((await toggle.getAttribute('aria-checked')) !== String(sound)) await toggle.click();
-      const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('dialog').getByRole('button', { name: 'Export', exact: true }).click()]);
+      const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Export video' }).click()]);
       return readFile((await download.path())!);
     };
     /* an audio track's sample entry names its codec: mp4a for AAC, Opus for Opus */
@@ -643,12 +659,11 @@ test.describe('Phase 2: MP4 export', () => {
     await openRecording(page);
     await seekTo(page, 1);
     await page.keyboard.press('Shift+P');
-    await page.getByRole('button', { name: 'Export' }).click();
-    await page.getByRole('menuitem', { name: 'MP4 video…' }).click();
-    await page.getByRole('group', { name: 'Size' }).getByRole('button', { name: '4K' }).click();
+    const dialog = await openExport(page, 'Video');
+    await dialog.getByRole('group', { name: 'Size' }).getByRole('button', { name: '4K' }).click();
     let downloaded = false;
     page.on('download', () => (downloaded = true));
-    await page.getByRole('dialog').getByRole('button', { name: 'Export', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Export video' }).click();
     await expect(page.getByRole('progressbar', { name: 'Export progress' })).toBeVisible();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Export cancelled' })).toBeVisible();

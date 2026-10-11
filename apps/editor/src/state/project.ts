@@ -1,7 +1,7 @@
 import { commands, createHistory, createProject, newId, type Project } from '@waypost/core';
 import { MediaUnsupportedError, type MediaHandle } from '@waypost/media';
 import { mediaClient } from '../engine/session';
-import { entryFor, getEntry, lastProjectId, listProjects, putEntry, rememberLastProject, removeEntry, type LibraryEntry } from '../storage/library';
+import { entryFor, getEntry, lastProjectId, listProjects, putEntry, rememberLastProject, removeEntry, timelineViewFor, type LibraryEntry } from '../storage/library';
 import { assetPath, deleteProjectFiles, loadProject, readSource, requestPersistence, saveProject, sourcePath, writeSource } from '../storage/opfs';
 import { openWaypostFile, saveWaypostFile } from '../storage/waypost-file';
 import { getEditor, notify, patchEditor, resetEditor, run, selectProject, setAssetImage, useEditor } from './store';
@@ -97,7 +97,7 @@ export async function addImage(file: File, use: 'logo' | 'background'): Promise<
 
 function resetStateFor(project: Project) {
   resetEditor();
-  return { history: createHistory(project), selection: null, save: 'saved' as const };
+  return { history: createHistory(project), selection: null, save: 'saved' as const, timelineView: timelineViewFor(project.id) };
 }
 
 /** The text to show for a failure, in plain language. */

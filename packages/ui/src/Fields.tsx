@@ -279,14 +279,16 @@ export interface SegmentedProps<T extends string> {
   value: T | null;
   onChange: (value: T) => void;
   disabled?: boolean;
+  /** one option per line, for labels too long to sit side by side */
+  stacked?: boolean;
 }
 
-/** A row of mutually exclusive buttons, such as speed presets or the Edit and Viewer views. */
-export function Segmented<T extends string>({ label, hideLabel, options, value, onChange, disabled }: SegmentedProps<T>) {
+/** A row of mutually exclusive buttons, such as speed presets or Hide's look; `stacked` puts them one under another. */
+export function Segmented<T extends string>({ label, hideLabel, options, value, onChange, disabled, stacked }: SegmentedProps<T>) {
   return (
     <div role="group" aria-label={label} className="flex flex-col gap-1">
       {!hideLabel && <span className="text-sm font-medium text-fg-muted">{label}</span>}
-      <div className="flex rounded-md border border-line-strong bg-raised p-0.5">
+      <div className={cx('flex rounded-md border border-line-strong bg-raised p-0.5', stacked && 'flex-col gap-0.5')}>
         {options.map(o => (
           <button
             key={o.value}
@@ -297,6 +299,7 @@ export function Segmented<T extends string>({ label, hideLabel, options, value, 
             onClick={() => onChange(o.value)}
             className={cx(
               'h-7 min-w-fit flex-1 rounded-sm px-2 text-sm whitespace-nowrap text-fg-muted hover:text-fg disabled:cursor-not-allowed disabled:text-fg-disabled',
+              stacked && 'text-left',
               'aria-pressed:bg-panel aria-pressed:font-semibold aria-pressed:text-fg aria-pressed:shadow-sm',
               focusRing,
             )}

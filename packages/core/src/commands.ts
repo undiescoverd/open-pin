@@ -1,7 +1,7 @@
-import type { Draft } from 'immer';
+import { current, type Draft } from 'immer';
 import { touch } from './draft';
 import type { Command } from './history';
-import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, type LayerMove } from './effects';
+import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, overlapsOn, type LayerMove } from './effects';
 import { blurRectAt } from './geometry';
 import {
   DEFAULT_FRAME,
@@ -140,6 +140,35 @@ export const commands = {
     };
   },
 
+  /**
+   * Copies a step's title, note, pause, zoom and annotations onto the frame at `time`. `annotationIds` gives the copies their ids, in
+   * order. Refused (no change) if another step already sits on that frame.
+   */
+  duplicateStep(args: { sourceStepId: string; stepId: string; annotationIds: string[]; time: number; now: number }): Command<Project> {
+    return {
+      label: 'Duplicate step',
+      run: d => {
+        const from = findStep(d, args.sourceStepId);
+        const src = d.sources.find(s => s.id === from.anchor.source);
+        if (!src) return;
+        const time = Math.min(Math.max(0, args.time), src.duration);
+        if (d.steps.some(s => s.anchor.source === src.id && sameFrame(s.anchor.time, time, src.fps))) return;
+        const annotations = from.annotations.map((a, i) => ({ ...structuredClone(current(a)), id: args.annotationIds[i] ?? `${a.id}_copy` }));
+        d.steps.push({
+          id: args.stepId,
+          anchor: { source: src.id, time },
+          title: from.title,
+          body: from.body,
+          minHold: from.minHold,
+          zoom: from.zoom ? structuredClone(current(from.zoom)) : null,
+          annotations,
+        });
+        sortSteps(d);
+        touch(d, args.now);
+      },
+    };
+  },
+
   /** Moves a step to another frame. Refused (no change) if another step sits there, so a drag stops at the last free spot. */
   moveStep(stepId: string, time: number, now: number): Command<Project> {
     return {
@@ -217,6 +246,21 @@ export const commands = {
           changed = true;
         }
         if (changed) touch(d, now);
+      },
+    };
+  },
+
+  /** Swaps an annotation for another of a different kind in the same place in the list, as when a highlight turns from a
+      spotlight into an outline. The replacement keeps the old one's id. */
+  replaceAnnotation(stepId: string, annotationId: string, annotation: Annotation, now: number, label = 'Change annotation'): Command<Project> {
+    return {
+      label,
+      run: d => {
+        const step = findStep(d, stepId);
+        const i = step.annotations.findIndex(a => a.id === annotationId);
+        if (i < 0) return;
+        step.annotations[i] = { ...annotation, id: annotationId };
+        touch(d, now);
       },
     };
   },
@@ -350,6 +394,46 @@ export const commands = {
           }
           for (const k of blur.keyframes) k.time = Math.max(0, k.time + delta);
         }
+        touch(d, now);
+      },
+    };
+  },
+
+  /**
+   * Hide's How long: sets a region's start and end outright (source seconds, kept on the recording and at least `MIN_REGION` long).
+   * Where that would overlap a neighbour on its layer, it moves to the lowest layer with room instead of stopping short, so the
+   * time asked for is the time it covers. Its keyframes stay where they are.
+   */
+  setBlurSpan(blurId: string, start: number, end: number, now: number, label = 'Change how long it is hidden'): Command<Project> {
+    return {
+      label,
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        const source = blur && d.sources.find(s => s.id === blur.source);
+        if (!blur || !source) return;
+        const D = source.duration;
+        let s = Math.min(Math.max(0, start), D), e = Math.min(Math.max(0, end), D);
+        if (e - s < MIN_REGION) [s, e] = e + MIN_REGION <= D ? [s, s + MIN_REGION] : [Math.max(0, D - MIN_REGION), D];
+        if (Math.abs(s - blur.start) < 1e-9 && Math.abs(e - blur.end) < 1e-9) return;
+        blur.start = s;
+        blur.end = e;
+        if (overlapsOn(d.blurs, blur.layer, s, e, blur.id)) {
+          blur.layer = freeLayer(d.blurs, s, e, blur.id);
+          compactLayers(d.blurs);
+        }
+        touch(d, now);
+      },
+    };
+  },
+
+  /** Replaces a region's whole stack of effects, as Hide's Look does with its one effect. */
+  setBlurEffects(blurId: string, effects: Effect[], now: number, label = 'Change look'): Command<Project> {
+    return {
+      label,
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        if (!blur) return;
+        blur.effects = effects.map(e => ({ ...e }));
         touch(d, now);
       },
     };
