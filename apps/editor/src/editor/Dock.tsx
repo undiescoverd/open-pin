@@ -1,11 +1,12 @@
 import { Button, cx } from '@waypost/ui';
 import { currentPlayback } from '../engine/session';
 import { selectProject, useEditor } from '../state/store';
+import { nextHint } from './nextHint';
 import { TOOLS } from './tools';
 
 /* The line under the frame, as wide as the frame: what the canvas is waiting for, or what just happened (docs/03-design-system.md,
-   "Editor layout"). The tools that used to sit here are the Add buttons at the top of the right panel now, so the frame gets the
-   height they took. */
+   "Editor layout"); when there's nothing to say, the next useful thing to do. The tools that used to sit here are the Add buttons at
+   the top of the right panel now, so the frame gets the height they took. */
 export function Dock() {
   return <StatusChip />;
 }
@@ -19,6 +20,7 @@ function StatusChip() {
   const tool = useEditor(s => s.tool);
   const project = useEditor(selectProject);
   const ready = useEditor(s => s.phase === 'ready');
+  const looked = useEditor(s => s.looked);
   const stepNumber = stoppedAt && project ? project.steps.findIndex(s => s.id === stoppedAt) + 1 : 0;
   const hint = TOOLS.find(t => t.id === tool)?.hint ?? '';
 
@@ -34,9 +36,16 @@ function StatusChip() {
   } else if (tool !== 'select') text = hint;
   /* before a recording is open the drop zone has its own message line */
   if (!ready) text = '';
+  const next = ready && !text && project ? nextHint(project, looked) : '';
 
   return (
-    <div className="flex h-[34px] w-full min-w-0 items-center justify-center">
+    <div className="relative flex h-[34px] w-full min-w-0 items-center justify-center">
+      {/* the hint sits where the status chip would be, and makes way for it */}
+      {next && (
+        <p data-testid="next-hint" className="absolute inset-x-0 m-0 truncate text-center text-xs text-fg-muted">
+          {next}
+        </p>
+      )}
       <div
         role="status"
         aria-live="polite"

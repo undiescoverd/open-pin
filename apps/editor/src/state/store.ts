@@ -119,6 +119,8 @@ export interface EditorState {
   previewOpen: boolean;
   /** the quick actions offered next to a click marker just dropped (Add callout · Highlight · Zoom here), until anything else happens */
   quick: { stepId: string; at: Point } | null;
+  /** whether the guide has been previewed or Export opened since the project opened, after which the next-step hint has no more to say */
+  looked: boolean;
 }
 
 const INITIAL: EditorState = {
@@ -147,6 +149,7 @@ const INITIAL: EditorState = {
   exportDialog: 'closed',
   previewOpen: false,
   quick: null,
+  looked: false,
 };
 
 export const useEditor = create<EditorState>(() => INITIAL);
@@ -321,7 +324,7 @@ export function setProjectsOpen(open: boolean): void {
   set({ projectsOpen: open });
 }
 export function setExportDialog(view: EditorState['exportDialog']): void {
-  set({ exportDialog: view });
+  set(view === 'closed' ? { exportDialog: view } : { exportDialog: view, looked: true });
 }
 /** Opens the guide preview (⌘↩), once there is a step to show. */
 export function setPreviewOpen(open: boolean): void {
@@ -331,7 +334,7 @@ export function setPreviewOpen(open: boolean): void {
     return;
   }
   if (open) currentPlayback()?.pause();
-  set({ previewOpen: open });
+  set(open ? { previewOpen: open, looked: true } : { previewOpen: open });
 }
 
 export function setZoom(zoom: number): void {
