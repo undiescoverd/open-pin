@@ -2,7 +2,9 @@
 
 Waypost should be immediately familiar to anyone who has used a video or guide editor, but look like its own product and be much easier to use than FramePin's editor. This doc covers what's wrong with FramePin's UI, the redesigned editor layout, and **PinKit**, our React component library and design tokens.
 
-**Clickable mockup:** [`design/mockup/editor.html`](../design/mockup/editor.html) puts this layout and these tokens into a working page: open it in Chrome. It has a sample project, all the tools, timeline editing, the guide preview, the Share dialog and the ⌘K command palette. Nothing is saved or exported; it's for judging the design before real code exists.
+**Design canvas:** "Waypost simple editor" on claude.ai (boards 1 to 5, light and dark, drawn at 1440×900) is the visual reference for the layout below: https://claude.ai/artifact/BUeKy3swhxrWXYrDdfaGgy (private to its owner). [06 — Simplify plan](06-simplify-plan.md) describes every screen in words.
+
+**The clickable mockup** ([`design/mockup/editor.html`](../design/mockup/editor.html)) shows the layout from before Phase 4 (lanes always open, a tool palette under the frame, Share and an Export menu). It is retired as the layout reference. It stays in the repository only because it is still the working reference for narration and music, which aren't built yet ([05](05-editor-interactions.md), sections 2 and 6).
 
 ## Lessons from FramePin's editor
 
@@ -11,52 +13,91 @@ From the editor screenshot (described in [01-feature-analysis.md](01-feature-ana
 | # | Problem | Effect | Waypost fix |
 |---|---|---|---|
 | 1 | **Three stacked navigation layers** in the left panel: header buttons (Export/Widget), a button group (Settings/Blur Info/Voice Over), then tabs (Frames/Background/Logo). | You can't tell which are modes, which are panels and what "Settings" means. | One **context inspector** on the right that shows the properties of whatever is selected. Project-wide options live in one "Guide" panel with clear sections. Blur and voice become tools and timeline lanes, not modes. |
-| 2 | **The main action is hidden.** You create a step by "clicking on the screen", explained only in an empty state; the blue pin button has no label. | New users don't know how to start. | A labelled **Pin tool (P)** in the canvas toolbar and a **"+ Pin step"** button at the top of the step list, both with shortcut hints. |
+| 2 | **The main action is hidden.** You create a step by "clicking on the screen", explained only in an empty state; the blue pin button has no label. | New users don't know how to start. | **+ Add step** (⇧P) at the top of the Steps list, a labelled **Click** button (P) among the Add buttons, and a quiet next-step hint under the frame that says what to do next. |
 | 3 | **Wasted space.** The left panel is almost empty; black gutters around the canvas; the clip fills half the timeline and the rest is dead space. | The video is smaller than it needs to be, and the timeline is hard to read. | The canvas fits the available space. The timeline **fits to width** by default with a zoom slider. The step list shows real content (thumbnails and titles). |
 | 4 | **Low contrast.** Grey-on-near-black text, barely visible tracks, faint disabled buttons. | Hard to read, especially on a laptop in daylight. | Tokens checked against WCAG AA: 4.5:1 for text, 3:1 for UI shapes. |
 | 5 | **Cryptic labels.** A clip labelled `0 [17.775]`; speed buttons `x5 x2 1 1/2 1/3` with no hint whether they change preview or clip speed; look-alike icon-only transport buttons. | Guesswork. | Readable clip labels ("Clip 1 · 0:00–0:09 · 1×"). Clip speed lives in the clip's inspector; preview speed is a separate, labelled dropdown. Every icon button has a tooltip with its shortcut. |
 | 6 | **Two unrelated accents:** blue for buttons and tabs, orange for the playhead, with no meaning behind either. | Visual noise. | Colors have jobs: **coral = steps and the primary action**, **teal = "where you are"** (playhead, selection, focus). Nothing else is colored. |
-| 7 | **Outputs in the wrong place.** Export and Widget sit in the left sidebar header. | The most important finishing actions are hard to find. | A top bar with **Preview**, **Export ▾** and a primary **Share** button on the right, where people expect them. |
-| 8 | **Steps aren't visible as steps.** No list of pinned frames with titles, and no step markers on the timeline. | Hard to see the guide's structure. | A step rail with numbered cards, plus a dedicated **Steps** lane on the timeline with numbered markers. |
+| 7 | **Outputs in the wrong place.** Export and Widget sit in the left sidebar header. | The most important finishing actions are hard to find. | A top bar with **Preview** and one primary **Export** button on the right, where people expect them. Export opens one dialog for the guide, the video, the PDF and the images. |
+| 8 | **Steps aren't visible as steps.** No list of pinned frames with titles, and no step markers on the timeline. | Hard to see the guide's structure. | A Steps list with numbered rows that open into a step card, plus numbered pins above the filmstrip (and a dedicated **Steps** lane in the full timeline). |
 | 9 | **Shouty empty lane:** "ADD BACKGROUND AUDIO" in caps inside a big dashed box. | Draws attention away from the work. | A compact "+ Add music" button on a labelled Music lane. |
 | 10 | **Unexplained checkerboard** around the recording. | Looks like a rendering glitch. | Framing is shown as the real background (gradient/color) once chosen, with a "Frame" section in the Guide panel. |
 | 11 | **Undo without redo**, no visible shortcuts. | Mistakes are costly. | Undo/redo in the top bar, ⌘Z / ⇧⌘Z, and a ⌘K command palette that lists every action with its shortcut. |
 
 ## Editor layout
 
+Phase 4 made the editor simple by default ([06 — Simplify plan](06-simplify-plan.md)): steps are the unit of work, adding is always in one place, and precise controls sit in a collapsed **Advanced** section at the end of each panel. Nothing was removed from the engine; the full timeline is one click away behind **Trim & edit video**.
+
+### First run
+
 ```
-┌────────────────────────────────────────────────────────────────────────────────────┐
-│ ◆ Waypost  ‹ Projects   Onboarding flow ▾   ↶ ↷      Preview   Export ▾   [Share]  │
-├──────────────┬──────────────────────────────────────────────────┬──────────────────┤
-│ STEPS  + Pin │ ┌────────────────────────────────────────────┐   │ INSPECTOR        │
-│              │ │                                            │   │ Step 2           │
-│ ┌──────────┐ │ │                                            │   │ Title            │
-│ │1 [thumb] │ │ │  recording on its background,              │   │ [Click the gear] │
-│ │Open Sett…│ │ │  with annotations                          │   │ Note             │
-│ └──────────┘ │ │                                            │   │ [              ] │
-│ ┌──────────┐ │ │                                            │   │ Hold    2.5 s    │
-│ │2 [thumb] │ │ └────────────────────────────────────────────┘   │ Zoom    on       │
-│ │Click gear│ │ [▸Select ⌖▢↗▭⊕▦  Stopped at 2   Edit|Viewer ]    │ Annotations      │
-│ └──────────┘ │                                                  │  1 Click marker  │
-│              │                                                  │  2 Callout       │
-│              │                                                  │ Narration  TTS   │
-├──────────────┴──────────────────────────────────────────────────┴──────────────────┤
-│ 0:04.98 / 0:17.78   ⇤ step  ◀ frame  ▶ Play  frame ▶  step ⇥ Preview 1× ▾ zoom ─○─ │
-│ 0s       2        4        6        8        10       12       14       16         │
-│ Steps          ①                    ②                       ③                      │
-│ Video  [ Clip 1 · 0:00–0:09 · 1×            ][ Clip 2 · 0:09–0:17 · 2×       ]     │
-│ Effects ▬▬▬▬▬▬▬▬▬▬▬                                                                │
-│ Voice          ▭▭▭▭                 ▭▭▭▭▭                   ▭▭▭                    │
-│ Music  + Add music                                                                 │
-└────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ ◆ Waypost                                                              ‹ Projects  ◐   │
+│ ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐ │
+│ ╎                                                                                    ╎ │
+│ ╎                                       (film)                                       ╎ │
+│ ╎                            Drop a screen recording here                            ╎ │
+│ ╎      MP4, MOV, WebM or MKV, from QuickTime, Loom, OBS or any other recorder.       ╎ │
+│ ╎                   [Choose a recording…]  [Open a project file…]                    ╎ │
+│ ╎                                                                                    ╎ │
+│ ╎                  ① Add steps     ② Explain each one     ③ Export                   ╎ │
+│ ╎             Your recording stays in this browser. Nothing is uploaded.             ╎ │
+│ ╎                                                                                    ╎ │
+│ └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘ │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Top bar:** app mark, back to Projects, editable project name, undo/redo, then Preview, an Export menu (MP4, PDF, Screenshots, Guide folder) and the primary **Share** button (publishes the guide and copies the embed snippet).
-- **Step rail (left):** numbered step cards with thumbnail and title; drag to reorder in time; selecting a card jumps the playhead there. A small warning badge marks orphaned steps.
-- **Canvas (centre):** the frame, with its top edge level with the top of the Steps rail and the Inspector so it gets all the height there is, and a **dock** under it, as wide as the frame and always the same height: the tools on the left (the picked tool shows its name when there is room), what the canvas is waiting for or what just happened in the middle (up to two lines of small text, the rest in a tooltip, so the frame never resizes when a message comes and goes), and the **Edit / Viewer** switch on the right. In a narrow window the status drops to a row of its own, and the switch wraps if the tools leave it no room. *Edit* shows every annotation at once with handles and the dashed zoom box. *Viewer* shows the step exactly as the published guide does: the zoom eases in and annotations appear in their reveal order, and leaving the step (Continue or Play, or switching back to Edit) eases back out, the zoom returning to the whole frame as the annotations fade, instead of cutting. Playback always uses the viewer rendering and stops on every pin until you click Continue, press Space or click the frame. The Pin tool (P) pins the current frame and drops a click marker where you click.
-- **Inspector (right):** context-driven, in the style of DaVinci Resolve's inspector. The first tab is **Inspector** and shows collapsible groups for whatever is selected: Step, Annotation, Effect region, Narration, Music or Clip. Every value is a slider with a number box and a reset button (double-click a name to reset it), and times are typed as timecodes. An effect region has an Effects stack (any number of effects, applied in order, each switchable and reorderable), a Layer group (forward, backward, front, back), Timing (start, end, length, fades) and Position and size in pixels; Narration and Music have Timing, fades, volume, mute and ducking. The second tab, **Guide**, holds the project-wide options: Frame (background, padding, corners, shadow, aspect), Logo, Player (mode, controls, accent, CTA), Audio (original, voice, music) and Analytics.
-- **Timeline (bottom):** one header row with the timecode at the left, the transport in the middle and snapping, ripple and timeline zoom at the right; ruler; labelled lanes for Steps, Video, Effects, Voice and Music (Steps always on top, picture over sound, Music always last). Teal playhead, which only the **ruler** moves; clicking in a lane never scrubs. Pins, blur bars, voice bars and the music bar drag to move, and the edges of blur, voice and music bars drag to trim (stretching a voice bar changes its speaking speed). The edges of a clip on the Video lane drag to trim it: with **ripple trim** on (the default, ⇧R toggles it) the clips ripple and everything after moves up; with it off, the trim leaves a hatched **gap** and nothing else moves (select a gap to resize or close it, and the last frame of the previous clip holds through it). Trimmed footage can be dragged back out, and a trim stops at any pinned step. A **magnet** button (N) turns on snapping: edges snap to the nearest edge on any lane, the playhead and the ends of the guide (clip trims snap to a pin's frame, a blur edge, another clip's edge or the playhead), with an amber guide line; holding Alt flips it for one drag. Split at playhead with R. Transport keys follow DaVinci Resolve's J K L: **L** plays forward (press again for 2×, then 4×), **J** plays backward the same way, **K** plays or pauses (like Space), and all of them stop at every pinned step. **⇧L** / **⇧J** jump to the next / previous edit (any cut, pin, or start or end of a blur, voice or music bar), **⌘,** plays from the very start, **⌘.** jumps to the very end, and **=** / **-** zoom the timeline in and out (1× to 8×, following the playhead). The lanes are resizable, and the timeline fits to width until you zoom.
-- **Empty project:** the canvas becomes a drop zone ("Drop a screen recording: MP4, MOV, WebM, MKV", Browse…, Record screen) with a three-step hint: *1. Pin the moments that matter (P) · 2. Point things out · 3. Share*.
+Until there is a recording, the whole window is one drop zone (a file dropped anywhere opens too). Only the logo, **Projects** (projects saved in this browser) and the theme button sit above it. A recording the browser can't open says what to do ("Open it in QuickTime Player, choose File › Export As › 1080p…").
+
+### Editing a step
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ ◆ Waypost ‹Projects  Onboarding flow  Saved    ↶ ↷ ◐  [Preview] [Export]               │
+├─────────────────┬───────────────────────────────────────────────┬──────────────────────┤
+│ STEPS 3  [+Add] │ ┌───────────────────────────────────────────┐ │ ADD TO STEP 2        │
+│ ┌─────────────┐ │ │                                           │ │ [Callout] [Arrow]    │
+│ │1 [thumb]    │ │ │   recording on its background,            │ │ [Highlight][Zoom]    │
+│ │Open the menu│ │ │   with annotations and handles            │ │ [Hide]    [Click]    │
+│ └─────────────┘ │ │                                           │ │ ──────────────────── │
+│ ┌─────────────┐ │ │      ◎ ┌───────────────────────────────┐  │ │ Callout · Step 2     │
+│ │2 [thumb]    │ │ │        │Add callout·Highlight·Zoom here│  │ │ Words  [_______]     │
+│ │Title  [____]│ │ │        └───────────────────────────────┘  │ │ Colour ● ● ● ●       │
+│ │Note   [____]│ │ │                                           │ │ › Advanced           │
+│ │On this step │ │ └───────────────────────────────────────────┘ │ Remove callout       │
+│ │[Click][Call]│ │            Give step 3 a title                │                      │
+│ │Waits for a  │ │                                               │                      │
+│ │click…  [Dup]│ │                                               │                      │
+│ │› Advanced   │ │                                               │                      │
+│ └─────────────┘ │                                               │                      │
+├─────────────────┴───────────────────────────────────────────────┴──────────────────────┤
+│ 0:04.98 / 0:17.78    ⇤ ◀ ▶ ▶ ⇥    Playback stops at every step [Trim & edit video]     │
+│        ①              ②                   ③                                            │
+│ ▕[ the whole recording as one strip    ▒▒ Hidden during step 2 ▒▒           ]▏         │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Top bar:** app mark, back to Projects, the editable project name and "Saved", then undo and redo, the theme, and **Preview** and **Export** (primary). That's all.
+- **Steps (left):** **+ Add step** (⇧P) at the top, then one row per step (thumbnail, number, title, and a one-line summary such as "Click marker · Callout"). The selected step opens in place as the **step card**: **Title**; **Note** (optional, the body text of the PDF and the guide); **On this step**, chips for what's on it (Click marker, Callout, Zoom…) that select it on the frame; a footer saying how the step behaves in words ("Waits for a click, or 2.5 s in a video") with **Duplicate** (⌘D, which copies the step onto the frame at the playhead); and **Advanced**: exact time, pause and appearing order.
+- **Canvas (centre):** the frame, with its top edge level with the top of the Steps list and the right panel so it gets all the height there is. Click a thing to select it and drag it to move it. Under the frame is one line, as wide as the frame and always the same height: what the canvas is waiting for or what just happened ("Stopped at step 2" with **Continue**), and otherwise the **next-step hint**, one quiet suggestion ("Press Add step where the viewer should click", "Give step 2 a title", "Preview it, then Export") that says nothing once the guide has been previewed or Export opened. While paused, the frame shows every annotation with handles and the dashed zoom box. Playback shows each step as the viewer sees it (the zoom eases in, annotations appear in their order) and stops at every step until Continue, Space or a click on the frame.
+- **Quick actions:** right after a click marker drops (the Click button or the P tool), a small bar next to it offers **Add callout · Highlight · Zoom here**, each placed around the click. It goes away as soon as you do anything else.
+- **Right panel: Add, then adjust.** It always starts with **Add to step N** (or *Add to a new step* on a frame without one): six large labelled buttons, **Callout, Arrow, Highlight, Zoom, Hide** and **Click**. One click puts the item on the frame, selected, around the step's click when there is one and otherwise in the middle. The keys (C, A, H, Z, X, P) pick the matching tool instead, to draw the item exactly where you click or drag, and show in each button's tooltip. Below the buttons the panel shows only the selected item's few simple controls, then its **Advanced**, then **Remove**:
+
+  | Item | Simple controls | Under Advanced |
+  |---|---|---|
+  | Callout | The step's title and note, or your own words; colour | Side, exact position, when it appears |
+  | Arrow | Colour | Exact ends, when it appears |
+  | Highlight | Spotlight or outline | Exact box, when it appears |
+  | Zoom | How close (1.25× to 4×) | Exact area, centre on the click |
+  | Hide | Look (Cover, Pixelate or Blur; Cover by default), strength, how long (*This step only*, *From here to the end*, *The whole video*) | Name, the effect stack, opacity, layers, timing and fades, exact position and size, keyframes for following a moving thing |
+  | Click | Nothing (drag it) | Position, colour, when it appears |
+  | Clip, gap (full timeline only) | Trim (In, Out, Plays for), speed, volume and mute; a gap's length | — |
+
+  The panel's second tab, **Guide**, holds the recording and where the project is saved. How the guide plays, the end button, the player's look, framing, background and logo are in Export.
+- **Filmstrip (bottom):** the timecode, the transport and "Playback stops at every step" in one header row with **Trim & edit video** at the right; under it one strip of the whole recording with the numbered pins above it. Click a pin to go to its step and drag it to move it in time; click the strip to move the playhead; trim handles sit at both ends. Hidden areas show as tinted bars on the strip ("Hidden during step 2").
+- **Trim & edit video** swaps the filmstrip for the full timeline, and **Done** comes back; the choice is remembered per project. The full timeline has the ruler and labelled lanes for Steps, Video, Effects, Voice and Music (Steps always on top, picture over sound, Music always last). Teal playhead, which only the **ruler** moves; clicking in a lane never scrubs. Pins and effect bars drag to move, and their edges drag to trim. The edges of a clip on the Video lane drag to trim it: with **ripple trim** on (the default, ⇧R toggles it) everything after moves up; with it off, the trim leaves a hatched **gap** (the last frame holds through it). A trim stops at any pinned step. A **magnet** button (N) turns on snapping to every edge, the playhead and the ends, with an amber guide line; holding Alt flips it for one drag. Split at the playhead with R. J K L shuttle as in DaVinci Resolve (and stop at every step), ⇧L / ⇧J jump between edits, and = / - zoom the timeline. These keys work in both views, but only the full timeline shows the controls they drive; [05](05-editor-interactions.md) has the exact behaviour.
+- **Preview** (⌘↩) opens the guide in the real player **at the selected step** (on the start card when nothing is selected). Esc closes it and selects the step it was showing.
+- **Export** opens one dialog: **What to export** (*Interactive guide*, *Video*, *PDF*, *Images*), then only what matters for it: how the guide plays (*Viewer clicks Next*, *Plays by itself*, *Plain video*) and its button at the end; the video's size, captions and sound (with a plain note about which parts are silent); the PDF's page size; the images' format. Its **Advanced** holds the end button's timing, the player's accent, colours and controls, folder or zip with a PDF copy, and the framing, background and logo every export draws. After an interactive guide is saved, it shows the link and the embed code, with plain-words help for GitHub Pages, Netlify and Cloudflare Pages. "Publish online, coming later" sits at the bottom.
 
 ## Identity: "Coral & Graphite"
 
@@ -173,12 +214,14 @@ React components built on Radix primitives (for keyboard, focus and screen-reade
 - `EmptyState`: icon, headline, body, actions.
 - `Badge`, `Chip`, `Toast` ("Exported 12 screenshots"), `ProgressDialog` (export/publish progress with cancel).
 
-### Editor-specific
-- `Timeline`: ruler with zoom, lanes, snapping.
-  - `ClipBlock` (trim handles, readable label, speed badge), `StepMarker` (numbered coral pin, draggable), `EffectBar` (one row per layer), `VoiceBlock`, `MusicLane`, `Playhead` (teal, with grip).
-- `CanvasStage`: composited frame plus a selection overlay (resize/rotate handles, snapping guides, click-marker placement).
-- `ToolPalette`: Select, Pin, Callout, Arrow, Spotlight, Box, Zoom, Blur.
-- `RevealOrderList`: reorderable reveal groups for the selected step.
+### Editor-specific (in `apps/editor/src/editor`)
+- `FirstRun`: the full-window drop zone before there is a recording.
+- `StepRail`: the Steps list, with the selected step open as its step card.
+- `CanvasView` and `AnnotationOverlay`: the composited frame plus the selection overlay (handles, drawing, click-marker placement); `QuickActions` is the bar after a pin; `Dock` is the line under the frame (status, or the next-step hint).
+- `AddPanel` and `Inspector`: the Add buttons, then the selected item's simple controls, its Advanced and Remove.
+- `Filmstrip`: the default view of time (pins, hidden-area bars, trim handles).
+- `Timeline`: the full timeline behind Trim & edit video: ruler with zoom, lanes, snapping, clip blocks with trim handles and speed badges, numbered step markers, effect bars (one row per layer), the Voice and Music lanes, the teal playhead.
+- `ExportDialog` and `PreviewDialog`.
 
 ### Player counterparts
 The player has its own tiny CSS (no React) using the same tokens: `wp-stage`, `wp-controls`, `wp-progress` (with step markers), `wp-counter`, `wp-cta`, `wp-start` (the "Start guide" overlay). The guide's accent overrides `--wp-accent`.
@@ -206,15 +249,15 @@ Chosen to avoid the browser shortcuts a web page can't override (⌘T, ⌘W, ⌘
 | Play from the very start / jump to the very end | ⌘, / ⌘. |
 | Zoom the timeline in / out | = / - |
 | Select the layer below / above | ⇧K / ⇧I |
-| Pin step at playhead | ⇧P |
-| Tools: select, pin, callout, arrow, spotlight, box, zoom, blur | V, P, C, A, S, B, Z, X |
+| Add step at playhead | ⇧P |
+| Duplicate the selected step onto the frame at the playhead | ⌘D |
+| Tools: select, click (pin), callout, arrow, highlight, zoom, hide | V, P, C, A, H, Z, X (S and B pick the spotlight and outline highlights) |
 | Split clip at playhead | R |
 | Snapping on/off (hold Alt to flip it for one drag) | N |
 | Ripple trim on/off | ⇧R |
 | Delete selection | ⌫ |
 | Undo / redo | ⌘Z / ⇧⌘Z |
-| Command palette | ⌘K |
-| Preview guide | ⌘↩ |
-| Export menu | ⌘E |
+| Command palette (not built yet; its top-bar button is disabled) | ⌘K |
+| Preview guide, at the selected step | ⌘↩ |
 
-L, J and K follow DaVinci Resolve and, like Space, stop at every pinned step. On Windows and Linux use Ctrl in place of ⌘. Some browsers keep ⌘, for their own settings; if yours does, use the command palette's "Play from the very start".
+L, J and K follow DaVinci Resolve and, like Space, stop at every pinned step. On Windows and Linux use Ctrl in place of ⌘. Some browsers keep ⌘, for their own settings. There is no Export shortcut: ⌘E was the old Export menu, and the Export button replaced it.

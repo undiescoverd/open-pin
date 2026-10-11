@@ -125,7 +125,7 @@ One **Export** button, one dialog.
 
 For whoever (or whichever chat) builds this next.
 
-**Read first:** this file, the Phase 4 list in [04-roadmap.md](04-roadmap.md), then [03-design-system.md](03-design-system.md) and [05-editor-interactions.md](05-editor-interactions.md) for how the editor works today. Those two still describe the old layout. Updating them is the last Phase 4 item.
+**Read first:** this file, the Phase 4 list in [04-roadmap.md](04-roadmap.md), then [03-design-system.md](03-design-system.md) and [05-editor-interactions.md](05-editor-interactions.md) for how the editor works today. (Phase 4 is built; those two describe the new layout, and the roadmap's "Phase 4 as built" lists where it differs from this plan.)
 
 **The screens:** the design canvas "Waypost simple editor" is the visual reference (boards 1 to 5, light and dark). It lives on claude.ai, not in this repository, and it's private to its owner: https://claude.ai/artifact/BUeKy3swhxrWXYrDdfaGgy. Its boards are drawn at 1440×900. If the canvas isn't available, the "The screens" section above describes every panel in words.
 
