@@ -73,6 +73,8 @@ export function urlMedia(base: string): GuideMedia {
 class VideoDriver implements SegmentDriver {
   private readonly videos: HTMLVideoElement[];
   private current: HTMLVideoElement | null = null;
+  /** ends the segment that is waiting, so a retry that fails after a pause doesn't leave the player stuck */
+  private settle: (() => void) | null = null;
 
   constructor(
     surface: SegmentSurface,
@@ -122,8 +124,10 @@ class VideoDriver implements SegmentDriver {
         v.removeEventListener('ended', done);
         v.removeEventListener('error', done);
         signal.removeEventListener('abort', done);
+        if (this.settle === done) this.settle = null;
         resolve();
       };
+      this.settle = done;
       v.addEventListener('ended', done);
       v.addEventListener('error', done);
       signal.addEventListener('abort', done);
@@ -143,7 +147,10 @@ class VideoDriver implements SegmentDriver {
   }
 
   resume(): void {
-    void this.current?.play().catch(() => undefined);
+    /* a pause before playback began left the play() AbortError pending; this retry is the one that plays it */
+    this.current?.play().catch((e: unknown) => {
+      if ((e as Error | null)?.name !== 'AbortError') this.settle?.();
+    });
   }
 
   progress(): number {

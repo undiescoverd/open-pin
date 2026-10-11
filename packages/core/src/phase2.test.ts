@@ -267,6 +267,12 @@ describe('loading a project checks how its fields fit together', () => {
     expect(() => parseProject({ ...p, logo: { asset: 'nope', corner: 'br', size: 0.1, opacity: 1 } })).toThrow(/logo|valid/);
   });
 
+  it('refuses a clip, step or blur that runs past the end of its recording', () => {
+    const p = fresh();
+    expect(() => parseProject({ ...p, timeline: [{ ...p.timeline[0]!, out: 99 }] })).toThrow(/timeline\.0\.out/);
+    expect(() => parseProject({ ...p, steps: [{ id: 's', anchor: { source: 'src1', time: 99 }, title: '', body: '', annotations: [] }] })).toThrow(/anchor/);
+  });
+
   it('a step never moves off the clips, where it would drop out of the guide', () => {
     let p = run(fresh(), clipCommands.trimClip('c_src1', 'out', 5, true, 3), pin('s1', 5));
     p = run(p, commands.moveStep('s1', 5 + 1 / 30, 4));
