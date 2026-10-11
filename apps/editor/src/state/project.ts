@@ -24,8 +24,11 @@ async function thumbnailOf(media: MediaHandle): Promise<Blob | undefined> {
   try {
     const bitmap = await media.frame(0, THUMB_WIDTH);
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-    canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
-    bitmap.close();
+    try {
+      canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
+    } finally {
+      bitmap.close();
+    }
     return await canvas.convertToBlob({ type: 'image/webp', quality: 0.8 });
   } catch {
     return undefined;
@@ -36,6 +39,9 @@ async function thumbnailOf(media: MediaHandle): Promise<Blob | undefined> {
 async function present(project: Project): Promise<void> {
   const source = project.sources[0];
   if (!source) throw new Error('This project has no recording.');
+  /* an edit still waiting for autosave goes to disk first, so it can't land on top of the project being opened; if it can't,
+     the current project stays open with its changes */
+  if (!(await flushSave())) throw new Error("Your last changes to the open guide couldn't be saved, so it stays open. Try again, or save a project file.");
   const file = await readSource(project.id, source.file);
   const media = await mediaClient().open(file);
   releaseCurrent();
@@ -112,13 +118,14 @@ export async function importRecording(file: File): Promise<void> {
     return;
   }
   patchEditor({ busy: 'Reading the recording…' });
+  let id: string | undefined;
   try {
     const probe = await mediaClient().open(file);
     const info = probe.info;
     probe.close();
     patchEditor({ busy: 'Saving it in this browser…' });
     await requestPersistence();
-    const id = newId('p');
+    id = newId('p');
     const sourceId = newId('src');
     const path = sourcePath(sourceId, file.name);
     await writeSource(id, path, file);
@@ -136,6 +143,7 @@ export async function importRecording(file: File): Promise<void> {
     notify('Recording ready. Press P, then click the frame where viewers should click.');
   } catch (error) {
     patchEditor({ busy: null });
+    if (id) await discardUnopened(id);
     notify(describe(error, "Couldn't open that recording."), 'error');
   }
 }
@@ -173,14 +181,16 @@ export async function restoreLastProject(): Promise<void> {
 
 export async function openWaypost(file: File): Promise<void> {
   patchEditor({ busy: 'Opening project file…', projectsOpen: false });
+  const id = newId('p');
   try {
-    const project = await openWaypostFile(file, newId('p'));
+    const project = await openWaypostFile(file, id);
     await present(project);
     const media = getEditor().media;
     await putEntry(entryFor(project, media ? await thumbnailOf(media) : undefined));
     notify(`Opened ${project.name}. It's now a copy in this browser.`);
   } catch (error) {
     patchEditor({ busy: null });
+    await discardUnopened(id);
     notify(describe(error, "That file isn't a Waypost project."), 'error');
   }
 }
@@ -202,7 +212,28 @@ export async function saveWaypost(): Promise<void> {
   }
 }
 
+/** Removes the folder of a project that failed before it opened, so a half-copied recording doesn't fill the storage unseen. */
+async function discardUnopened(id: string): Promise<void> {
+  /* the project may already be on screen (a failed save after it opened), so it is closed as well */
+  if (selectProject(getEditor())?.id === id) {
+    await deleteProject(id).catch(() => undefined);
+    return;
+  }
+  await deleteProjectFiles(id).catch(() => undefined);
+}
+
+/** Drops the autosave still waiting for this project, so it can't bring the folder and list entry back. */
+function dropPending(id: string): void {
+  if (pending?.id !== id) return;
+  clearTimeout(timer);
+  pending = null;
+}
+
 export async function deleteProject(id: string): Promise<void> {
+  dropPending(id);
+  await writing;
+  /* a write that was in flight may have failed and put the change back: drop it again before the files go */
+  dropPending(id);
   if (selectProject(getEditor())?.id === id) {
     releaseCurrent();
     resetEditor();
@@ -226,28 +257,34 @@ export function closeProject(): void {
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let pending: Project | null = null;
-let writing: Promise<void> = Promise.resolve();
+let writing: Promise<boolean> = Promise.resolve(true);
 
-async function write(project: Project): Promise<void> {
-  patchEditor({ save: 'saving' });
+/** Resolves true when the project is on disk. A failure keeps the change pending, so the next flush tries it again. */
+async function write(project: Project): Promise<boolean> {
+  const current = () => selectProject(getEditor())?.id === project.id;
+  if (current()) patchEditor({ save: 'saving' });
   try {
     await saveProject(project);
     const previous = await getEntry(project.id);
     await putEntry(entryFor(project, previous?.thumb));
-    if (selectProject(getEditor())?.id === project.id) patchEditor({ save: 'saved' });
+    if (current()) patchEditor({ save: 'saved' });
+    return true;
   } catch {
+    pending ??= project;
     patchEditor({ save: 'error' });
     notify("Couldn't save to this browser's storage. Keep a copy with Save project file.", 'error');
+    return false;
   }
 }
 
 /** Writes any change not yet on disk. Called on tab hide and before saving a file. */
-export function flushSave(): Promise<void> {
+export function flushSave(): Promise<boolean> {
   clearTimeout(timer);
   const project = pending;
   pending = null;
   if (project) writing = writing.then(() => write(project));
-  return writing;
+  /* with nothing to write, the answer is whether an earlier write failed and its change is still waiting */
+  return project ? writing : writing.then(() => pending === null);
 }
 
 /** Saves a moment after each change, so typing doesn't write on every key. */

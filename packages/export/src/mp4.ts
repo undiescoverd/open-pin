@@ -168,7 +168,12 @@ export async function encodePlan(job: PlanEncode): Promise<{ frames: number; vid
     output.addAudioTrack(audio);
   }
   output.setMetadataTags({ title: project.name });
-  await output.start();
+  try {
+    await output.start();
+  } catch (error) {
+    await output.cancel().catch(() => undefined);
+    throw error;
+  }
 
   const sound = audio && audioTrack ? soundtrack(segments, new AudioSampleSink(audioTrack), audioTrack.sampleRate, Math.min(CHANNELS, audioTrack.numberOfChannels)) : null;
   let pending: AudioSample | null = null;
@@ -225,8 +230,8 @@ export async function encodePlan(job: PlanEncode): Promise<{ frames: number; vid
     job.onProgress(total, total);
     await output.finalize();
   } catch (error) {
-    await frames.return(undefined);
-    await output.cancel();
+    await frames.return(undefined).catch(() => undefined);
+    await output.cancel().catch(() => undefined);
     throw error;
   } finally {
     (pending as AudioSample | null)?.close();

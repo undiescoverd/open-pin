@@ -107,12 +107,21 @@ export function outputAspect(frame: Pick<Frame, 'aspect'>, source: Size2): numbe
 }
 
 /**
+ * The padding actually used: a share of the output's width, held back on wide shapes so the space it leaves above and below the
+ * recording is never more than half the height (at 21:9 a quarter of the width each side would leave no room at all).
+ */
+function paddingFor(frame: Pick<Frame, 'aspect' | 'padding'>, source: Size2): number {
+  const ar = outputAspect(frame, source);
+  return Math.min(frame.padding, 1 / (4 * ar));
+}
+
+/**
  * The output size that keeps the recording at its own pixel size inside the padding: the smallest frame of the chosen shape
  * whose inner area holds the whole recording. Even numbers, since video encoders need them.
  */
 export function nativeOutputSize(frame: Pick<Frame, 'aspect' | 'padding'>, source: Size2): Size2 {
   const ar = outputAspect(frame, source);
-  const p = frame.padding;
+  const p = paddingFor(frame, source);
   const width = Math.max(source[0] / (1 - 2 * p), source[1] / (1 / ar - 2 * p));
   return [even(width), even(width / ar)];
 }
@@ -134,7 +143,7 @@ export interface FrameLayout {
 /** Where the recording sits in an output of `size`: centred in the space the padding leaves, keeping its shape. */
 export function frameLayout(frame: Pick<Frame, 'aspect' | 'padding'>, source: Size2, size: Size2): FrameLayout {
   const [W, H] = size;
-  const pad = frame.padding * W;
+  const pad = paddingFor(frame, source) * W;
   const boxW = Math.max(1, W - 2 * pad), boxH = Math.max(1, H - 2 * pad);
   const scale = Math.min(boxW / source[0], boxH / source[1]);
   const w = source[0] * scale, h = source[1] * scale;

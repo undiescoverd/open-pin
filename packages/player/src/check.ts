@@ -23,7 +23,7 @@ export function checkGuide(value: unknown): Guide {
   if (g.schema !== GUIDE_SCHEMA) throw new GuideError("guide.json isn't a Waypost guide.");
   if (!isSize(g.size) || !isSize(g.sourceSize) || !g.frame || !g.playback || !g.branding) throw new GuideError('guide.json is incomplete.');
   if (!Array.isArray(g.steps) || g.steps.length === 0) throw new GuideError('This guide has no steps.');
-  const paths = [g.poster, g.background, g.logo?.image, g.outro?.file, ...g.steps.flatMap(s => [s.still, s.segment?.file])].filter(p => p != null);
+  const paths = [g.poster, g.background, g.logo?.image, g.outro?.file, g.fonts?.regular, g.fonts?.semibold, ...g.steps.flatMap(s => [s.still, s.segment?.file])].filter(p => p != null);
   if (!paths.every(isGuidePath)) throw new GuideError('guide.json points at files outside its folder.');
   if (g.cta && !/^https?:\/\//i.test(g.cta.url)) throw new GuideError('The call to action needs a web address.');
   return g as Guide;

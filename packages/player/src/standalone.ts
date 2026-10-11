@@ -16,9 +16,10 @@ function scan(root: ParentNode): void {
   for (const el of found) {
     const url = el.dataset.waypost?.trim();
     const mounted = players.get(el);
-    if (!url || mounted?.url === url) continue;
+    if (mounted?.url === url) continue;
     mounted?.player.destroy();
-    players.set(el, { url, player: mount(el, url) });
+    if (url) players.set(el, { url, player: mount(el, url) });
+    else players.delete(el);
   }
 }
 

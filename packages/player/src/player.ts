@@ -692,6 +692,7 @@ export class Player implements PlayerHandle {
     this.abort?.abort();
     this.spin(false);
     for (const o of this.observers) o.disconnect();
+    this.root.removeEventListener('fullscreenchange', this.onFullscreen);
     document.removeEventListener('fullscreenchange', this.onFullscreen);
     this.driver?.dispose();
     this.root.innerHTML = '';

@@ -154,7 +154,8 @@ function applyEffect(wctx: Ctx, effect: Effect, x: number, y: number, w: number,
       cctx.drawImage(wctx.canvas as AnyCanvas, x, y, w, h, 0, 0, cols, rows);
       wctx.imageSmoothingEnabled = false;
       wctx.clearRect(x, y, w, h);
-      wctx.drawImage(cells, 0, 0, cols, rows, x, y, cols * block, rows * block);
+      /* back over exactly the area it averaged, so each block sits on the pixels it stands for */
+      wctx.drawImage(cells, 0, 0, cols, rows, x, y, w, h);
       break;
     }
     case 'blur': {

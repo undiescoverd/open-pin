@@ -138,6 +138,12 @@ export async function exportMp4(options: Mp4Options): Promise<void> {
   try {
     const [recording, regular, semibold] = await Promise.all([readSource(project.id, source.file), fontBytes(figtree400), fontBytes(figtree600)]);
     const assets = await workerAssets(project, state.assetImages);
+    /* a Cancel while the files were being read comes before the worker's job, which would otherwise forget it */
+    if (cancelled) {
+      for (const [, image] of assets) image.close();
+      notify('Export cancelled.');
+      return;
+    }
     const file = `${exporter.safeFileName(project.name)}.mp4`;
     const result = await exporter.renderMp4({ project, recording, assets, fonts: { regular, semibold }, options, file }, (done, total) => {
       if (cancelled) return;
@@ -209,6 +215,11 @@ export async function exportGuide(options: GuideExportOptions): Promise<void> {
     const guide = parseGuide(JSON.parse(JSON.stringify(plan.guide)));
     const recording = await readSource(project.id, source.file);
     const assets = await workerAssets(project, state.assetImages);
+    if (cancelled) {
+      for (const [, image] of assets) image.close();
+      notify('Export cancelled.');
+      return;
+    }
     const media = await exporter.renderGuide({ project, plan: { stills: plan.stills, segments: plan.segments }, size: guide.size, recording, assets }, (done, total) =>
       show('Exporting guide…', (done / total) * 0.9, `Rendering steps and motion · ${Math.round((done / total) * 100)}%`),
     );
