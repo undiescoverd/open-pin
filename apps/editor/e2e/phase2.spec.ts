@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { blurAlphaAt, blurRectAt, exportPlan, frameLayout, parseProject, planAt, tlToSrc, type Project } from '@waypost/core';
 import { readFile } from 'node:fs/promises';
-import { dragOnFrame, frameBox, openExport, openExportAdvanced, openItemAdvanced, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepChip, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
+import { canvasBar, dragOnFrame, frameBox, openExport, openItemAdvanced, openStyle, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepChip, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
 
 /** The Phase 2 acceptance tests (docs/04-roadmap.md, "Phase 2 — Edit and polish"; the checks in docs/05-editor-interactions.md,
     section 10). The fixture is 6 seconds long, 640 × 400, at 30 fps. */
@@ -438,12 +438,10 @@ test.describe('Phase 2: zoom, framing and logo', () => {
 
   test('framing changes the output; a logo is stored with the project and comes back after a reload', async ({ page }) => {
     await openRecording(page);
-    await openExport(page);
-    await openExportAdvanced(page);
-    await page.getByLabel('Shape').selectOption('16:9');
-    await typeInto(page.getByLabel('Padding', { exact: true }), '10');
-    await page.getByRole('group', { name: 'Background' }).getByRole('button', { name: 'Gradient' }).click();
-    await page.getByRole('group', { name: 'Gradient' }).getByRole('button', { name: /Ember/ }).click();
+    await canvasBar(page).getByRole('button', { name: '16:9', exact: true }).click();
+    const style = await openStyle(page);
+    await typeInto(style.getByLabel('Padding', { exact: true }), '10');
+    await style.getByRole('group', { name: 'Gradient' }).getByRole('button', { name: /Ember/ }).click();
     const size = await page.getByTestId('frame-canvas').evaluate((c: HTMLCanvasElement) => [c.width, c.height]);
     expect(size[0]! / size[1]!).toBeCloseTo(16 / 9, 2);
     expect(size[0]).toBeGreaterThan(640);
@@ -460,7 +458,6 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     });
     await page.locator('input[type=file][aria-label="Add a logo…"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(logo, 'base64') });
     await expect(page.getByText('logo.png in a corner of every frame')).toBeVisible();
-    await page.keyboard.press('Escape');
     await expect.poll(() => canvasHash(page, corner)).not.toBe(plain);
     const withLogo = await canvasHash(page, corner);
 
@@ -531,12 +528,10 @@ test.describe('Phase 2: MP4 export', () => {
     });
 
     await test.step('a gradient background', async () => {
-      await openExport(page, 'Video');
-      await openExportAdvanced(page);
-      await typeInto(page.getByLabel('Padding', { exact: true }), '6');
-      await page.getByRole('group', { name: 'Background' }).getByRole('button', { name: 'Gradient' }).click();
+      const style = await openStyle(page);
+      await typeInto(style.getByLabel('Padding', { exact: true }), '6');
       await leaveField(page);
-      await page.keyboard.press('Escape');
+      await style.getByRole('group', { name: 'Gradient' }).getByRole('button', { name: /Reef/ }).click();
     });
 
     const project = await savedProject(page);

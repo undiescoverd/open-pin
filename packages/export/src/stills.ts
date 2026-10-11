@@ -32,10 +32,10 @@ export function canvasToBlob(canvas: AnyCanvas, type: string, quality?: number):
 
 /**
  * The step as a picture, the way the guide shows it: framed, with its effect regions, zoomed in and every annotation showing, and
- * the logo. At the recording's own pixel size inside the framing, or `maxWidth` wide, keeping the shape. `opaque` fills a
- * transparent background, for formats without transparency.
+ * the logo. At the recording's own pixel size inside the framing, or `maxWidth` wide, keeping the shape. `opaque` (the default,
+ * so a picture matches the canvas and the video) fills a missing background with the same dark the video uses.
  */
-export async function renderStep(job: ExportJob, step: Step, maxWidth?: number, opaque = false): Promise<AnyCanvas> {
+export async function renderStep(job: ExportJob, step: Step, maxWidth?: number, opaque = true): Promise<AnyCanvas> {
   await loadRenderFonts();
   const bitmap = await job.frameFor(step);
   try {

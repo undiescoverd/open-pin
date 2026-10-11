@@ -181,7 +181,7 @@ An unselected zoom box is selected by its dashed outline only, so it never block
 
 ## 7. Right panel and step card
 
-The right panel has two tabs: **Inspector** (the Add buttons, then the selection) and **Guide** (the recording and where the project is saved; how the guide plays and how it looks are in the Export dialog). Under the Add buttons the panel shows the selected item's few simple controls, then a collapsed **Advanced** section with the precise ones, then **Remove**. Advanced, closed, is one line saying what's inside; whether it is open is remembered while you work, as is each collapsible group inside it. Selecting something new shows the Inspector tab, scrolled to the top.
+The right panel has two tabs: **Inspector** (the Add buttons, then the selection) and **Canvas** (the look of the picture, then the recording and where the project is saved; see 7.4. How the guide plays and the player's look are in the Export dialog). Under the Add buttons the panel shows the selected item's few simple controls, then a collapsed **Advanced** section with the precise ones, then **Remove**. Advanced, closed, is one line saying what's inside; whether it is open is remembered while you work, as is each collapsible group inside it. Selecting something new shows the Inspector tab, scrolled to the top.
 
 A selected **step** opens as a card in the Steps list instead: Title, Note, the "On this step" chips (each selects its item), a footer saying how the step behaves ("Waits for a click, or 2.5 s in a video") with **Duplicate**, and Advanced (exact time, pause, appearing order). The right panel then only says where things are, with **Delete step**.
 
@@ -216,7 +216,14 @@ A Hide region keeps every effect it had: projects saved before Phase 4 open with
 ### 7.3 Preview and Export
 
 - **Preview** (⌘↩, or the top-bar button) opens the guide in the real player at the selected step's still, or on the start card when no step is selected. Closing it (Esc or the close button) selects the step it was showing and moves the playhead there; closing from the start or end card leaves the editor as it was.
-- **Export** opens one dialog: what to export, then only what matters for it, with the rest under its Advanced ([03](03-design-system.md), "Editing a step"). Under the video's sound switch it says which parts will be silent: sped-up or slowed clips (how many, and for how long), muted clips, gaps and the pauses at steps. A recording without sound has the switch off and disabled. Its Advanced also holds the guide's **annotation colour**: new arrows, outlines and click markers take it (callouts start as dark bubbles), and changing it recolours, in one undo step, every annotation still in the old colour; one given its own colour keeps it.
+- **Export** opens one dialog: what to export, then only what matters for it, with the rest under its Advanced ([03](03-design-system.md), "Editing a step"). Under the video's sound switch it says which parts will be silent: sped-up or slowed clips (how many, and for how long), muted clips, gaps and the pauses at steps. A recording without sound has the switch off and disabled. Nothing about the canvas is in Export (see 7.4).
+
+### 7.4 The canvas
+
+- **The canvas bar** sits directly above the frame, as wide as it: the shape buttons (Original, 16:9, 4:3, 1:1, 4:5; one undo step each) and **Style**, which shows the Canvas tab. The frame sits under it, so the bar starts level with the top of the Steps list and the right panel.
+- **The Canvas tab** (second tab of the right panel): Background (gradients, colours, image), Frame (padding, corner radius, shadow), Annotations (the guide's annotation colour: new arrows, outlines and click markers take it, callouts start as dark bubbles, and changing it recolours, in one undo step, every annotation still in the old colour; one given its own colour keeps it), Logo, then Recording and Saving. A project with no steps opens on it; selecting something, or adding a step, shows the Inspector tab.
+- **A new project** is 16:9 on the Dusk gradient with no padding. Opening an older project keeps its frame.
+- **What the frame shows is what every export draws.** Where there is no background the editor draws the same near-black the video and the guide use, so there is never a see-through canvas, and PNG and WebP exports are opaque. The only difference allowed between the frame and a picture export is the antialiasing along the rounded corners.
 
 ## 8. Undo and redo
 

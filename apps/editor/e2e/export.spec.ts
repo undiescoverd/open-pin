@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { addButton, exportDialog, inspector, openExport, openExportAdvanced, openRecording, seekTo, stepChip, waitForFrame, watchErrors } from './helpers';
+import { addButton, exportDialog, inspector, openExport, openExportAdvanced, openRecording, openStyle, seekTo, stepChip, waitForFrame, watchErrors } from './helpers';
 
 /** Phase 4, item 6: one Export button and one dialog. Pick what to export, answer what matters for it, and find the rest under
     Advanced. The Phase 1 to 3 specs export through it; this spec covers the dialog itself. */
@@ -36,11 +36,13 @@ test.describe('Export', () => {
     await expect(dialog.getByText("We'll give you the link and embed code next.")).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Export guide' })).toBeEnabled();
     await expect(dialog.getByText('Coming later')).toBeVisible();
-    /* the player's look, saving, framing and logo wait under Advanced */
-    await expect(summary(page)).toContainText('Player look, saving, PDF copy, annotation colour, framing and logo');
+    /* the player's look and the saving options wait under Advanced; the canvas isn't in Export at all */
+    await expect(summary(page)).toContainText('End button timing, player look, saving, PDF copy');
     await expect(dialog.getByRole('switch', { name: 'Step counter' })).toBeHidden();
     await openExportAdvanced(page);
-    for (const group of ['Player', 'Saving', 'Background and framing', 'Logo']) await expect(dialog.getByRole('region', { name: group })).toBeVisible();
+    for (const group of ['Player', 'Saving']) await expect(dialog.getByRole('region', { name: group })).toBeVisible();
+    for (const group of ['Background and framing', 'Logo', 'Annotations']) await expect(dialog.getByRole('region', { name: group })).toHaveCount(0);
+    await expect(dialog.getByLabel('Shape')).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toBeHidden();
     expect(errors).toEqual([]);
@@ -53,7 +55,8 @@ test.describe('Export', () => {
     await expect(dialog.getByRole('switch', { name: 'Step titles as captions' })).toBeVisible();
     await expect(dialog.getByText(/^\d+ × 1080 · 0:0\d\.\d\d long, with 1 step pause\.$/)).toBeVisible();
     await expect(dialog.getByRole('group', { name: 'How it plays' })).toHaveCount(0);
-    await expect(summary(page)).toContainText('Annotation colour, framing, background and logo');
+    /* a video, PDF or set of images has nothing to hide: the canvas is what the frame shows */
+    await expect(summary(page)).toHaveCount(0);
 
     await kinds(page).getByRole('button', { name: /^PDF/ }).click();
     await expectOptions(dialog.getByRole('group', { name: 'Page size' }), ['A4', 'Letter', '16:9 slides']);
@@ -101,10 +104,8 @@ test.describe('Export', () => {
     await addButton(page, 'Arrow').click();
     await colour('Iris').click(); /* given its own colour by hand */
 
-    const dialog = await openExport(page, 'PDF');
-    await openExportAdvanced(page);
-    await dialog.getByRole('group', { name: 'Annotation colour' }).getByRole('button', { name: 'Lagoon' }).click();
-    await page.keyboard.press('Escape');
+    const style = await openStyle(page);
+    await style.getByRole('group', { name: 'Annotation colour' }).getByRole('button', { name: 'Lagoon' }).click();
 
     await stepChip(page, /Outline/).click();
     await expect(colour('Lagoon')).toHaveAttribute('aria-pressed', 'true');
@@ -119,14 +120,16 @@ test.describe('Export', () => {
     await expect(colour('Coral')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('the Guide tab no longer holds the player or framing, and points to Export', async ({ page }) => {
+  test('the Canvas tab holds the look, the recording and saving; there is no Guide tab', async ({ page }) => {
     await openRecording(page);
-    await page.getByRole('tab', { name: 'Guide' }).click();
-    await expect(page.getByText('How the guide plays, the button at the end')).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Guide' })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Project' })).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Canvas' }).click();
+    await expect(page.getByText('What you see on the frame is what every export draws.')).toBeVisible();
     await expect(page.getByRole('group', { name: 'Playback' })).toHaveCount(0);
-    await expect(page.getByLabel('Shape')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Open Export' }).click();
-    await expect(exportDialog(page)).toBeVisible();
+    await expect(inspector(page).getByLabel('Shape')).toHaveCount(0);
+    await expect(page.getByRole('tabpanel', { name: 'Canvas' }).getByText('Recording', { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save project file…' })).toBeVisible();
   });
 
   test('the link and embed code: a placeholder address until one is typed, and back to Export', async ({ page }) => {

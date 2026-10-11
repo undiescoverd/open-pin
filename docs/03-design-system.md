@@ -21,7 +21,7 @@ From the editor screenshot (described in [01-feature-analysis.md](01-feature-ana
 | 7 | **Outputs in the wrong place.** Export and Widget sit in the left sidebar header. | The most important finishing actions are hard to find. | A top bar with **Preview** and one primary **Export** button on the right, where people expect them. Export opens one dialog for the guide, the video, the PDF and the images. |
 | 8 | **Steps aren't visible as steps.** No list of pinned frames with titles, and no step markers on the timeline. | Hard to see the guide's structure. | A Steps list with numbered rows that open into a step card, plus numbered pins above the filmstrip (and a dedicated **Steps** lane in the full timeline). |
 | 9 | **Shouty empty lane:** "ADD BACKGROUND AUDIO" in caps inside a big dashed box. | Draws attention away from the work. | A compact "+ Add music" button on a labelled Music lane. |
-| 10 | **Unexplained checkerboard** around the recording. | Looks like a rendering glitch. | Framing is shown as the real background (gradient/color) once chosen, with a "Frame" section in the Guide panel. |
+| 10 | **Unexplained checkerboard** around the recording. | Looks like a rendering glitch. | A new project starts on a gradient, and the editor draws exactly what every export draws, so there is never a see-through checkerboard. The canvas controls are a bar above the frame and a Canvas tab. |
 | 11 | **Undo without redo**, no visible shortcuts. | Mistakes are costly. | Undo/redo in the top bar, ⌘Z / ⇧⌘Z, and a ⌘K command palette that lists every action with its shortcut. |
 
 ## Editor layout
@@ -55,17 +55,17 @@ Until there is a recording, the whole window is one drop zone (a file dropped an
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ ◆ Waypost ‹Projects  Onboarding flow  Saved    ↶ ↷ ◐  [Preview] [Export]               │
 ├─────────────────┬───────────────────────────────────────────────┬──────────────────────┤
-│ STEPS 3  [+Add] │ ┌───────────────────────────────────────────┐ │ ADD TO STEP 2        │
-│ ┌─────────────┐ │ │                                           │ │ [Callout] [Arrow]    │
-│ │1 [thumb]    │ │ │   recording on its background,            │ │ [Highlight][Zoom]    │
-│ │Open the menu│ │ │   with annotations and handles            │ │ [Hide]    [Click]    │
-│ └─────────────┘ │ │                                           │ │ ──────────────────── │
-│ ┌─────────────┐ │ │      ◎ ┌───────────────────────────────┐  │ │ Callout · Step 2     │
-│ │2 [thumb]    │ │ │        │Add callout·Highlight·Zoom here│  │ │ Words  [_______]     │
-│ │Title  [____]│ │ │        └───────────────────────────────┘  │ │ Colour ● ● ● ●       │
-│ │Note   [____]│ │ │                                           │ │ › Advanced           │
-│ │On this step │ │ └───────────────────────────────────────────┘ │ Remove callout       │
-│ │[Click][Call]│ │            Give step 3 a title                │                      │
+│ STEPS 3  [+Add] │ [Original|16:9|4:3|1:1|4:5]  [● Style]        │ Inspector │ Canvas   │
+│ ┌─────────────┐ │ ┌───────────────────────────────────────────┐ │ ADD TO STEP 2        │
+│ │1 [thumb]    │ │ │   recording on its background,            │ │ [Callout] [Arrow]    │
+│ │Open the menu│ │ │   with annotations and handles            │ │ [Highlight][Zoom]    │
+│ └─────────────┘ │ │                                           │ │ [Hide]    [Click]    │
+│ ┌─────────────┐ │ │      ◎ ┌───────────────────────────────┐  │ │ ──────────────────── │
+│ │2 [thumb]    │ │ │        │Add callout·Highlight·Zoom here│  │ │ Callout · Step 2     │
+│ │Title  [____]│ │ │        └───────────────────────────────┘  │ │ Words  [_______]     │
+│ │Note   [____]│ │ │                                           │ │ Colour ● ● ● ●       │
+│ │On this step │ │ └───────────────────────────────────────────┘ │ › Advanced           │
+│ │[Click][Call]│ │            Give step 3 a title                │ Remove callout       │
 │ │Waits for a  │ │                                               │                      │
 │ │click…  [Dup]│ │                                               │                      │
 │ │› Advanced   │ │                                               │                      │
@@ -79,7 +79,8 @@ Until there is a recording, the whole window is one drop zone (a file dropped an
 
 - **Top bar:** app mark, back to Projects, the editable project name and "Saved", then undo and redo, the theme, and **Preview** and **Export** (primary). That's all.
 - **Steps (left):** **+ Add step** (⇧P) at the top, then one row per step (thumbnail, number, title, and a one-line summary such as "Click marker · Callout"). The selected step opens in place as the **step card**: **Title**; **Note** (optional, the body text of the PDF and the guide); **On this step**, chips for what's on it (Click marker, Callout, Zoom…) that select it on the frame; a footer saying how the step behaves in words ("Waits for a click, or 2.5 s in a video") with **Duplicate** (⌘D, which copies the step onto the frame at the playhead); and **Advanced**: exact time, pause and appearing order.
-- **Canvas (centre):** the frame, with its top edge level with the top of the Steps list and the right panel so it gets all the height there is. Click a thing to select it and drag it to move it. Under the frame is one line, as wide as the frame and always the same height: what the canvas is waiting for or what just happened ("Stopped at step 2" with **Continue**), and otherwise the **next-step hint**, one quiet suggestion ("Press Add step where the viewer should click", "Give step 2 a title", "Preview it, then Export") that says nothing once the guide has been previewed or Export opened. While paused, the frame shows every annotation with handles and the dashed zoom box. Playback shows each step as the viewer sees it (the zoom eases in, annotations appear in their order) and stops at every step until Continue, Space or a click on the frame.
+- **Canvas bar (above the frame):** directly above the frame, as wide as it, always in view: the shape as one-click buttons (**Original, 16:9, 4:3, 1:1, 4:5**) and a **Style** button, which shows the Canvas tab. See "The canvas" below.
+- **Frame (centre):** the picture, under the canvas bar and taking the height that is left. Click a thing to select it and drag it to move it. Under the frame is one line, as wide as the frame and always the same height: what the canvas is waiting for or what just happened ("Stopped at step 2" with **Continue**), and otherwise the **next-step hint**, one quiet suggestion ("Press Add step where the viewer should click", "Give step 2 a title", "Preview it, then Export") that says nothing once the guide has been previewed or Export opened. While paused, the frame shows every annotation with handles and the dashed zoom box. Playback shows each step as the viewer sees it (the zoom eases in, annotations appear in their order) and stops at every step until Continue, Space or a click on the frame.
 - **Quick actions:** right after a click marker drops (the Click button or the P tool), a small bar next to it offers **Add callout · Highlight · Zoom here**, each placed around the click. It goes away as soon as you do anything else.
 - **Right panel: Add, then adjust.** It always starts with **Add to step N** (or *Add to a new step* on a frame without one): six large labelled buttons, **Callout, Arrow, Highlight, Zoom, Hide** and **Click**. One click puts the item on the frame, selected, around the step's click when there is one and otherwise in the middle. The keys (C, A, H, Z, X, P) pick the matching tool instead, to draw the item exactly where you click or drag, and show in each button's tooltip. Below the buttons the panel shows only the selected item's few simple controls, then its **Advanced**, then **Remove**:
 
@@ -93,11 +94,20 @@ Until there is a recording, the whole window is one drop zone (a file dropped an
   | Click | Nothing (drag it) | Position, colour, when it appears |
   | Clip, gap (full timeline only) | Trim (In, Out, Plays for), speed, volume and mute; a gap's length | — |
 
-  The panel's second tab, **Guide**, holds the recording and where the project is saved. How the guide plays, the end button, the player's look, framing, background and logo are in Export.
+  The panel's second tab, **Canvas**, holds the look of the picture (see below), then the recording and where the project is saved. How the guide plays, the end button and the player's look are in Export.
 - **Filmstrip (bottom):** the timecode, the transport and "Playback stops at every step" in one header row with **Trim & edit video** at the right; under it one strip of the whole recording with the numbered pins above it. Click a pin to go to its step and drag it to move it in time; click the strip to move the playhead; trim handles sit at both ends. Hidden areas show as tinted bars on the strip ("Hidden during step 2").
 - **Trim & edit video** swaps the filmstrip for the full timeline, and **Done** comes back; the choice is remembered per project. The full timeline has the ruler and labelled lanes for Steps, Video, Effects, Voice and Music (Steps always on top, picture over sound, Music always last). Teal playhead, which only the **ruler** moves; clicking in a lane never scrubs. Pins and effect bars drag to move, and their edges drag to trim. The edges of a clip on the Video lane drag to trim it: with **ripple trim** on (the default, ⇧R toggles it) everything after moves up; with it off, the trim leaves a hatched **gap** (the last frame holds through it). A trim stops at any pinned step. A **magnet** button (N) turns on snapping to every edge, the playhead and the ends, with an amber guide line; holding Alt flips it for one drag. Split at the playhead with R. J K L shuttle as in DaVinci Resolve (and stop at every step), ⇧L / ⇧J jump between edits, and = / - zoom the timeline. These keys work in both views, but only the full timeline shows the controls they drive; [05](05-editor-interactions.md) has the exact behaviour.
 - **Preview** (⌘↩) opens the guide in the real player **at the selected step** (on the start card when nothing is selected). Esc closes it and selects the step it was showing.
-- **Export** opens one dialog: **What to export** (*Interactive guide*, *Video*, *PDF*, *Images*), then only what matters for it: how the guide plays (*Viewer clicks Next*, *Plays by itself*, *Plain video*) and its button at the end; the video's size, captions and sound (with a plain note about which parts are silent); the PDF's page size; the images' format. Its **Advanced** holds the end button's timing, the player's accent, colours and controls, folder or zip with a PDF copy, the guide's **annotation colour** (new arrows, outlines and click markers take it, and changing it recolours those still in the old colour), and the framing, background and logo every export draws. After an interactive guide is saved, it shows the link and the embed code, with plain-words help for GitHub Pages, Netlify and Cloudflare Pages. "Publish online, coming later" sits at the bottom.
+- **Export** opens one dialog: **What to export** (*Interactive guide*, *Video*, *PDF*, *Images*), then only what matters for it: how the guide plays (*Viewer clicks Next*, *Plays by itself*, *Plain video*) and its button at the end; the video's size, captions and sound (with a plain note about which parts are silent); the PDF's page size; the images' format. Its **Advanced**, for the interactive guide only, holds the end button's timing, the player's accent, colours and controls, and folder or zip with a PDF copy. A video, PDF or set of images has no Advanced. Nothing about the canvas is in Export: whatever the frame shows is what every export draws. After an interactive guide is saved, it shows the link and the embed code, with plain-words help for GitHub Pages, Netlify and Cloudflare Pages. "Publish online, coming later" sits at the bottom.
+
+### The canvas
+
+The canvas is the picture every step, the preview and every export is drawn on: the recording, framed on a background. It is chosen where it can be seen, never in Export.
+
+- **A new project starts 16:9 on a gradient** (Dusk), with no padding, so a 16:9 recording fills the canvas and any other shape sits on the gradient with rounded corners and a shadow. Projects saved before this keep the frame they had.
+- **The shape** is one click in the bar above the frame (Original keeps the recording's own shape). Picking one changes the frame at once and is one undo step.
+- **The Canvas tab** (right panel, beside the frame so a change can be watched as it is made) holds, in order: **Background** (the four gradients, six colours or an image), **Frame** (padding 0 to 25%, corner radius, shadow), **Annotations** (the guide's annotation colour: new arrows, outlines and click markers take it, and changing it recolours those still in the old colour, in one undo step), **Logo** (corner, size, margin, opacity), then the **Recording** and **Saving** sections. A new project, and any project with no steps yet, opens on this tab so the look can be chosen first; selecting or adding something shows the Inspector, and **Style** (or the tab) brings the canvas back.
+- **No see-through canvas.** Where there is no background (older projects), the editor draws the same dark the video and the guide use, so bars never show a checkerboard, and image exports are opaque too.
 
 ## Identity: "Coral & Graphite"
 

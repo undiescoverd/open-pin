@@ -97,7 +97,8 @@ export async function addImage(file: File, use: 'logo' | 'background'): Promise<
 
 function resetStateFor(project: Project) {
   resetEditor();
-  return { history: createHistory(project), selection: null, save: 'saved' as const, timelineView: timelineViewFor(project.id) };
+  /* a new project starts on the canvas, so its look can be chosen first; one with steps opens on the Inspector */
+  return { history: createHistory(project), selection: null, save: 'saved' as const, timelineView: timelineViewFor(project.id), rightTab: project.steps.length ? ('selection' as const) : ('canvas' as const) };
 }
 
 /** The text to show for a failure, in plain language. */

@@ -4,7 +4,7 @@ import type { Command } from './history';
 import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, overlapsOn, type LayerMove } from './effects';
 import { blurRectAt } from './geometry';
 import {
-  DEFAULT_FRAME,
+  NEW_PROJECT_FRAME,
   DEFAULT_GUIDE,
   SCHEMA_VERSION,
   type Annotation,
@@ -50,7 +50,7 @@ export function createProject(args: { id: string; name: string; source: Source; 
     steps: [],
     blurs: [],
     assets: [],
-    frame: { ...DEFAULT_FRAME, background: { type: 'none' } },
+    frame: structuredClone(NEW_PROJECT_FRAME),
     logo: null,
     guide: structuredClone(DEFAULT_GUIDE),
   };

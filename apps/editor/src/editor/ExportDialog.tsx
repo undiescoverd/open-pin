@@ -1,32 +1,26 @@
 import {
-  ASPECTS,
   clipLength,
-  GRADIENT_PRESETS,
   embedSnippets,
   exportPlan,
   formatTimecode,
   guideSize,
   guideSlug,
   outputSizeForHeight,
-  type Aspect,
-  type GradientPreset,
-  type LogoCorner,
   type PlaybackMode,
   type Project,
 } from '@waypost/core';
 import type { PdfPage, StillFormat } from '@waypost/export';
-import { ANNOTATION_COLORS, GRADIENTS } from '@waypost/render';
-import { Advanced, Button, ColorSwatchPicker, Dialog, Icon, ParamRow, Segmented, SelectField, Switch, TextField, cx, focusRing } from '@waypost/ui';
-import { Check, ClipboardCopy, Copy, Download, FileText, Film, ImageDown, ImagePlus, Images, Link2, MousePointerClick, type LucideIcon } from 'lucide-react';
-import { useRef, useState, type ReactNode } from 'react';
+import { Advanced, Button, ColorSwatchPicker, Dialog, Icon, Segmented, SelectField, Switch, TextField, cx, focusRing } from '@waypost/ui';
+import { Check, ClipboardCopy, Copy, Download, FileText, Film, ImageDown, Images, Link2, MousePointerClick, type LucideIcon } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { copyFrame, exportGuide, exportMp4, exportPdfGuide, exportScreenshots, saveFrame } from '../state/exporting';
-import { addImage } from '../state/project';
-import { notify, selectProject, setAnnotationColor, setExportDialog, setFrame, setGuide, setLogo, useEditor } from '../state/store';
+import { selectProject, setExportDialog, setGuide, useEditor } from '../state/store';
 import { useEditSession } from './useEditSession';
 
 /* Export (docs/06-simplify-plan.md, "Export"): one dialog for everything that leaves the editor. Pick what to export, answer the
-   one or two questions that matter for it, and export. How the guide plays and its end button sit in plain view; the player's look,
-   saving options, framing, background and logo are under Advanced. After an interactive guide is saved, the same dialog gives its
+   one or two questions that matter for it, and export. How the guide plays and its end button sit in plain view; the player's look
+   and the saving options are under Advanced. The canvas (shape, background, logo) isn't here: it's set in the bar above the frame,
+   and every export draws what the frame shows. After an interactive guide is saved, the same dialog gives its
    link and embed code (F11), with plain-words help for the common free hosts. */
 
 type Kind = 'guide' | 'video' | 'pdf' | 'images';
@@ -199,9 +193,8 @@ export function ExportDialog() {
           )}
         </div>
 
-        <Advanced id={`export-${kind}`} summary={kind === 'guide' ? 'Player look, saving, PDF copy, annotation colour, framing and logo' : 'Annotation colour, framing, background and logo'} className="-mt-1">
-          {kind === 'guide' && (
-            <>
+        {kind === 'guide' && (
+          <Advanced id="export-guide" summary="End button timing, player look, saving, PDF copy" className="-mt-1">
               <EndButtonAdvanced project={project} />
               <PlayerLook project={project} />
               <Group title="Saving">
@@ -218,12 +211,8 @@ export function ExportDialog() {
                   <SelectField label="PDF copy" value={pdfCopy} options={PDF_COPY} onChange={v => setPdfCopy(v as PdfPage | 'none')} />
                 </div>
               </Group>
-            </>
-          )}
-          <AnnotationStyle project={project} />
-          <FramingGroup project={project} />
-          <LogoGroup project={project} />
-        </Advanced>
+          </Advanced>
+        )}
 
         {/* stays in view while Advanced is open and the dialog scrolls */}
         <div className="sticky -bottom-5 z-10 -mx-5 -mt-3 -mb-5 flex flex-col gap-3.5 bg-panel px-5 pt-3 pb-5">
@@ -368,158 +357,6 @@ function PlayerLook({ project }: { project: Project }) {
       <Switch label="Step counter" checked={g.controls.counter} onChange={counter => setGuide({ controls: { ...g.controls, counter } }, counter ? 'Show step counter' : 'Hide step counter')} />
       <Switch label="Progress bar" checked={g.controls.progress} onChange={progress => setGuide({ controls: { ...g.controls, progress } }, progress ? 'Show progress bar' : 'Hide progress bar')} />
       <Switch label="Fullscreen button" checked={g.controls.fullscreen} onChange={fullscreen => setGuide({ controls: { ...g.controls, fullscreen } }, fullscreen ? 'Show fullscreen button' : 'Hide fullscreen button')} />
-    </Group>
-  );
-}
-
-// ----- framing, background and logo: every export draws them ------------------------------------------------------------
-
-const ASPECT_LABEL: Record<Aspect, string> = { source: 'Same as the recording', '16:9': '16:9 widescreen', '4:3': '4:3', '1:1': '1:1 square', '4:5': '4:5 portrait' };
-const BACKGROUND_COLORS = [
-  { id: 'paper', name: 'Paper', value: '#F6F7F9' },
-  { id: 'white', name: 'White', value: '#FFFFFF' },
-  { id: 'ink', name: 'Ink', value: '#0E1116' },
-  { id: 'coral', name: 'Coral', value: '#FF5A4E' },
-  { id: 'lagoon', name: 'Lagoon', value: '#13B8A6' },
-  { id: 'iris', name: 'Iris', value: '#6E6BFF' },
-];
-const CORNERS: ReadonlyArray<{ value: LogoCorner; label: string }> = [
-  { value: 'tl', label: '↖ Top left' },
-  { value: 'tr', label: '↗ Top right' },
-  { value: 'bl', label: '↙ Bottom left' },
-  { value: 'br', label: '↘ Bottom right' },
-];
-
-/** A button that opens a file picker for an image. */
-function ImagePicker({ label, onFile }: { label: string; onFile: (file: File) => void }) {
-  const input = useRef<HTMLInputElement>(null);
-  return (
-    <>
-      <input
-        ref={input}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif,image/avif"
-        hidden
-        aria-label={label}
-        onChange={e => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (file) onFile(file);
-        }}
-      />
-      <Button size="sm" icon={<Icon icon={ImagePlus} />} onClick={() => input.current?.click()}>
-        {label}
-      </Button>
-    </>
-  );
-}
-
-function FramingGroup({ project }: { project: Project }) {
-  const frame = project.frame;
-  const session = useEditSession();
-  const bg = frame.background;
-  const kind = bg.type;
-  const image = bg.type === 'image' ? project.assets.find(a => a.id === bg.asset) : undefined;
-  return (
-    <Group title="Background and framing">
-      <SelectField label="Shape" value={frame.aspect} options={ASPECTS.map(a => ({ value: a, label: ASPECT_LABEL[a] }))} onChange={v => setFrame({ aspect: v as Aspect }, 'Change shape')} />
-      <div {...session.bind} className="flex flex-col gap-3">
-        <ParamRow label="Padding" value={Math.round(frame.padding * 100)} min={0} max={25} unit="%" defaultValue={0} onChange={v => setFrame({ padding: v / 100 }, 'Change padding', session.key())} />
-        <ParamRow label="Corner radius" value={frame.cornerRadius} min={0} max={40} unit="px" defaultValue={12} onChange={v => setFrame({ cornerRadius: v }, 'Change corner radius', session.key())} />
-      </div>
-      <Segmented
-        label="Background"
-        options={[
-          { value: 'none', label: 'None' },
-          { value: 'color', label: 'Colour' },
-          { value: 'gradient', label: 'Gradient' },
-          { value: 'image', label: 'Image' },
-        ]}
-        value={kind}
-        onChange={v => {
-          if (v === 'none') setFrame({ background: { type: 'none' } }, 'Remove background');
-          else if (v === 'color') setFrame({ background: { type: 'color', color: '#F6F7F9' } }, 'Change background');
-          else if (v === 'gradient') setFrame({ background: { type: 'gradient', preset: 'dusk' } }, 'Change background');
-          else {
-            const last = [...project.assets].reverse().find(a => a.id !== project.logo?.asset);
-            if (last) setFrame({ background: { type: 'image', asset: last.id } }, 'Change background');
-            else notify('Choose an image for the background.');
-          }
-        }}
-      />
-      {bg.type === 'color' && <ColorSwatchPicker label="Background colour" colors={BACKGROUND_COLORS} value={bg.color} onChange={color => setFrame({ background: { type: 'color', color } }, 'Change background')} />}
-      {bg.type === 'gradient' && (
-        <div role="group" aria-label="Gradient" className="grid grid-cols-4 gap-1.5">
-          {GRADIENT_PRESETS.map((g: GradientPreset) => (
-            <button
-              key={g}
-              type="button"
-              aria-pressed={bg.preset === g}
-              onClick={() => setFrame({ background: { type: 'gradient', preset: g } }, 'Change background')}
-              className={cx('flex flex-col items-center gap-1 rounded-md p-1 text-xs text-fg-muted aria-pressed:outline-2 aria-pressed:outline-sel', focusRing)}
-            >
-              <span className="h-8 w-full rounded-sm border border-line" style={{ background: `linear-gradient(135deg, ${GRADIENTS[g].stops[0]}, ${GRADIENTS[g].stops[1]})` }} />
-              {GRADIENTS[g].name}
-            </button>
-          ))}
-        </div>
-      )}
-      {(kind === 'image' || kind === 'none') && (
-        <div className="flex flex-col gap-1">
-          {image && <Help>Image: {image.name}</Help>}
-          <ButtonRow>
-            <ImagePicker label={image ? 'Replace background image…' : 'Choose a background image…'} onFile={file => void addImage(file, 'background')} />
-          </ButtonRow>
-        </div>
-      )}
-      <Switch label="Shadow" checked={frame.shadow} onChange={shadow => setFrame({ shadow }, shadow ? 'Add shadow' : 'Remove shadow')} />
-      <Help>{frame.padding > 0 || frame.aspect !== 'source' ? 'The recording sits on the background with rounded corners.' : 'Add padding or pick a shape to put the recording on a background.'}</Help>
-    </Group>
-  );
-}
-
-const ANNOTATION_SWATCHES = ANNOTATION_COLORS.map(c => ({ id: c.id, name: c.name, value: c.stroke }));
-
-/** One annotation colour for the whole guide (docs/06-simplify-plan.md, "Other decisions"). */
-function AnnotationStyle({ project }: { project: Project }) {
-  return (
-    <Group title="Annotations">
-      <ColorSwatchPicker label="Annotation colour" colors={ANNOTATION_SWATCHES} value={project.guide.annotationColor} onChange={setAnnotationColor} />
-      <Help>New arrows, outlines and click markers take it (callouts stay dark bubbles). Changing it recolours every one still in the old colour; one you gave its own colour keeps it.</Help>
-    </Group>
-  );
-}
-
-function LogoGroup({ project }: { project: Project }) {
-  const logo = project.logo;
-  const session = useEditSession();
-  const asset = logo ? project.assets.find(a => a.id === logo.asset) : undefined;
-  return (
-    <Group title="Logo">
-      {logo ? (
-        <>
-          <Help>{asset?.name ?? 'Logo'} in a corner of every frame, the video and the guide.</Help>
-          <Segmented label="Corner" options={CORNERS.map(c => ({ value: c.value, label: c.label.split(' ')[0]!, title: c.label.slice(2) }))} value={logo.corner} onChange={corner => setLogo({ ...logo, corner: corner as LogoCorner }, 'Move logo')} />
-          <div {...session.bind} className="flex flex-col gap-3">
-            <ParamRow label="Size" value={Math.round(logo.size * 100)} min={3} max={30} unit="%" defaultValue={10} onChange={v => setLogo({ ...logo, size: v / 100 }, 'Resize logo', session.key())} />
-            <ParamRow label="Margin" value={Math.round(logo.margin * 1000) / 10} min={0} max={10} step={0.5} unit="%" defaultValue={3} onChange={v => setLogo({ ...logo, margin: v / 100 }, 'Change logo margin', session.key())} />
-            <ParamRow label="Opacity" value={Math.round(logo.opacity * 100)} min={10} max={100} unit="%" defaultValue={90} onChange={v => setLogo({ ...logo, opacity: v / 100 }, 'Change logo opacity', session.key())} />
-          </div>
-          <ButtonRow>
-            <ImagePicker label="Replace logo…" onFile={file => void addImage(file, 'logo')} />
-            <Button size="sm" variant="ghost" onClick={() => setLogo(null)}>
-              Remove logo
-            </Button>
-          </ButtonRow>
-        </>
-      ) : (
-        <>
-          <Help>Put your logo in a corner of every frame. A PNG or SVG with a transparent background works best.</Help>
-          <ButtonRow>
-            <ImagePicker label="Add a logo…" onFile={file => void addImage(file, 'logo')} />
-          </ButtonRow>
-        </>
-      )}
     </Group>
   );
 }

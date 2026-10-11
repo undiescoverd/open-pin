@@ -104,8 +104,8 @@ test.describe('editor shell', () => {
   test('inspector tabs switch by click and arrow keys', async ({ page }) => {
     await openRecording(page, { fullTimeline: false });
     await expect(page.getByRole('heading', { name: 'Nothing selected' })).toBeVisible();
-    await page.getByRole('tab', { name: 'Guide' }).click();
-    await expect(page.getByRole('heading', { name: 'Guide settings' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Canvas' }).click();
+    await expect(page.getByRole('heading', { name: 'Canvas', exact: true })).toBeVisible();
     await page.keyboard.press('ArrowLeft');
     await expect(page.getByRole('tab', { name: 'Inspector' })).toBeFocused();
     await expect(page.getByRole('heading', { name: 'Nothing selected' })).toBeVisible();
