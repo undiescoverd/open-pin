@@ -90,7 +90,9 @@ Build order for the Waypost web app. Each phase ends with something usable, and 
 - **On a phone**, annotation text scales with the picture like everything else, so a callout is small on a narrow screen. Its text is also read out through the live region.
 - **Cross-origin embeds:** when the page and the guide are on different sites, the guide's host must send `Access-Control-Allow-Origin` for the player to fetch `guide.json` and the fonts. GitHub Pages does; `embed.txt` says to use the iframe otherwise.
 
-## Phase 4 — Simplify (next)
+## Phase 4 — Simplify
+
+**Status: built (items 1 to 11), tested in Chromium.** The first-guide test with three new users (the first "done when" below) is still to run. Differences from the plan are listed under [Phase 4 as built](#phase-4-as-built) below.
 
 Make the editor simple by default, as designed in [06-simplify-plan.md](06-simplify-plan.md). Nothing is removed from the engine; precise controls move behind **Trim & edit video** and **Advanced** sections. Build it in this order, each item shippable on its own:
 
@@ -112,7 +114,20 @@ Make the editor simple by default, as designed in [06-simplify-plan.md](06-simpl
 - Every Phase 1 to 3 browser test still passes (moved to the new controls where needed), and new tests cover the filmstrip, the Add buttons, the Hide panel, Advanced sections and the Export dialog.
 - Projects saved before Phase 4 open unchanged, effect stacks and all.
 
-## Phase 5 — Click capture
+### Phase 4 as built
+
+- **Tests.** Each item has its own browser spec in `apps/editor/e2e` (`filmstrip`, `stepcard`, `addpanel`, `hide`, `export`, `preview`, `quickactions`, and the first-run and next-step-hint tests in `shell`), and the Phase 1 to 3 specs drive the new controls (most open the full timeline with Trim & edit video first). The first-guide test with new users hasn't been run.
+- **Preview** opens at the selected step's still, or on the start card when no step is selected. Esc selects the step the preview was showing, which may be a later one if you moved on in the preview. Two small bugs turned up and were fixed: the Esc that closes any dialog no longer also reaches the editor (it cleared the selection), and a tooltip no longer opens behind a dialog, where it took the dialog's first Esc.
+- **Quick actions** appear after the Click button too, not just the Pin tool, since both drop a click marker. Their buttons do exactly what the matching Add buttons do.
+- **Duplicate step** is on the step card and ⌘D. It copies the step onto the frame at the playhead, and refuses a frame that already has a step. There is no separate step menu.
+- **The next-step hint** asks for a step, then a title for the first untitled step, then "Preview it, then Export". It stops once the guide has been previewed or Export opened since the project was opened. It sits under the frame only when the status line has nothing else to say.
+- **First run** keeps **Projects** and the theme button above the drop zone, so saved projects stay reachable before a recording is open.
+- **Honest messages:** the video's sound switch says how many sped-up or slowed clips will be silent and for how long, and is off and disabled for a recording without sound. Recordings the browser can't open name their format (ProRes, HEVC…) and say to re-export from QuickTime Player as H.264.
+- **The ⌘K command palette** is still not built (its top-bar button is disabled), and **⌘E** went with the old Export menu. The keyboard tables in docs 03 and 05 say so.
+- **The HTML mockup** is retired as the layout reference in favour of the design canvas. It stays in `design/mockup` only for narration and music, which aren't built yet.
+- **One annotation style per guide** (from the simplify plan's other decisions) isn't built: annotation colours are still set one by one.
+
+## Phase 5 — Click capture (next)
 
 Pinning every click by hand is the slowest part of making a guide. Capture the clicks while recording, so a guide starts with a step at each one, already in the right place. A web page can't see clicks outside its own tab, so this needs a small browser extension (Chrome first). It is always optional: anyone who doesn't want it skips it in one click and works exactly as in Phase 4.
 

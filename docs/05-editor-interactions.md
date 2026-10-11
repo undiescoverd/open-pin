@@ -1,6 +1,8 @@
 # 05 — Editor interactions
 
-The exact behaviour of the editor's timeline, canvas, Inspector and keyboard, as proven in the clickable mockup ([`design/mockup/editor.html`](../design/mockup/editor.html), landed in #1). The real editor (`apps/editor`, `packages/core`) should reproduce it. [03 — Design system](03-design-system.md) says what the editor looks like; this doc says how it behaves.
+The exact behaviour of the editor's timeline, canvas, right panel and keyboard. It was first proven in the clickable mockup ([`design/mockup/editor.html`](../design/mockup/editor.html), landed in #1), and the real editor (`apps/editor`, `packages/core`) reproduces it. [03 — Design system](03-design-system.md) says what the editor looks like; this doc says how it behaves.
+
+**Since Phase 4** the editor is simple by default ([06 — Simplify plan](06-simplify-plan.md)): the filmstrip replaces the lanes until **Trim & edit video** opens them, the Add buttons at the top of the right panel replace the tool palette, the step card in the Steps list holds a step's words and pause, and precise controls sit under **Advanced**. Everything below still works; sections 4, 5, 7 and 9 say where each control lives now. The mockup still shows the old layout and is only the reference for narration and music, which aren't built yet.
 
 "Must" marks behaviour the mockup was tested against. Numbers (8 px, 0.2 s, 4×) are the tested values, not arbitrary: change them on purpose, not by accident. The mockup simplifies a few things; those are listed under [Gaps](#gaps-the-mockup-does-not-cover).
 
@@ -36,7 +38,7 @@ Defaults and ranges are the tested ones. Units: s = seconds, % = percent, px = p
 | | gap | 0 s | ≥ 0 |
 | **Step** | pause ("hold") | 2.5 s | 1–8 s |
 | | zoom | none | square box, 25–80% of the frame (4× down to 1.25×) |
-| **Effect region** (drawn with the Blur tool) | effects | one Pixelate | an ordered stack of any length: Pixelate (block size), Blur, Darken, Desaturate (amount 0–100), Tint (strength and colour), Solid fill (opacity and colour); each can be switched off |
+| **Effect region** (Hide) | effects | one Cover (solid fill) | an ordered stack of any length: Pixelate (block size), Blur, Darken, Desaturate (amount 0–100), Tint (strength and colour), Solid fill (opacity and colour); each can be switched off |
 | | layer | lowest free layer | 1 to the number of layers; higher layers draw on top |
 | | corner radius | 4 px | 0–40 |
 | | opacity | 100% | 10–100 |
@@ -59,11 +61,17 @@ Narration length is the clip's real length for a recording or an imported file. 
 - **Kinds:** step, annotation, zoom box, clip, gap, blur, voice, music. One thing is selected at a time. The Inspector always shows the selection.
 - **Selecting from the timeline never moves the playhead**, so you can park it on a frame and pick up a pin, a clip or a hidden area without losing your place. Dragging a pin shows the frame under it while it moves, then puts the playhead back. **Double-click** a pin to go to it, or a hidden area to go into it if the playhead is outside. (Selecting a step in the Steps list still goes to it.)
 - **Clicking empty space in a timeline lane** selects the step at the playhead (or nothing). It never moves the playhead.
-- **Esc**, in order: leave a drawing tool, then clear the "stopped at a step" state, then leave the Viewer view, then step an annotation or zoom selection back up to its step.
+- **Esc**, in order: leave a drawing tool, then clear the "stopped at a step" state, then step an annotation or zoom selection back up to its step, then clear the selection. The Esc that closes a dialog (Preview, Export, Projects) does only that.
 - **Delete** removes the selection: a zoom (removes the zoom), an annotation, a step, a blur, narration (sets it to none), music, or a gap (closes it).
 - **Select the layer below / above (`⇧K` / `⇧I`):** the lanes are Steps, Video, Effects, Voice, Music. Take the middle of the selected item in time; in the next lane that has items, pick the item that covers that time, or the nearest one. Empty lanes are skipped. With nothing selected, `⇧K` picks the top lane and `⇧I` the bottom. Pauses playback. Stops at the ends.
 
 ## 4. Timeline
+
+### 4.0 Filmstrip, and the full timeline behind Trim & edit video
+
+- **The filmstrip** is the default: one strip of the whole recording that always fits the width, with the numbered pins above it (the same Steps lane as the full timeline: click to select, drag to move, double-click to go to the step), hidden areas as tinted bars on it ("Hidden during step 2"; click to select, double-click to go into it), and trim handles at both ends, which trim the first clip's start and the last clip's end (←/→ on a focused handle trims one frame). Clicking or dragging on the strip moves the playhead, snapping as below.
+- **Trim & edit video** swaps it for the full timeline described in the rest of this section, and **Done** swaps back. The choice is remembered per project.
+- The transport and its keys (J K L, ⇧J ⇧L, = -) work in both views; the controls for snapping, ripple and timeline zoom show only in the full timeline.
 
 ### 4.1 Lanes and the playhead
 
@@ -72,7 +80,7 @@ Narration length is the clip's real length for a recording or an imported file. 
   - **The stack** is edited in the Inspector: add an effect from the list, switch each one on or off, move it earlier or later, change its amount (and colour for Tint and Fill), or remove it. Effects apply from the top of the list down. A region with no effects leaves the recording as it is and shows a dashed outline while editing. The bar names the stack when there's more than one ("Email field · 3 effects"), and its tooltip lists it.
   - **Layers:** each Effects-lane row is a layer, the top row is the top layer, and higher layers draw on top on the canvas. Two regions never overlap in time on one layer: moving or trimming a bar stops at its neighbours on that layer. A new region goes on the lowest layer with room. Dragging a bar up or down moves it to the row under the pointer if it fits there; if that row is taken at that time, a new layer is slotted in just past it; above the top row or below the bottom row makes a new top or bottom layer. The Inspector's Layer group has Bring forward and Send backward (each passes exactly one layer), Bring to front and Send to back. Empty layers are removed straight away.
 - **Lanes with many rows** (Effects, Voice) show at most **four rows** and scroll for the rest, so the canvas never shrinks; the label then shows the count ("9 effects ↕"). Selecting a bar that's scrolled out of view scrolls it into view.
-- **Adding an effect region:** the Blur tool (`X`), then drag over the frame; or the **+** on the Effects lane's label (or "Add a blur at the playhead" in ⌘K), which adds one in the middle of the frame, staggered so repeated adds don't sit on top of each other. Either way it starts at the playhead, runs to the end of the recording and starts with one Pixelate effect. New regions are named "Blur N" with a number no other region uses.
+- **Adding an effect region:** the **Hide** button at the top of the right panel, or the **+** on the Effects lane's label, adds one in the middle of the frame, staggered so repeated adds don't sit on top of each other; the Hide tool (`X`) draws one where you drag. Either way it starts with one **Cover** effect and lasts for the step on screen (or from the playhead to the end of the recording when the frame has no step), and a message says which. The Hide panel's *How long* changes that to *From here to the end* or *The whole video*. New regions are named "Blur N" with a number no other region uses.
 - **Only the ruler moves the playhead.** Click or drag on the ruler to scrub. Clicking or dragging anywhere in a lane must not.
 - Scrubbing snaps (see [snapping](#44-snapping)).
 
@@ -124,14 +132,15 @@ A toggle (`N`, on by default). Holding **Alt** flips it for the drag in progress
 
 ## 5. Canvas
 
-### 5.1 Tools
+### 5.1 Adding things: the Add buttons, the tools and the quick actions
 
-Select (`V`), Pin (`P`), Callout (`C`), Arrow (`A`), Spotlight (`S`), Box (`B`), Zoom (`Z`), Blur (`X`). `Esc` returns to Select.
-
-- **Pin:** click the frame. Creates a step at the playhead frame (or moves that step's click marker if one is already there) and gives it a click marker.
-- **Callout, Arrow, Spotlight, Box, Zoom:** need a step at the playhead; otherwise a message says to pin the frame first. A drag of at least 1.5% of the frame draws the shape; a plain click makes a default-size one. A zoom box is always the frame's shape.
-- **Blur:** doesn't need a step. It starts at the playhead and lasts to the end of the guide.
-- After drawing, the tool returns to Select with the new item selected.
+- **The Add buttons** at the top of the right panel (**Callout, Arrow, Highlight, Zoom, Hide, Click**) put the item on the step at the playhead with one click, selected, around the step's click marker when it has one and otherwise in the middle of the frame. A second item of the same kind sits a little further on, so they don't stack. On a frame without a step, the frame becomes a step first. Click on a step that has no click marker gives it one in the middle; on a step that has one it selects it. Hide isn't tied to a step (see 4.1). A new callout takes the step's title as its words.
+- **The tools** draw an item exactly where you click or drag. Their keys pick them: Select (`V`), Pin (`P`, the Click button's key), Callout (`C`), Arrow (`A`), Highlight (`H`, a spotlight; `S` and `B` pick the spotlight and the outline), Zoom (`Z`), Hide (`X`). The picked tool's Add button shows as armed, and `Esc` returns to Select. There is no tool palette.
+  - **Pin:** click the frame. Creates a step at the playhead frame (or moves that step's click marker if one is already there) and gives it a click marker.
+  - **Callout, Arrow, Highlight, Zoom:** need a step at the playhead; otherwise a message says to pin the frame first. A drag of at least 1.5% of the frame draws the shape; a plain click makes a default-size one. A zoom box is always the frame's shape.
+  - **Hide:** doesn't need a step. It starts at the playhead.
+  - After drawing, the tool returns to Select with the new item selected.
+- **Quick actions:** right after a click marker drops (the Pin tool or the Click button), a bar next to it offers **Add callout · Highlight · Zoom here**, each the same as the Add button, so placed around the click. It sits below and to the right of the marker, or above and to the left where there's no room, and only while that frame is on screen. It goes away as soon as anything else happens: an edit, a new selection, another tool, a pointer press outside it, or any key but Tab (Tab reaches its buttons, and Enter or Space presses one).
 
 ### 5.2 Select tool: who gets the drag
 
@@ -156,7 +165,8 @@ An unselected zoom box is selected by its dashed outline only, so it never block
 ### 5.3 Other canvas rules
 
 - Dragging on the canvas, the timeline or the step rail must never select text. The Inspector's fields stay selectable.
-- **Edit** view shows every annotation with handles; **Viewer** view shows the step as the published guide would (zoom eased in, annotations revealing in group order). Timeline editing works in both. Playing always uses viewer rendering. **Leaving a step the Viewer's way eases out, it never cuts:** pressing Continue, Play or Space from it, or switching back to Edit, returns the zoom to the whole frame over half a second while the annotations fade, as in the published guide and the MP4 (the same timings). Moving the playhead somewhere else (seeking, scrubbing, stepping a frame) cuts at once, and reduced motion cuts too.
+- **While paused** the frame shows every annotation with handles and the dashed zoom box, ready to edit. **Playing** always shows each step as the published guide does (the zoom eases in, annotations reveal in group order), and so does a step playback has stopped at, where a click on the frame carries on like Continue. **Leaving such a step eases out, it never cuts:** pressing Continue, Play or Space from it returns the zoom to the whole frame over half a second while the annotations fade, as in the published guide and the MP4 (the same timings). Moving the playhead somewhere else (seeking, scrubbing, stepping a frame) cuts at once, and reduced motion cuts too. (The Edit / Viewer switch under the frame went with the tool palette in Phase 4; **Preview** shows the guide exactly as viewers get it.)
+- **The line under the frame** is one status line of fixed height: a message, "Playing 2×", "Stopped at step N" with Continue, or the picked tool's hint. When it has nothing to say it shows the **next-step hint**: "Press Add step where the viewer should click" with no steps, then "Give step N a title" for the first untitled step, then "Preview it, then Export"; once the guide has been previewed or Export opened since the project opened, nothing.
 
 ## 6. Playback and transport
 
@@ -169,9 +179,11 @@ An unselected zoom box is selected by its dashed outline only, so it never block
 - **Narration plays while playing forward**, from wherever the playhead enters a voice bar. Recorded and imported clips follow the playhead, the playback speed (pitch kept), volume and fades. Generated voice can't seek or fade, so it only starts within 0.35 s of the bar's start and ignores fades. Pausing, stopping at a step, scrubbing or playing backward silences it. `M` turns sound off; the guide preview uses the same setting.
 - **Music plays under everything** while playing forward, looping to fill its bar, at its volume with fades. **Auto-ducking** lowers it while someone is speaking: speech is detected inside recorded and imported narration (20 ms frames above a threshold set between the clip's noise floor and its peaks; pauses under 0.3 s are bridged and blips under 0.12 s ignored), so the music comes back up in the pauses between sentences. Generated voice ducks for its whole bar, because the browser's speech engine doesn't report its pauses. The music eases down 0.2 s before speech and recovers over the "Recover over" time after it. A line on the music bar draws the ducking.
 
-## 7. Inspector
+## 7. Right panel and step card
 
-Two tabs: **Inspector** (the selection) and **Guide** (project-wide settings). The Inspector is a stack of collapsible groups; whether a group is collapsed is remembered while you work. Selecting something new scrolls the panel to the top.
+The right panel has two tabs: **Inspector** (the Add buttons, then the selection) and **Guide** (the recording and where the project is saved; how the guide plays and how it looks are in the Export dialog). Under the Add buttons the panel shows the selected item's few simple controls, then a collapsed **Advanced** section with the precise ones, then **Remove**. Advanced, closed, is one line saying what's inside; whether it is open is remembered while you work, as is each collapsible group inside it. Selecting something new shows the Inspector tab, scrolled to the top.
+
+A selected **step** opens as a card in the Steps list instead: Title, Note, the "On this step" chips (each selects its item), a footer saying how the step behaves ("Waits for a click, or 2.5 s in a video") with **Duplicate**, and Advanced (exact time, pause, appearing order). The right panel then only says where things are, with **Delete step**.
 
 ### 7.1 Parameter rows
 
@@ -185,16 +197,26 @@ Every numeric value is one row: **label, reset button, slider, number box with i
 
 ### 7.2 Panels
 
-| Selection | Groups |
-|---|---|
-| Step | Title, note, **position** (typed timeline time), pause, zoom on/off and amount, annotation list with reveal order, narration |
-| Annotation | Text or curve, colour, **position and size** in px, reveal group |
-| Zoom | Amount, centre on the click, preview zoomed, remove |
-| Clip | **Trim** (In, Out, Plays for), **Speed** (presets and a number), **Audio** (volume, mute), split at playhead |
-| Gap | Length, close gap |
-| Effect region | Name, **Effects** (the stack, with Add an effect, and the region's opacity), **Layer** (forward, backward, front, back), **Timing** (start, end, length, start/end at playhead, fades), **Position and size** |
-| Narration | **Source** (generated voice, recorded voice, audio file, original audio, none) and its controls: voice, script and Preview; Record with a level meter and a 2-minute cap; choose, replace or remove a file. **Timing** (start, offset, speaking speed, fades), **Audio** (volume, mute) |
-| Music | **Timing** (start, end, length, start/end at playhead, play to the end, fades), **Audio** (volume, mute, use my own music file), **Ducking** (auto-duck under speech, lower to, recover over) |
+| Selection | Simple controls | Under Advanced |
+|---|---|---|
+| Step (on the step card) | Title, note, "On this step" chips, Duplicate | **Position** (typed timeline time), pause, appearing order |
+| Callout | Words (the step's title and note, or your own), colour | Bubble placement, **position** in px, appearing group |
+| Arrow | Colour | Exact ends in px, appearing group |
+| Highlight | Spotlight or outline (and the outline's colour) | Exact box in px, appearing group |
+| Click marker | Nothing (drag it) | Position in px, colour, appearing group |
+| Zoom | How close (1.25× to 4×, about the box's centre) | Exact area in px, centre on the click |
+| Hide (an effect region) | **Look** (Cover, Pixelate or Blur), **Strength** (Pixelate and Blur; Cover can't leak), **How long** (this step only, from here to the end, the whole video) | Name, **Effects** (the stack, with Add an effect, and the region's opacity), **Layer** (forward, backward, front, back), **Timing** (start, end, length, start/end at playhead, fades), **Position and size**, keyframes |
+| Clip (full timeline) | **Trim** (In, Out, Plays for), **Speed** (presets and a number), **Audio** (volume, mute), split at playhead | — |
+| Gap (full timeline) | Length, close gap | — |
+| Narration (not built yet) | **Source** (generated voice, recorded voice, audio file, original audio, none) and its controls: voice, script and Preview; Record with a level meter and a 2-minute cap; choose, replace or remove a file. **Timing** (start, offset, speaking speed, fades), **Audio** (volume, mute) | |
+| Music (not built yet) | **Timing** (start, end, length, start/end at playhead, play to the end, fades), **Audio** (volume, mute, use my own music file), **Ducking** (auto-duck under speech, lower to, recover over) | |
+
+A Hide region keeps every effect it had: projects saved before Phase 4 open with their stacks, layers and fades unchanged. A region whose stack isn't one of the three simple looks says it has its own mix of effects, under Advanced, until a look is picked to replace it.
+
+### 7.3 Preview and Export
+
+- **Preview** (⌘↩, or the top-bar button) opens the guide in the real player at the selected step's still, or on the start card when no step is selected. Closing it (Esc or the close button) selects the step it was showing and moves the playhead there; closing from the start or end card leaves the editor as it was.
+- **Export** opens one dialog: what to export, then only what matters for it, with the rest under its Advanced ([03](03-design-system.md), "Editing a step"). Under the video's sound switch it says which parts will be silent: sped-up or slowed clips (how many, and for how long), muted clips, gaps and the pauses at steps. A recording without sound has the switch off and disabled.
 
 ## 8. Undo and redo
 
@@ -214,8 +236,9 @@ No shortcut fires while a dialog is open. Typing in a text, number or text-area 
 | `⌘,` `⌘.` | Play from the very start; jump to the very end |
 | `=` `+` `-` | Zoom the timeline in, in, out |
 | `⇧K` `⇧I` | Select the layer below, above |
-| `V` `P` `C` `A` `S` `B` `Z` `X` | Tools |
-| `⇧P` | Pin a step at the playhead |
+| `V` `P` `C` `A` `H` `Z` `X` | Tools: select, pin (click), callout, arrow, highlight, zoom, hide (`S` and `B` pick the spotlight and outline highlights) |
+| `⇧P` | Add a step at the playhead |
+| `⌘D` | Copy the selected step onto the frame at the playhead |
 | `R` | Split the clip at the playhead |
 | `N` | Snapping on or off (hold `Alt` to flip it for one drag) |
 | `⇧R` | Ripple trim on or off |
@@ -223,10 +246,10 @@ No shortcut fires while a dialog is open. Typing in a text, number or text-area 
 | `Delete` | Delete the selection |
 | `Esc` | See section 3 |
 | `⌘Z` `⇧⌘Z` | Undo, redo |
-| `⌘K` | Command palette (lists every action with its key) |
-| `⌘↩` `⌘E` | Preview guide; export menu |
+| `⌘K` | Command palette (not built yet) |
+| `⌘↩` | Preview the guide at the selected step |
 
-Keys are matched case-insensitively, so they also work with Caps Lock on. `⌘,` is Settings in Chrome and Safari; a page may not be able to claim it, which is why every shortcut is also in the command palette.
+Keys are matched case-insensitively, so they also work with Caps Lock on. `⌘,` is Settings in Chrome and Safari; a page may not be able to claim it. There is no Export shortcut: the Export button replaced the old Export menu (`⌘E`).
 
 ## 10. Acceptance checks
 
@@ -249,7 +272,7 @@ Written so each can become an automated test in the real editor. The sample proj
 15. Typing `jkl=-` into a text field changes only the field.
 16. Typing 3 into a blur's Start field and pressing Enter sets 0:03.00; ⌘Z reverts it; typing a start after the end is refused and the field reverts.
 17. Editing a number, then immediately clicking a segmented button, applies both.
-18. `R` splits at the playhead; `⌘B` does nothing; `B` selects Box and `X` selects Blur.
+18. `R` splits at the playhead; `⌘B` does nothing; `B` selects Box (the outline highlight) and `X` selects Hide.
 19. Importing a 1.5 s audio file as a step's narration makes its voice bar 1.5 s long with a waveform; playing from that pin plays it; ⌘Z removes the clip again and ⇧⌘Z brings it back.
 20. Playing from a pin with generated voice speaks the step's script; pausing stops the speech; with sound off (`M`) nothing is spoken.
 21. Adding ten effect regions at the same playhead gives twelve bars with twelve different names; the Effects lane stays four rows tall, scrolls, labels itself "12 effects", and the canvas keeps its size. Deleting one and adding another still gives unique names.
