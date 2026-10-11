@@ -175,7 +175,7 @@ export function StepRail() {
         <div className="flex flex-1 flex-col justify-center gap-2 p-5 text-center text-fg-muted">
           <p className="m-0 font-medium text-fg">No steps yet</p>
           <p className="m-0">
-            Open a recording, then press Add step <KeyCap keys={['shift', 'p']} /> where viewers should click, or use the Pin tool <KeyCap keys={['p']} />.
+            Press Add step <KeyCap keys={['shift', 'p']} /> where viewers should click, or use the Pin tool <KeyCap keys={['p']} />.
           </p>
         </div>
       ) : (

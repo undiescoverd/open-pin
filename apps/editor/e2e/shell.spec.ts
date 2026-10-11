@@ -2,20 +2,40 @@ import { expect, test, type Page } from '@playwright/test';
 import { addButton, openRecording, watchErrors } from './helpers';
 
 test.describe('editor shell', () => {
-  test('shows the empty editor with every pane', async ({ page }) => {
+  test('first run is one drop zone with the shape of the job; the editor appears with a recording', async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto('/');
     await expect(page).toHaveTitle('Waypost');
+    await expect(page.getByRole('heading', { name: 'Drop a screen recording here' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Choose a recording…' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open a project file…' })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'How it works' }).getByRole('listitem')).toHaveText(['1Add steps', '2Explain each one', '3Export']);
+    /* nothing else until there is a recording */
+    for (const pane of [/Steps/, 'Inspector']) await expect(page.getByRole('complementary', { name: pane })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Filmstrip' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Export', exact: true })).toHaveCount(0);
+
+    await openRecording(page, { fullTimeline: false });
     await expect(page.getByRole('banner', { name: 'Waypost' })).toBeVisible();
     await expect(page.getByRole('complementary', { name: /Steps/ })).toBeVisible();
     await expect(page.getByRole('main', { name: 'Canvas' })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Filmstrip' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Drop a screen recording' })).toBeVisible();
-    await expect(page.getByRole('group', { name: 'Add to a step' }).getByRole('button')).toHaveCount(6);
-    for (const lane of ['Steps lane', 'Filmstrip']) await expect(page.getByLabel(`${lane}, empty`)).toBeVisible();
-    await expect(page.getByText('0:00.000 / 0:00.000')).toBeVisible();
+    await expect(page.getByRole('group', { name: /^Add to/ }).getByRole('button')).toHaveCount(6);
     expect(errors).toEqual([]);
+  });
+
+  test('the next-step hint under the frame suggests one thing at a time, then goes quiet', async ({ page }) => {
+    await openRecording(page, { fullTimeline: false });
+    const hint = page.getByTestId('next-hint');
+    await expect(hint).toHaveText('Press Add step where the viewer should click', { timeout: 10_000 });
+    await page.getByRole('button', { name: 'Add step' }).click();
+    await expect(hint).toHaveText('Give step 1 a title', { timeout: 10_000 });
+    await page.getByRole('complementary', { name: /Steps/ }).getByRole('textbox', { name: 'Title' }).fill('Open the menu');
+    await expect(hint).toHaveText('Preview it, then Export', { timeout: 10_000 });
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    await page.keyboard.press('Escape');
+    await expect(hint).toHaveCount(0);
   });
 
   test('fits a laptop screen without scrolling sideways', async ({ page }) => {
@@ -25,9 +45,9 @@ test.describe('editor shell', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('Add buttons wait for a recording, then keys pick the drawing tools, but not while typing', async ({ page }) => {
+  test('Add buttons come with a recording, then keys pick the drawing tools, but not while typing', async ({ page }) => {
     await page.goto('/');
-    await expect(addButton(page, 'Click')).toBeDisabled();
+    await expect(addButton(page, 'Click')).toHaveCount(0);
     await page.keyboard.press('p');
     const armed = page.locator('[data-armed]');
     await expect(armed).toHaveCount(0);
@@ -82,7 +102,7 @@ test.describe('editor shell', () => {
   });
 
   test('inspector tabs switch by click and arrow keys', async ({ page }) => {
-    await page.goto('/');
+    await openRecording(page, { fullTimeline: false });
     await expect(page.getByRole('heading', { name: 'Nothing selected' })).toBeVisible();
     await page.getByRole('tab', { name: 'Guide' }).click();
     await expect(page.getByRole('heading', { name: 'Guide settings' })).toBeVisible();

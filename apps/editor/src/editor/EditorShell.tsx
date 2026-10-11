@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { openFile, restoreLastProject, startAutosave } from '../state/project';
 import { ExportDialog } from './ExportDialog';
 import { Filmstrip } from './Filmstrip';
+import { FirstRun } from './FirstRun';
 import { Inspector } from './Inspector';
 import { PreviewDialog } from './PreviewDialog';
 import { ProjectsDialog } from './ProjectsDialog';
@@ -16,6 +17,7 @@ import { useEditor } from '../state/store';
 export function EditorShell() {
   useShortcuts();
   const timelineView = useEditor(s => s.timelineView);
+  const ready = useEditor(s => s.phase === 'ready');
 
   useEffect(() => {
     const stop = startAutosave();
@@ -40,6 +42,15 @@ export function EditorShell() {
       window.removeEventListener('drop', drop);
     };
   }, []);
+
+  /* until there is a recording, the whole window is the drop zone */
+  if (!ready)
+    return (
+      <>
+        <FirstRun />
+        <ProjectsDialog />
+      </>
+    );
 
   return (
     <div className="grid h-full min-h-[640px] min-w-[960px] gap-3 px-4 py-3 [grid-template-areas:'top_top_top'_'steps_stage_insp'_'tl_tl_tl'] grid-cols-[264px_minmax(0,1fr)_304px] grid-rows-[auto_minmax(0,1fr)_auto]">
