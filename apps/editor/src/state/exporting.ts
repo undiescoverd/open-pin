@@ -143,6 +143,7 @@ export async function exportMp4(options: Mp4Options): Promise<void> {
     const assets = await workerAssets(project, state.assetImages);
     /* a Cancel while the files were being read comes before the worker's job, which would otherwise forget it */
     if (cancelled) {
+      for (const [, image] of assets) image.close();
       notify('Export cancelled.');
       return;
     }
@@ -219,6 +220,7 @@ export async function exportGuide(options: GuideExportOptions): Promise<void> {
     const recording = await readSource(project.id, source.file);
     const assets = await workerAssets(project, state.assetImages);
     if (cancelled) {
+      for (const [, image] of assets) image.close();
       notify('Export cancelled.');
       return;
     }

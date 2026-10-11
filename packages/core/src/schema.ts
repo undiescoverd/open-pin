@@ -239,16 +239,25 @@ export const ProjectSchema = z.object({
   if (p.sources.length === 0) issue(['sources'], 'needs a recording');
   const sources = new Set(p.sources.map(s => s.id));
   const assets = new Set(p.assets.map(a => a.id));
+  const durations = new Map(p.sources.map(s => [s.id, s.duration]));
+  /* a tolerance for float noise in trims and speeds: a time that ends exactly at the recording's end is still inside it */
+  const inside = (source: string, time: number) => {
+    const duration = durations.get(source);
+    return duration === undefined || time <= duration + 1e-3;
+  };
   p.timeline.forEach((c, i) => {
     if (!sources.has(c.source)) issue(['timeline', i, 'source'], 'names no recording');
     if (!(c.out > c.in)) issue(['timeline', i], 'ends before it starts');
+    else if (!inside(c.source, c.out)) issue(['timeline', i, 'out'], 'runs past the end of its recording');
   });
   p.steps.forEach((st, i) => {
     if (!sources.has(st.anchor.source)) issue(['steps', i, 'anchor', 'source'], 'names no recording');
+    else if (!inside(st.anchor.source, st.anchor.time)) issue(['steps', i, 'anchor', 'time'], 'is past the end of its recording');
   });
   p.blurs.forEach((b, i) => {
     if (!sources.has(b.source)) issue(['blurs', i, 'source'], 'names no recording');
     if (b.end < b.start) issue(['blurs', i], 'ends before it starts');
+    else if (!inside(b.source, b.end)) issue(['blurs', i, 'end'], 'runs past the end of its recording');
   });
   if (p.logo && !assets.has(p.logo.asset)) issue(['logo', 'asset'], 'names no image');
   if (p.frame.background.type === 'image' && !assets.has(p.frame.background.asset)) issue(['frame', 'background', 'asset'], 'names no image');

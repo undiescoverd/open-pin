@@ -111,6 +111,7 @@ class LiveDriver implements SegmentDriver {
         /* the canvas keeps showing the last frame */
         const until = performance.now() + piece.seconds * 1000;
         while (performance.now() < until && !signal.aborted && !this.paused) await new Promise(r => requestAnimationFrame(r));
+        if (superseded()) return;
         this.gone += piece.seconds;
         continue;
       }
