@@ -204,7 +204,7 @@ Annotation text uses a bundled Figtree font (WOFF2), so canvas output is identic
 ├─ seg/outro.mp4         whatever plays after the last step
 ├─ assets/               the logo and background image, when the guide has them
 ├─ fonts/                Figtree for annotation text
-└─ audio/<step-id>.m4a   optional narration, from Phase 7 (music later)
+└─ audio/<step-id>.m4a   optional narration, from Phase 8 (music later)
 ```
 
 Embed:

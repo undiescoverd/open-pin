@@ -1,6 +1,6 @@
 # 07 — Hosting and payment options
 
-How Waypost could add online storage for published guides, how FramePin does it, and the ways Waypost could charge. Nothing here is decided yet: it feeds Phase 6 (Sharing) and the open questions on selling in [04-roadmap.md](04-roadmap.md).
+How Waypost could add online storage for published guides, how FramePin does it, and the ways Waypost could charge. Nothing here is decided yet: it feeds Phase 7 (Sharing) and the open questions on selling in [04-roadmap.md](04-roadmap.md).
 
 **Status:** options and a recommendation. Prices and provider fees haven't been checked; look them up before setting a price.
 
@@ -8,7 +8,7 @@ How Waypost could add online storage for published guides, how FramePin does it,
 
 - Projects live in the browser's private storage (OPFS) with a small IndexedDB list. Nothing is uploaded; `.waypost` files are the backup ([02-architecture.md](02-architecture.md#storage)).
 - Share exports a static folder or zip (`packages/export/src/bundle.ts`) that the person uploads to any static host.
-- Phase 6 plans **Publish online**: connect a host once, then one click gives a link and an embed code. The first host is an open question.
+- Phase 7 plans **Publish online**: connect a host once, then one click gives a link and an embed code. The first host is an open question.
 
 External storage such as Cloudflare R2 answers that question. It's a place for published guides, not for projects.
 
@@ -26,7 +26,7 @@ External storage such as Cloudflare R2 answers that question. It's a place for p
 
 ### B. We host on our own R2 (accounts, or close to it)
 
-- The editor asks a small Cloudflare Worker for presigned upload URLs and uploads straight to R2. This is the true one-click experience Phase 6 asks for.
+- The editor asks a small Cloudflare Worker for presigned upload URLs and uploads straight to R2. This is the true one-click experience Phase 7 asks for.
 - The Worker needs an identity. The licence key can be it: the key proves a purchase, and the Worker issues a per-guide secret so republishing keeps the same link. Real accounts are only needed for managing guides across devices or recovering them.
 - **The real work is around the code:** quotas, abuse and takedowns (we'd host other people's recordings), deletion and privacy obligations, and running costs. R2 has no egress fees, but storage and requests still cost money, which sits badly with a one-off price. It also ends the "no server" claim.
 - **Size:** about two weeks, closer to a month with the first version of the backend.
@@ -75,7 +75,7 @@ Not at the start. Copy the product, not the payment and backend structure:
 
 1. **Launch** as a one-off purchase with a year of updates, plus an early-bird lifetime price for the first buyers.
 2. **Licences** from Lemon Squeezy or Paddle: they issue and check keys, handle VAT and host the checkout. The "year of updates" is an update-expiry date on the key. The key is checked online once and cached, so the editor works offline.
-3. **Phase 6 publishing** with the person's own storage (option A): R2 first, behind a generic upload destination so S3 and Cloudflare Pages direct upload can follow. Put the effort into a painless setup.
+3. **Phase 7 publishing** with the person's own storage (option A): R2 first, behind a generic upload destination so S3 and Cloudflare Pages direct upload can follow. Put the effort into a painless setup.
 4. **Later, only if people ask:** the optional hosting add-on (option B, with the licence key as identity) and a team tier.
 5. **Avoid:** a pure subscription for the editor, and usage-based pricing.
 
