@@ -125,7 +125,7 @@ Make the editor simple by default, as designed in [06-simplify-plan.md](06-simpl
 - **Honest messages:** the video's sound switch says how many sped-up or slowed clips will be silent and for how long, and is off and disabled for a recording without sound. Recordings the browser can't open name their format (ProRes, HEVC…) and say to re-export from QuickTime Player as H.264.
 - **The ⌘K command palette** is still not built (its top-bar button is disabled), and **⌘E** went with the old Export menu. The keyboard tables in docs 03 and 05 say so.
 - **The HTML mockup** is retired as the layout reference in favour of the design canvas. It stays in `design/mockup` only for narration and music, which aren't built yet.
-- **One annotation style per guide** (from the simplify plan's other decisions) isn't built: annotation colours are still set one by one.
+- **One annotation style per guide** is its colour only: **Annotation colour** under Export's Advanced, which new arrows, outlines and click markers take; changing it recolours every annotation still in the old colour, and one given its own colour keeps it. Callouts stay dark bubbles. Callout shape and text size aren't built, because the renderer has no such options yet.
 
 ## Phase 5 — Click capture (next)
 

@@ -88,7 +88,7 @@ One **Export** button, one dialog.
 
 - **Quick actions after the Click tool:** right after a pin drops, a small bar next to it offers **Add callout · Highlight · Zoom here**, each placed around the click. It goes away as soon as you do anything else.
 - **Duplicate step** (⌘D and in the step's menu) copies the title, note, annotations and zoom to the frame you're on.
-- **One annotation style per guide** (colour, callout shape, text size), set under Export's Advanced. New annotations use it. Changing it updates every annotation that hasn't been styled by hand.
+- **One annotation style per guide** (colour, callout shape, text size), set under Export's Advanced. New annotations use it. Changing it updates every annotation that hasn't been styled by hand. (Built for colour; shape and text size wait for the renderer to support them.)
 - **Next-step hint:** a single quiet line under the frame suggests the next useful thing ("Press Add step where the viewer should click", "Give step 2 a title", "Preview it, then Export") and says nothing once the guide is ready.
 - **Privacy check:** before any export, a short list of every hidden area with a thumbnail at its first and last frame, plus a warning if the recording's own sound is on. It doesn't block the export.
 - **SOP document export:** Markdown with a folder of step images, or a single HTML file with the images inside. The content is the guide title, then each step's number, title, note and annotated picture.

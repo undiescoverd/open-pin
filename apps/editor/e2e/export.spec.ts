@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { exportDialog, openExport, openExportAdvanced, openRecording, seekTo, waitForFrame, watchErrors } from './helpers';
+import { addButton, exportDialog, inspector, openExport, openExportAdvanced, openRecording, seekTo, stepChip, waitForFrame, watchErrors } from './helpers';
 
 /** Phase 4, item 6: one Export button and one dialog. Pick what to export, answer what matters for it, and find the rest under
     Advanced. The Phase 1 to 3 specs export through it; this spec covers the dialog itself. */
@@ -37,7 +37,7 @@ test.describe('Export', () => {
     await expect(dialog.getByRole('button', { name: 'Export guide' })).toBeEnabled();
     await expect(dialog.getByText('Coming later')).toBeVisible();
     /* the player's look, saving, framing and logo wait under Advanced */
-    await expect(summary(page)).toContainText('Player look, saving, PDF copy, framing and logo');
+    await expect(summary(page)).toContainText('Player look, saving, PDF copy, annotation colour, framing and logo');
     await expect(dialog.getByRole('switch', { name: 'Step counter' })).toBeHidden();
     await openExportAdvanced(page);
     for (const group of ['Player', 'Saving', 'Background and framing', 'Logo']) await expect(dialog.getByRole('region', { name: group })).toBeVisible();
@@ -53,7 +53,7 @@ test.describe('Export', () => {
     await expect(dialog.getByRole('switch', { name: 'Step titles as captions' })).toBeVisible();
     await expect(dialog.getByText(/^\d+ × 1080 · 0:0\d\.\d\d long, with 1 step pause\.$/)).toBeVisible();
     await expect(dialog.getByRole('group', { name: 'How it plays' })).toHaveCount(0);
-    await expect(summary(page)).toContainText('Framing, background and logo');
+    await expect(summary(page)).toContainText('Annotation colour, framing, background and logo');
 
     await kinds(page).getByRole('button', { name: /^PDF/ }).click();
     await expectOptions(dialog.getByRole('group', { name: 'Page size' }), ['A4', 'Letter', '16:9 slides']);
@@ -90,6 +90,33 @@ test.describe('Export', () => {
     await page.getByRole('group', { name: 'Speed presets' }).getByRole('button', { name: '2×' }).click();
     dialog = await openExport(page, 'Video');
     await expect(dialog.getByText(/^The sped-up or slowed clip is silent in the video \(\d\.\d s\): sound can't change speed yet\./)).toBeVisible();
+  });
+
+  test('one annotation colour for the guide: new annotations take it, and changing it recolours those still in the old one', async ({ page }) => {
+    await openRecording(page, { fullTimeline: false });
+    const colour = (name: string) => inspector(page).getByRole('group', { name: 'Colour' }).getByRole('button', { name });
+    await addButton(page, 'Highlight').click();
+    await inspector(page).getByRole('group', { name: 'Look' }).getByRole('button', { name: 'Outline' }).click();
+    await expect(colour('Coral')).toHaveAttribute('aria-pressed', 'true');
+    await addButton(page, 'Arrow').click();
+    await colour('Iris').click(); /* given its own colour by hand */
+
+    const dialog = await openExport(page, 'PDF');
+    await openExportAdvanced(page);
+    await dialog.getByRole('group', { name: 'Annotation colour' }).getByRole('button', { name: 'Lagoon' }).click();
+    await page.keyboard.press('Escape');
+
+    await stepChip(page, /Outline/).click();
+    await expect(colour('Lagoon')).toHaveAttribute('aria-pressed', 'true');
+    await stepChip(page, /Arrow/).click();
+    await expect(colour('Iris')).toHaveAttribute('aria-pressed', 'true');
+    await addButton(page, 'Arrow').click();
+    await expect(colour('Lagoon')).toHaveAttribute('aria-pressed', 'true');
+
+    await page.keyboard.press('ControlOrMeta+z');
+    await page.keyboard.press('ControlOrMeta+z'); /* the second arrow, then the colour change, in one step */
+    await stepChip(page, /Outline/).click();
+    await expect(colour('Coral')).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('the Guide tab no longer holds the player or framing, and points to Export', async ({ page }) => {

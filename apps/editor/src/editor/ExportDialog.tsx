@@ -15,13 +15,13 @@ import {
   type Project,
 } from '@waypost/core';
 import type { PdfPage, StillFormat } from '@waypost/export';
-import { GRADIENTS } from '@waypost/render';
+import { ANNOTATION_COLORS, GRADIENTS } from '@waypost/render';
 import { Advanced, Button, ColorSwatchPicker, Dialog, Icon, ParamRow, Segmented, SelectField, Switch, TextField, cx, focusRing } from '@waypost/ui';
 import { Check, ClipboardCopy, Copy, Download, FileText, Film, ImageDown, ImagePlus, Images, Link2, MousePointerClick, type LucideIcon } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
 import { copyFrame, exportGuide, exportMp4, exportPdfGuide, exportScreenshots, saveFrame } from '../state/exporting';
 import { addImage } from '../state/project';
-import { notify, selectProject, setExportDialog, setFrame, setGuide, setLogo, useEditor } from '../state/store';
+import { notify, selectProject, setAnnotationColor, setExportDialog, setFrame, setGuide, setLogo, useEditor } from '../state/store';
 import { useEditSession } from './useEditSession';
 
 /* Export (docs/06-simplify-plan.md, "Export"): one dialog for everything that leaves the editor. Pick what to export, answer the
@@ -199,7 +199,7 @@ export function ExportDialog() {
           )}
         </div>
 
-        <Advanced id={`export-${kind}`} summary={kind === 'guide' ? 'Player look, saving, PDF copy, framing and logo' : 'Framing, background and logo'} className="-mt-1">
+        <Advanced id={`export-${kind}`} summary={kind === 'guide' ? 'Player look, saving, PDF copy, annotation colour, framing and logo' : 'Annotation colour, framing, background and logo'} className="-mt-1">
           {kind === 'guide' && (
             <>
               <EndButtonAdvanced project={project} />
@@ -220,6 +220,7 @@ export function ExportDialog() {
               </Group>
             </>
           )}
+          <AnnotationStyle project={project} />
           <FramingGroup project={project} />
           <LogoGroup project={project} />
         </Advanced>
@@ -473,6 +474,18 @@ function FramingGroup({ project }: { project: Project }) {
       )}
       <Switch label="Shadow" checked={frame.shadow} onChange={shadow => setFrame({ shadow }, shadow ? 'Add shadow' : 'Remove shadow')} />
       <Help>{frame.padding > 0 || frame.aspect !== 'source' ? 'The recording sits on the background with rounded corners.' : 'Add padding or pick a shape to put the recording on a background.'}</Help>
+    </Group>
+  );
+}
+
+const ANNOTATION_SWATCHES = ANNOTATION_COLORS.map(c => ({ id: c.id, name: c.name, value: c.stroke }));
+
+/** One annotation colour for the whole guide (docs/06-simplify-plan.md, "Other decisions"). */
+function AnnotationStyle({ project }: { project: Project }) {
+  return (
+    <Group title="Annotations">
+      <ColorSwatchPicker label="Annotation colour" colors={ANNOTATION_SWATCHES} value={project.guide.annotationColor} onChange={setAnnotationColor} />
+      <Help>New arrows, outlines and click markers take it (callouts stay dark bubbles). Changing it recolours every one still in the old colour; one you gave its own colour keeps it.</Help>
     </Group>
   );
 }

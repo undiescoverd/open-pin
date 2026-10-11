@@ -121,7 +121,7 @@ export const commands = {
         const time = Math.min(Math.max(0, args.time), src.duration);
         const existing = d.steps.find(s => s.anchor.source === args.source && sameFrame(s.anchor.time, time, src.fps));
         const marker = (): ClickAnnotation | null =>
-          args.at ? { id: args.annotationId, type: 'click', at: clampPoint(args.at), color: DEFAULT_COLOR, reveal: 0 } : null;
+          args.at ? { id: args.annotationId, type: 'click', at: clampPoint(args.at), color: d.guide.annotationColor, reveal: 0 } : null;
         if (existing) {
           const click = existing.annotations.find(a => a.type === 'click');
           if (click && click.type === 'click' && args.at) click.at = clampPoint(args.at);
@@ -610,6 +610,23 @@ export const commands = {
         const next = { ...d.guide, ...patch };
         if (JSON.stringify(next) === JSON.stringify(d.guide)) return;
         d.guide = next as GuideSettings;
+        touch(d, now);
+      },
+    };
+  },
+
+  /**
+   * Changes the guide's annotation colour, which new annotations take, and recolours every annotation still in the old one.
+   * Annotations given another colour by hand keep it.
+   */
+  setAnnotationColor(color: string, now: number): Command<Project> {
+    return {
+      label: 'Change annotation colour',
+      run: d => {
+        const old = d.guide.annotationColor.toLowerCase();
+        if (old === color.toLowerCase()) return;
+        for (const step of d.steps) for (const a of step.annotations) if ('color' in a && a.color.toLowerCase() === old) a.color = color;
+        d.guide.annotationColor = color;
         touch(d, now);
       },
     };

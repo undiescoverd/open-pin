@@ -8,7 +8,6 @@ import {
   clamp01,
   clipCommands,
   commands,
-  DEFAULT_COLOR,
   newId,
   redo as redoHistory,
   spotAt,
@@ -678,7 +677,7 @@ export function addToStep(kind: AddKind): void {
   const near = click?.type === 'click' ? click.at : MIDDLE;
   const k = step.annotations.filter(a => a.type === type).length * STAGGER;
   const at: Point = [clamp01(near[0] + k), clamp01(near[1] + k)];
-  let annotation = createAnnotation(type, at, at, DEFAULT_COLOR);
+  let annotation = createAnnotation(type, at, at, project.guide.annotationColor);
   if (annotation.type === 'arrow') {
     /* the tip on the point, the tail up and to the left, or the other way where there's no room */
     const from: Point = [at[0] + (at[0] < 0.15 ? 0.12 : -0.12), at[1] + (at[1] < 0.15 ? 0.1 : -0.1)];
@@ -693,7 +692,8 @@ export function addToStep(kind: AddKind): void {
 export function setHighlightKind(stepId: string, id: string, kind: 'spotlight' | 'box'): void {
   const a = selectProject(getEditor())?.steps.find(s => s.id === stepId)?.annotations.find(x => x.id === id);
   if (!a || (a.type !== 'spotlight' && a.type !== 'box') || a.type === kind) return;
-  const next: Annotation = kind === 'box' ? { id, type: 'box', rect: a.rect, color: DEFAULT_COLOR, reveal: a.reveal } : { id, type: 'spotlight', rect: a.rect, reveal: a.reveal };
+  const color = selectProject(getEditor())!.guide.annotationColor;
+  const next: Annotation = kind === 'box' ? { id, type: 'box', rect: a.rect, color, reveal: a.reveal } : { id, type: 'spotlight', rect: a.rect, reveal: a.reveal };
   run(commands.replaceAnnotation(stepId, id, next, Date.now(), kind === 'box' ? 'Change to outline' : 'Change to spotlight'));
 }
 
@@ -914,6 +914,11 @@ export function setLogo(logo: Logo | null, label?: string, coalesceKey?: string)
 }
 
 // ----- the interactive guide (F9, F10) -------------------------------------------------------------------------------
+
+/** The guide's annotation colour (Export › Advanced): new annotations take it, and those still in the old colour change with it. */
+export function setAnnotationColor(color: string): void {
+  run(commands.setAnnotationColor(color, Date.now()));
+}
 
 export function setGuide(patch: Partial<GuideSettings>, label?: string, coalesceKey?: string): void {
   run(commands.setGuide(patch, Date.now(), label, coalesceKey));
