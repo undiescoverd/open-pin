@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
-import { addButton, clickFrame, exportDialog, openExport, openExportAdvanced, openRecording, seekTo, stepCards, watchErrors } from './helpers';
+import { addButton, clickFrame, deselectAll, exportDialog, openExport, openExportAdvanced, openRecording, seekTo, stepCards, watchErrors } from './helpers';
 import { serveStatic, type StaticHost } from './static-server';
 
 /** The Phase 3 acceptance tests (docs/04-roadmap.md, "Phase 3 — Interactive guide"): the player settings, the in-editor preview,
@@ -136,6 +136,7 @@ test.describe('Phase 3: player settings and preview', () => {
   test('Preview plays the guide in the real player: start card, motion, steps with annotations, keys, end card', async ({ page }) => {
     const errors = watchErrors(page);
     await makeGuide(page);
+    await deselectAll(page); /* with no step selected, the preview opens on the start card */
     await page.keyboard.press('Control+Enter');
     const dialog = page.getByRole('dialog', { name: 'Preview' });
     await expect(dialog).toBeVisible();
@@ -192,6 +193,7 @@ test.describe('Phase 3: player settings and preview', () => {
 
     await test.step('Auto: each step stays for its pause, then the guide carries on; Pause holds it', async () => {
       await setHowItPlays(page, 'Plays by itself');
+      await deselectAll(page); /* no step selected: the preview opens on the start card */
       await page.keyboard.press('Control+Enter');
       await p.start.click();
       await expectState(dialog, 'step-1');
@@ -206,6 +208,7 @@ test.describe('Phase 3: player settings and preview', () => {
 
     await test.step('Video: the bar fills in time, with each step marked where it comes', async () => {
       await setHowItPlays(page, 'Plain video');
+      await deselectAll(page); /* closing the preview selected the step it was on */
       await page.keyboard.press('Control+Enter');
       /* 1 s of motion, then 2.5 s on each step, 1.5 s between steps and a 2 s outro: step 1 is at 1 s of 13.5 */
       const first = await dialog.getByRole('button', { name: /^Go to step 1/ }).evaluate(el => parseFloat((el as HTMLElement).style.left));

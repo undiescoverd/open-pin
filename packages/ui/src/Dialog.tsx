@@ -1,9 +1,10 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { cx } from './cx';
 import { Icon } from './Icon';
 import { IconButton } from './IconButton';
+import { dialogOpened, InDialog } from './layers';
 
 export interface DialogProps {
   open: boolean;
@@ -18,13 +19,16 @@ export interface DialogProps {
 
 const WIDTHS = { sm: 'w-[380px]', md: 'w-[560px]', lg: 'w-[760px]', xl: 'w-[1080px]' };
 
-/** A modal panel. Focus is trapped inside while it is open, Esc closes it, and keyboard shortcuts in the app pause. */
+/** A modal panel. Focus is trapped inside while it is open, Esc closes it (and does nothing else), and keyboard shortcuts in the app pause. */
 export function Dialog({ open, onOpenChange, title, description, children, size = 'md' }: DialogProps) {
+  useEffect(() => (open ? dialogOpened() : undefined), [open]);
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-40 bg-scrim" />
         <RadixDialog.Content
+          /* the Esc that closes the dialog stops here, so it doesn't also reach the app's own Esc (which clears the selection) */
+          onEscapeKeyDown={e => e.stopPropagation()}
           className={cx(
             'fixed top-1/2 left-1/2 z-50 flex max-h-[92vh] max-w-[94vw] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-panel shadow-pop outline-none',
             WIDTHS[size],
@@ -43,7 +47,9 @@ export function Dialog({ open, onOpenChange, title, description, children, size 
               <IconButton label="Close" icon={<Icon icon={X} />} size="sm" />
             </RadixDialog.Close>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto p-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-auto p-5">
+            <InDialog.Provider value>{children}</InDialog.Provider>
+          </div>
         </RadixDialog.Content>
       </RadixDialog.Portal>
     </RadixDialog.Root>

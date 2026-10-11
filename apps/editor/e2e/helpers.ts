@@ -148,3 +148,10 @@ export async function openExportAdvanced(page: Page): Promise<void> {
   if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator(':scope > summary').click();
   await expect(details).toHaveAttribute('open', '');
 }
+
+/** Presses Esc until nothing is selected, so no step card is open (and Preview opens on the start card). */
+export async function deselectAll(page: Page): Promise<void> {
+  const title = stepRail(page).getByRole('textbox', { name: 'Title' });
+  for (let i = 0; i < 4 && (await title.count()) > 0; i++) await page.keyboard.press('Escape');
+  await expect(title).toHaveCount(0);
+}
