@@ -220,7 +220,7 @@ A Hide region keeps every effect it had: projects saved before Phase 4 open with
 
 ### 7.4 The canvas
 
-- **The canvas bar** sits directly above the frame, as wide as it: the shape buttons (Original, 16:9, 4:3, 1:1, 4:5; one undo step each) and **Style**, which shows the Canvas tab. The frame sits under it, so the bar starts level with the top of the Steps list and the right panel.
+- **The canvas controls** are all in the Canvas tab, never above the frame: the shape buttons first (Original, 16:9, 4:3, 1:1, 4:5; one undo step each), then background, frame, annotation colour and logo. The frame starts level with the top of the Steps list and the right panel, with nothing above it, and the tab carries no explanatory text.
 - **The Canvas tab** (second tab of the right panel): Background (gradients, colours, image), Frame (padding, corner radius, shadow), Annotations (the guide's annotation colour: new arrows, outlines and click markers take it, callouts start as dark bubbles, and changing it recolours, in one undo step, every annotation still in the old colour; one given its own colour keeps it), Logo, then Recording and Saving. A project with no steps opens on it; selecting something, or adding a step, shows the Inspector tab.
 - **A new project** is 16:9 on the Dusk gradient with no padding. Opening an older project keeps its frame.
 - **What the frame shows is what every export draws.** Where there is no background the editor draws the same near-black the video and the guide use, so there is never a see-through canvas, and PNG and WebP exports are opaque. The only difference allowed between the frame and a picture export is the antialiasing along the rounded corners.

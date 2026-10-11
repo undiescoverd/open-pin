@@ -3,17 +3,17 @@ import { unzipSync } from 'fflate';
 import { readFile } from 'node:fs/promises';
 import { canvasBar, exportDialog, openExport, openRecording, openStyle, watchErrors } from './helpers';
 
-/** The canvas bar: shape and style are chosen in view of the frame, a new project starts widescreen on a gradient, and Export
-    has none of it. What the canvas shows is what every export draws. */
+/** The Canvas tab: shape and style are chosen beside the frame, never above it, a new project starts widescreen on a gradient, and
+    Export has none of it. What the canvas shows is what every export draws. */
 
 const shape = (page: Page, name: string) => canvasBar(page).getByRole('button', { name, exact: true });
 
-test.describe('the canvas bar', () => {
-  test('a new project starts 16:9 on a gradient, with the controls in view above the frame', async ({ page }) => {
+test.describe('the Canvas tab', () => {
+  test('a new project starts 16:9 on a gradient, with the shape first in the Canvas tab', async ({ page }) => {
     const errors = watchErrors(page);
     await openRecording(page, { defaultCanvas: true });
     await expect(canvasBar(page)).toBeVisible();
-    await expect(canvasBar(page).getByRole('group', { name: 'Shape' }).getByRole('button')).toHaveText([/^Original/, /^16:9/, /^4:3/, /^1:1/, /^4:5/]);
+    await expect(canvasBar(page).getByRole('button')).toHaveText([/^Original/, /^16:9/, /^4:3/, /^1:1/, /^4:5/]);
     await expect(shape(page, '16:9')).toHaveAttribute('aria-pressed', 'true');
     /* the right panel opens on the Canvas, so the look can be chosen before the first step */
     await expect(page.getByRole('tab', { name: 'Canvas' })).toHaveAttribute('aria-selected', 'true');
@@ -46,16 +46,19 @@ test.describe('the canvas bar', () => {
     await expect(shape(page, 'Original')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('the bar is as wide as the frame, and the frame keeps its size when the shape changes', async ({ page }) => {
+  test('nothing sits above the frame, and it keeps its size when the shape changes', async ({ page }) => {
     await openRecording(page, { defaultCanvas: true });
+    await expect(page.getByRole('toolbar', { name: 'Canvas' })).toHaveCount(0);
+    const stage = (await page.getByRole('main', { name: 'Canvas' }).boundingBox())!;
     for (const name of ['16:9', '1:1', 'Original']) {
       await shape(page, name).click();
       await expect(shape(page, name)).toHaveAttribute('aria-pressed', 'true');
-      await expect.poll(async () => Math.abs((await canvasBar(page).boundingBox())!.width - (await page.getByTestId('frame-canvas').boundingBox())!.width)).toBeLessThanOrEqual(2);
+      const frame = (await page.getByTestId('frame-canvas').boundingBox())!;
+      expect(frame.y - stage.y).toBeLessThanOrEqual(2);
     }
   });
 
-  test('the Canvas tab sits beside the frame, never over it; adding a step shows the Inspector and Style brings the canvas back', async ({ page }) => {
+  test('the Canvas tab sits beside the frame, never over it; adding a step shows the Inspector and the Canvas tab brings the canvas back', async ({ page }) => {
     await openRecording(page, { defaultCanvas: true });
     const style = page.getByRole('tabpanel', { name: 'Canvas' });
     for (const group of ['Background', 'Frame', 'Annotations', 'Logo']) await expect(style.getByRole('region', { name: group })).toBeVisible();

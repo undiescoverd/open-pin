@@ -19,7 +19,7 @@ import { useEditSession } from './useEditSession';
 
 /* Export (docs/06-simplify-plan.md, "Export"): one dialog for everything that leaves the editor. Pick what to export, answer the
    one or two questions that matter for it, and export. How the guide plays and its end button sit in plain view; the player's look
-   and the saving options are under Advanced. The canvas (shape, background, logo) isn't here: it's set in the bar above the frame,
+   and the saving options are under Advanced. The canvas (shape, background, logo) isn't here: it's set in the Canvas tab,
    and every export draws what the frame shows. After an interactive guide is saved, the same dialog gives its
    link and embed code (F11), with plain-words help for the common free hosts. */
 

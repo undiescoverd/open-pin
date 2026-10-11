@@ -438,8 +438,8 @@ test.describe('Phase 2: zoom, framing and logo', () => {
 
   test('framing changes the output; a logo is stored with the project and comes back after a reload', async ({ page }) => {
     await openRecording(page);
-    await canvasBar(page).getByRole('button', { name: '16:9', exact: true }).click();
     const style = await openStyle(page);
+    await canvasBar(page).getByRole('button', { name: '16:9', exact: true }).click();
     await typeInto(style.getByLabel('Padding', { exact: true }), '10');
     await style.getByRole('group', { name: 'Gradient' }).getByRole('button', { name: /Ember/ }).click();
     const size = await page.getByTestId('frame-canvas').evaluate((c: HTMLCanvasElement) => [c.width, c.height]);
@@ -457,7 +457,7 @@ test.describe('Phase 2: zoom, framing and logo', () => {
       return btoa(String.fromCharCode(...bytes));
     });
     await page.locator('input[type=file][aria-label="Add a logo…"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(logo, 'base64') });
-    await expect(page.getByText('logo.png in a corner of every frame')).toBeVisible();
+    await expect(style.getByRole('button', { name: 'Remove logo' })).toBeVisible();
     await expect.poll(() => canvasHash(page, corner)).not.toBe(plain);
     const withLogo = await canvasHash(page, corner);
 

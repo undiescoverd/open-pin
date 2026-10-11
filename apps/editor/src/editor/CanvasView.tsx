@@ -5,7 +5,6 @@ import { Playback, type PlaybackHost } from '../engine/playback';
 import { currentPlayback, setPlayback } from '../engine/session';
 import { getEditor, selectProject, setPlaybackState, setPlayhead, timelineTimeOf, useEditor } from '../state/store';
 import { AnnotationOverlay } from './AnnotationOverlay';
-import { CanvasBar } from './CanvasBar';
 import { QuickActions } from './QuickActions';
 import { easeOutOf, leavingUntil, presentation, projectForDrawing, rememberViewer } from './visible';
 import { useFitSize } from './useFitSize';
@@ -128,8 +127,6 @@ export function CanvasView({ children }: { children?: ReactNode }) {
   const inner = layout?.inner ?? [0, 0, width, height];
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center gap-2">
-      {/* the canvas controls sit above the frame, as wide as it is, where they can't be missed */}
-      {source && <CanvasBar width={fit.width} />}
       <div ref={wrap} className="relative flex min-h-0 w-full min-w-0 flex-1 items-start justify-center">
         {/* the video element only feeds the canvas while playing forward; it is never shown */}
         <video ref={video} className="hidden" playsInline preload="auto" muted={false} />
