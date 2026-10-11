@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { exportDialog, openExport, openExportAdvanced, openRecording, seekTo, watchErrors } from './helpers';
+import { exportDialog, openExport, openExportAdvanced, openRecording, seekTo, waitForFrame, watchErrors } from './helpers';
 
 /** Phase 4, item 6: one Export button and one dialog. Pick what to export, answer what matters for it, and find the rest under
     Advanced. The Phase 1 to 3 specs export through it; this spec covers the dialog itself. */
@@ -65,6 +65,31 @@ test.describe('Export', () => {
     await expect(dialog.getByRole('button', { name: 'Copy frame' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Save frame as PNG' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Export images' })).toBeEnabled();
+  });
+
+  test("a recording without sound has no sound to turn on in the video", async ({ page }) => {
+    await openRecording(page); /* the test recording has no sound */
+    const dialog = await openExport(page, 'Video');
+    const sound = dialog.getByRole('switch', { name: "The recording's own sound" });
+    await expect(sound).toBeDisabled();
+    await expect(sound).toHaveAttribute('aria-checked', 'false');
+    await expect(dialog.getByText('This recording has no sound of its own.')).toBeVisible();
+  });
+
+  test('with sound, the video says the sped-up or slowed clips will be silent', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles('e2e/fixtures/demo-sound.webm');
+    await waitForFrame(page);
+    let dialog = await openExport(page, 'Video');
+    await expect(dialog.getByRole('switch', { name: "The recording's own sound" })).toBeEnabled();
+    await expect(dialog.getByText('Muted clips, gaps and the pauses at steps are silent.')).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Trim & edit video' }).click();
+    await page.locator('[data-clip]').first().click({ position: { x: 30, y: 8 } });
+    await page.getByRole('group', { name: 'Speed presets' }).getByRole('button', { name: '2×' }).click();
+    dialog = await openExport(page, 'Video');
+    await expect(dialog.getByText(/^The sped-up or slowed clip is silent in the video \(\d\.\d s\): sound can't change speed yet\./)).toBeVisible();
   });
 
   test('the Guide tab no longer holds the player or framing, and points to Export', async ({ page }) => {

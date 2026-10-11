@@ -1,5 +1,6 @@
 import { ALL_FORMATS, BlobSource, CanvasSink, EncodedPacketSink, Input, type InputVideoTrack } from 'mediabunny';
 import { FrameIndex } from './frame-index';
+import { cantPlayMessage, UNREADABLE } from './messages';
 
 /* Reads a recording with Mediabunny on top of WebCodecs: what it contains, the time of every frame, and any frame by index.
    This file is DOM-free apart from canvases, so it runs in the media worker. */
@@ -39,10 +40,7 @@ export class FrameReader {
     try {
       const track = await input.getPrimaryVideoTrack();
       if (!track) throw new UnsupportedMediaError("This file has no video. Choose a screen recording (MP4, MOV, WebM or MKV).");
-      if (!(await track.canDecode())) {
-        const codec = track.codec ?? 'this';
-        throw new UnsupportedMediaError(`This browser can't play ${codec.toUpperCase()} video. Try Chrome or Edge, or re-export the recording as H.264 MP4.`);
-      }
+      if (!(await track.canDecode())) throw new UnsupportedMediaError(cantPlayMessage(track.codec));
       const times: number[] = [];
       for await (const packet of new EncodedPacketSink(track).packets(undefined, undefined, { metadataOnly: true })) times.push(packet.timestamp);
       if (times.length === 0) throw new UnsupportedMediaError('This recording has no frames.');
@@ -60,7 +58,8 @@ export class FrameReader {
       return new FrameReader(input, track, info, index);
     } catch (error) {
       input.dispose();
-      throw error;
+      /* anything else the reader trips over means the file isn't a video it can read */
+      throw error instanceof UnsupportedMediaError ? error : new UnsupportedMediaError(UNREADABLE);
     }
   }
 
