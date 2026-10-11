@@ -151,7 +151,7 @@ Kept for when people ask for them, not planned:
 
 Decided: **Waypost** is the name, it's a **paid one-off purchase** (proprietary code), and the editor is hosted on **Cloudflare Pages**. After Phase 3: Waypost is a **guide and SOP maker first**, simple by default, with precise controls behind **Advanced** sections and **Trim & edit video** ([06-simplify-plan.md](06-simplify-plan.md)).
 
-Still open:
+Still open (the options for 1, 3 and 4 are laid out in [07-business-model.md](07-business-model.md)):
 1. **First publishing host** (Phase 6): Cloudflare Pages, Netlify or GitHub Pages. GitHub Pages needs a token and a repository, so test the other two against it first.
 2. **Name checks:** trademark, domain and app-store searches for "Waypost" before designing the app mark.
 3. **Selling:** payment provider (Lemon Squeezy or Paddle issue licence keys and handle VAT; Stripe is cheaper per sale but leaves keys and tax to us), the price, and whether there's a free trial or a free tier.
