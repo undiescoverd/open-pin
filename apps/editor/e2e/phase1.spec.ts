@@ -186,10 +186,17 @@ test.describe('opening files', () => {
   test('a broken video is refused with a message and nothing is saved', async ({ page }) => {
     await page.goto('/');
     await page.getByTestId('file-input').setInputFiles({ name: 'broken.mp4', mimeType: 'video/mp4', buffer: Buffer.from('not really a video at all') });
-    await expect(page.getByRole('status').filter({ hasText: /./ })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /couldn't be read as a video.*QuickTime Player/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Drop a screen recording' })).toBeVisible();
     await page.getByRole('button', { name: 'Projects' }).click();
     await expect(page.getByText('No projects yet')).toBeVisible();
+  });
+
+  test('a recording the browser cannot play (ProRes) says what to do', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles('e2e/fixtures/prores.mov');
+    await expect(page.getByRole('status').filter({ hasText: /can't play.*ProRes.*QuickTime Player, choose File › Export As › 1080p/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Drop a screen recording' })).toBeVisible();
   });
 
   for (const name of ['demo.mp4', 'demo.mkv']) {

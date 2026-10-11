@@ -1,5 +1,6 @@
 import {
   ASPECTS,
+  clipLength,
   GRADIENT_PRESETS,
   embedSnippets,
   exportPlan,
@@ -73,6 +74,16 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/** What the video's sound switch says: plainly, which parts will be silent (docs/06-simplify-plan.md, "Honest messages"). */
+function soundNote(project: Project, hasSound: boolean): string {
+  if (!hasSound) return 'This recording has no sound of its own.';
+  const changed = project.timeline.filter(c => Math.abs(c.speed - 1) > 1e-9);
+  if (changed.length === 0) return 'Muted clips, gaps and the pauses at steps are silent.';
+  const seconds = changed.reduce((sum, c) => sum + clipLength(c), 0);
+  const clips = changed.length === 1 ? 'The sped-up or slowed clip is' : `The ${changed.length} sped-up or slowed clips are`;
+  return `${clips} silent in the video (${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)} s): sound can't change speed yet. Muted clips, gaps and the pauses at steps are silent too.`;
+}
+
 export function ExportDialog() {
   const view = useEditor(s => s.exportDialog);
   const project = useEditor(selectProject);
@@ -86,6 +97,7 @@ export function ExportDialog() {
   const [audio, setAudio] = useState(true);
   const [page, setPage] = useState<PdfPage>('a4');
   const [format, setFormat] = useState<StillFormat>('png');
+  const hasSound = useEditor(s => s.media?.info.hasAudio ?? true);
   if (!project?.sources[0]) return null;
 
   const steps = project.steps.length;
@@ -157,7 +169,7 @@ export function ExportDialog() {
             <>
               <Segmented label="Size" options={HEIGHTS} value={height} onChange={setHeight} />
               <Switch label="Step titles as captions" checked={captions} onChange={setCaptions} />
-              <Switch label="The recording's own sound" checked={audio} onChange={setAudio} hint="Sped-up and slowed clips are silent." />
+              <Switch label="The recording's own sound" checked={audio && hasSound} disabled={!hasSound} onChange={setAudio} hint={soundNote(project, hasSound)} />
             </>
           )}
           {kind === 'pdf' && <Segmented label="Page size" options={PDF_PAGES} value={page} onChange={setPage} />}
