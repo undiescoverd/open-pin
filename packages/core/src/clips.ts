@@ -1,4 +1,4 @@
-import type { Draft } from 'immer';
+import { touch } from './draft';
 import type { Command } from './history';
 import { MAX_SPEED, MIN_SPEED, type Clip, type Project } from './schema';
 import { clipLength } from './time';
@@ -68,10 +68,6 @@ export function trimLimits(project: Project, clipId: string, edge: ClipEdge, rip
 /** Clamps an edge's new source time into its limits. */
 export function clampTrim(limits: TrimLimits, value: number): number {
   return Math.min(limits.max, Math.max(limits.min, value));
-}
-
-function touch(draft: Draft<Project>, now: number): void {
-  draft.updatedAt = now;
 }
 
 /** Whether `time` (source seconds) splits a clip into two usable pieces; a reason when it doesn't. */

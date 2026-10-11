@@ -902,7 +902,11 @@ export function setGuide(patch: Partial<GuideSettings>, label?: string, coalesce
 }
 
 export function setAssetImage(id: string, image: ImageBitmap): void {
-  set(s => ({ assetImages: new Map(s.assetImages).set(id, image) }));
+  set(s => {
+    const previous = s.assetImages.get(id);
+    if (previous && previous !== image) previous.close();
+    return { assetImages: new Map(s.assetImages).set(id, image) };
+  });
 }
 
 // ----- delete ---------------------------------------------------------------------------------------------------------

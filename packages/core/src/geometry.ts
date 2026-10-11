@@ -64,11 +64,6 @@ export function toView(p: Point, view: Rect): Point {
   return [(p[0] - view[0]) / view[2], (p[1] - view[1]) / view[3]];
 }
 
-/** A point of the view as a point of the recording (the inverse of `toView`). */
-export function fromView(p: Point, view: Rect): Point {
-  return [view[0] + p[0] * view[2], view[1] + p[1] * view[3]];
-}
-
 export function rectToView(r: Rect, view: Rect): Rect {
   const [x, y] = toView([r[0], r[1]], view);
   return [x, y, r[2] / view[2], r[3] / view[3]];
@@ -107,12 +102,21 @@ export function outputAspect(frame: Pick<Frame, 'aspect'>, source: Size2): numbe
 }
 
 /**
+ * The padding actually used: a share of the output's width, held back on wide shapes so the space it leaves above and below the
+ * recording is never more than half the height (at 21:9 a quarter of the width each side would leave no room at all).
+ */
+function paddingFor(frame: Pick<Frame, 'aspect' | 'padding'>, source: Size2): number {
+  const ar = outputAspect(frame, source);
+  return Math.min(frame.padding, 1 / (4 * ar));
+}
+
+/**
  * The output size that keeps the recording at its own pixel size inside the padding: the smallest frame of the chosen shape
  * whose inner area holds the whole recording. Even numbers, since video encoders need them.
  */
 export function nativeOutputSize(frame: Pick<Frame, 'aspect' | 'padding'>, source: Size2): Size2 {
   const ar = outputAspect(frame, source);
-  const p = frame.padding;
+  const p = paddingFor(frame, source);
   const width = Math.max(source[0] / (1 - 2 * p), source[1] / (1 / ar - 2 * p));
   return [even(width), even(width / ar)];
 }
@@ -134,17 +138,11 @@ export interface FrameLayout {
 /** Where the recording sits in an output of `size`: centred in the space the padding leaves, keeping its shape. */
 export function frameLayout(frame: Pick<Frame, 'aspect' | 'padding'>, source: Size2, size: Size2): FrameLayout {
   const [W, H] = size;
-  const pad = frame.padding * W;
+  const pad = paddingFor(frame, source) * W;
   const boxW = Math.max(1, W - 2 * pad), boxH = Math.max(1, H - 2 * pad);
   const scale = Math.min(boxW / source[0], boxH / source[1]);
   const w = source[0] * scale, h = source[1] * scale;
   const inner: Rect = [(W - w) / 2, (H - h) / 2, w, h];
   const inset = inner[0] > 0.5 || inner[1] > 0.5;
   return { width: W, height: H, inner, inset };
-}
-
-/** A point on the output as a point on the recording (normalised), for pointer input on a framed canvas. */
-export function outputToRecording(p: Point, layout: FrameLayout): Point {
-  const [x, y, w, h] = layout.inner;
-  return [(p[0] - x) / w, (p[1] - y) / h];
 }

@@ -29,15 +29,9 @@ import { FONT_FAMILY, REFERENCE_WIDTH, type Ctx } from './geometry';
      4. logo (F19)
      5. the step title caption (MP4 only, F13) */
 
-export type AnyCanvas = OffscreenCanvas | HTMLCanvasElement;
+import { makeCanvas, type AnyCanvas } from './canvas';
 
-export function makeCanvas(width: number, height: number): AnyCanvas {
-  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(Math.max(1, Math.ceil(width)), Math.max(1, Math.ceil(height)));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.ceil(width));
-  canvas.height = Math.max(1, Math.ceil(height));
-  return canvas;
-}
+export { makeCanvas, type AnyCanvas };
 
 /** The framing gradients (docs/03-design-system.md, "Framing presets"): top left to bottom right. */
 export const GRADIENTS: Record<GradientPreset, { name: string; stops: [string, string] }> = {
@@ -154,7 +148,8 @@ function applyEffect(wctx: Ctx, effect: Effect, x: number, y: number, w: number,
       cctx.drawImage(wctx.canvas as AnyCanvas, x, y, w, h, 0, 0, cols, rows);
       wctx.imageSmoothingEnabled = false;
       wctx.clearRect(x, y, w, h);
-      wctx.drawImage(cells, 0, 0, cols, rows, x, y, cols * block, rows * block);
+      /* back over exactly the area it averaged, so each block sits on the pixels it stands for */
+      wctx.drawImage(cells, 0, 0, cols, rows, x, y, w, h);
       break;
     }
     case 'blur': {

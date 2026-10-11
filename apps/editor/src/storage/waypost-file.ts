@@ -98,6 +98,8 @@ export async function openWaypostFile(file: Blob, newId: string): Promise<Projec
   let json: Uint8Array[] = [];
   let failure: unknown;
   const writes: Promise<void>[] = [];
+  const writers: Promise<FileSystemWritableFileStream>[] = [];
+  const written = new Set<string>();
   let drain: Promise<void> = Promise.resolve(); /* the latest write, awaited between reads so a slow disk can't pile up chunks */
   const unzip = new Unzip();
   unzip.register(UnzipPassThrough);
@@ -115,6 +117,8 @@ export async function openWaypostFile(file: Blob, newId: string): Promise<Projec
     } else {
       /* stream the recording into OPFS as it is unzipped; each chunk waits for the one before it */
       const writer = openSourceWriter(newId, entry.name);
+      writers.push(writer);
+      written.add(entry.name);
       let queue: Promise<void> = writer.then(() => undefined);
       const finished = Promise.withResolvers<void>();
       writes.push(finished.promise);
@@ -135,17 +139,23 @@ export async function openWaypostFile(file: Blob, newId: string): Promise<Projec
     }
     entry.start();
   };
-  const reader = file.stream().getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    unzip.push(value, false);
-    await drain;
+  try {
+    const reader = file.stream().getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      unzip.push(value, false);
+      await drain;
+      if (failure) throw failure;
+    }
+    unzip.push(new Uint8Array(0), true);
+    await Promise.all(writes);
     if (failure) throw failure;
+  } catch (error) {
+    /* let go of the half-written files, so the caller can delete the folder */
+    await Promise.all(writers.map(w => w.then(s => s.abort()).catch(() => undefined)));
+    throw error;
   }
-  unzip.push(new Uint8Array(0), true);
-  await Promise.all(writes);
-  if (failure) throw failure;
   if (json.length === 0) throw new Error("This file doesn't contain a Waypost project.");
   const bytes = new Uint8Array(json.reduce((n, c) => n + c.length, 0));
   let offset = 0;
@@ -155,6 +165,8 @@ export async function openWaypostFile(file: Blob, newId: string): Promise<Projec
   }
   const parsed = parseProject(JSON.parse(new TextDecoder().decode(bytes)));
   const project: Project = { ...parsed, id: newId };
+  const missing = [...project.sources, ...project.assets].find(f => !written.has(f.file));
+  if (missing) throw new Error(`This project file is missing ${missing.file}.`);
   await saveProject(project);
   return project;
 }

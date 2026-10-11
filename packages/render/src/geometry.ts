@@ -1,4 +1,4 @@
-import type { Annotation, ArrowAnnotation, CalloutAnnotation } from '@waypost/core';
+import { clamp, type Annotation, type ArrowAnnotation, type CalloutAnnotation } from '@waypost/core';
 
 /* Annotation geometry. Sizes are designed against a 1280 px wide recording (the mockup's space) and scale with the output width,
    so a callout looks the same on a 1280 or a 2880 px recording. Everything here returns pixels of the output. */
@@ -17,7 +17,7 @@ export const FONT_FAMILY = 'Figtree, system-ui, sans-serif';
 /** Pixels per design pixel. */
 export const unit = (size: Size): number => size.width / REFERENCE_WIDTH;
 
-export const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
+export { clamp };
 
 export function calloutFont(size: Size): string {
   return `600 ${20 * unit(size)}px ${FONT_FAMILY}`;
@@ -65,19 +65,28 @@ export function layoutCallout(ctx: Ctx, a: CalloutAnnotation, size: Size): Callo
   const height = lines.length * lineHeight + 2 * padY;
   const ax = a.anchor[0] * W, ay = a.anchor[1] * H;
   const margin = 12 * u, gap = 22 * u;
+  /* a bubble with no room on its side flips to the other one, if that has room, so the pointer still faces the anchor */
+  const fits = {
+    right: ax + gap + width <= W - margin,
+    left: ax - gap - width >= margin,
+    bottom: ay + gap + height <= H - margin,
+    top: ay - gap - height >= margin,
+  };
+  const opposite = { right: 'left', left: 'right', bottom: 'top', top: 'bottom' } as const;
+  const side = !fits[a.placement] && fits[opposite[a.placement]] ? opposite[a.placement] : a.placement;
   let left: number, top: number, tip: number;
-  if (a.placement === 'right' || a.placement === 'left') {
-    left = a.placement === 'right' ? ax + gap : ax - gap - width;
+  if (side === 'right' || side === 'left') {
+    left = side === 'right' ? ax + gap : ax - gap - width;
     top = clamp(ay - height / 2, margin, H - margin - height);
     tip = clamp(ay - top, 14 * u, height - 14 * u);
   } else {
     left = clamp(ax - width / 2, margin, W - margin - width);
-    top = a.placement === 'bottom' ? ay + gap : ay - gap - height;
+    top = side === 'bottom' ? ay + gap : ay - gap - height;
     tip = clamp(ax - left, 16 * u, width - 16 * u);
   }
   left = clamp(left, margin, W - margin - width);
   top = clamp(top, margin, H - margin - height);
-  return { left, top, width, height, side: a.placement, tip, lines, lineHeight, padX, padY };
+  return { left, top, width, height, side, tip, lines, lineHeight, padX, padY };
 }
 
 /** The arrow's curve and head, in output pixels. */

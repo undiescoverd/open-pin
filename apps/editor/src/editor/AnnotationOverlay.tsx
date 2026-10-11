@@ -279,6 +279,14 @@ export function AnnotationOverlay({ width, height, cssWidth }: OverlayProps) {
     setDraft({ stepId: g.stepId, annotation: next });
   };
 
+  /* the system took the pointer (a palm, a gesture): drop the draft rather than commit it */
+  const onPointerCancel = (e: ReactPointerEvent) => {
+    gesture.current = null;
+    if (ref.current?.hasPointerCapture(e.pointerId)) ref.current.releasePointerCapture(e.pointerId);
+    setDraft(null);
+    setShapeDraft(null);
+  };
+
   const onPointerUp = (e: ReactPointerEvent) => {
     const g = gesture.current;
     gesture.current = null;
@@ -328,7 +336,7 @@ export function AnnotationOverlay({ width, height, cssWidth }: OverlayProps) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      onPointerCancel={onPointerCancel}
       onPointerLeave={() => setHover(null)}
     >
       {!viewer && (

@@ -73,6 +73,8 @@ export function urlMedia(base: string): GuideMedia {
 class VideoDriver implements SegmentDriver {
   private readonly videos: HTMLVideoElement[];
   private current: HTMLVideoElement | null = null;
+  /** ends the segment that is waiting, so a retry that fails after a pause doesn't leave the player stuck */
+  private settle: (() => void) | null = null;
 
   constructor(
     surface: SegmentSurface,
@@ -118,19 +120,25 @@ class VideoDriver implements SegmentDriver {
         for (const other of this.videos) if (other !== v) other.classList.remove('on');
       };
       const done = () => {
+        if (signal.aborted && this.current === v) v.pause();
         v.removeEventListener('ended', done);
         v.removeEventListener('error', done);
         signal.removeEventListener('abort', done);
+        if (this.settle === done) this.settle = null;
         resolve();
       };
+      this.settle = done;
       v.addEventListener('ended', done);
       v.addEventListener('error', done);
       signal.addEventListener('abort', done);
       /* older Safari and Firefox have no requestVideoFrameCallback; 'playing' comes a moment early there */
       if (typeof (v as Partial<HTMLVideoElement>).requestVideoFrameCallback === 'function') v.requestVideoFrameCallback(show);
       else v.addEventListener('playing', show, { once: true });
-      /* a refused or failed play skips the motion rather than leaving the viewer stuck */
-      v.play().catch(done);
+      /* a refused or failed play skips the motion rather than leaving the viewer stuck; a pause before playback began is
+         an AbortError, and resume() plays it later */
+      v.play().catch((e: unknown) => {
+        if ((e as Error | null)?.name !== 'AbortError') done();
+      });
     });
   }
 
@@ -139,7 +147,10 @@ class VideoDriver implements SegmentDriver {
   }
 
   resume(): void {
-    void this.current?.play().catch(() => undefined);
+    /* a pause before playback began left the play() AbortError pending; this retry is the one that plays it */
+    this.current?.play().catch((e: unknown) => {
+      if ((e as Error | null)?.name !== 'AbortError') this.settle?.();
+    });
   }
 
   progress(): number {

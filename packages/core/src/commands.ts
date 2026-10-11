@@ -1,4 +1,5 @@
 import { current, type Draft } from 'immer';
+import { touch } from './draft';
 import type { Command } from './history';
 import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, overlapsOn, type LayerMove } from './effects';
 import { blurRectAt } from './geometry';
@@ -20,7 +21,7 @@ import {
   type Source,
   type Step,
 } from './schema';
-import { snapToFrame, srcToTl } from './time';
+import { isOnTimeline, srcToTl } from './time';
 
 /* The edits made to a project, apart from timeline editing (clips.ts). Each is a named command (see history.ts). They take every id they need as an argument,
    so they are deterministic and easy to test. Callers check preconditions with the `can*` helpers first. */
@@ -75,16 +76,12 @@ export function stepAtTime(project: Project, source: string, time: number): Step
 
 /** Pinning is possible on any frame the clips play. */
 export function canPinAt(project: Project, source: string, time: number): boolean {
-  return project.timeline.some(c => c.source === source && time >= c.in && time <= c.out);
+  return isOnTimeline(project.timeline, source, time);
 }
 
 function sortSteps(draft: Draft<Project>): void {
   const timeline = draft.timeline;
   draft.steps.sort((a, b) => srcToTl(timeline, a.anchor.source, a.anchor.time) - srcToTl(timeline, b.anchor.source, b.anchor.time));
-}
-
-function touch(draft: Draft<Project>, now: number): void {
-  draft.updatedAt = now;
 }
 
 export function stepIndex(project: Project, stepId: string): number {
@@ -103,7 +100,9 @@ export const commands = {
       label: 'Rename guide',
       coalesceKey,
       run: d => {
-        d.name = name.slice(0, 90);
+        const next = name.slice(0, 90);
+        if (d.name === next) return;
+        d.name = next;
         touch(d, now);
       },
     };
@@ -128,7 +127,8 @@ export const commands = {
           if (click && click.type === 'click' && args.at) click.at = clampPoint(args.at);
           else {
             const m = marker();
-            if (m) existing.annotations.unshift(m);
+            if (!m) return;
+            existing.annotations.unshift(m);
           }
         } else {
           const m = marker();
@@ -178,6 +178,8 @@ export const commands = {
         const src = d.sources.find(s => s.id === step.anchor.source);
         if (!src) return;
         const t = Math.min(Math.max(0, time), src.duration);
+        /* a step off every clip would drop out of the guide and the exports */
+        if (!canPinAt(d, step.anchor.source, t)) return;
         if (d.steps.some(s => s.id !== stepId && s.anchor.source === step.anchor.source && sameFrame(s.anchor.time, t, src.fps))) return;
         if (step.anchor.time === t) return;
         step.anchor.time = t;
@@ -360,6 +362,8 @@ export const commands = {
           e = Math.min(Math.max(0, args.end), D);
           const leftMoved = Math.abs(s - was.start) > 1e-9;
           if (e - s < MIN_REGION) [s, e] = leftMoved ? [e - MIN_REGION, e] : [s, s + MIN_REGION];
+          if (s < 0) [s, e] = [0, Math.min(D, MIN_REGION)];
+          if (e > D) [s, e] = [Math.max(0, D - MIN_REGION), D];
         }
         blur.start = s;
         blur.end = e;
@@ -380,7 +384,16 @@ export const commands = {
           blur.end = e;
         }
         if (Math.abs(blur.start - was.start) < 1e-9 && Math.abs(blur.end - was.end) < 1e-9 && d.blurs.map(b => b.layer).join() === layers) return;
-        if (args.shift) for (const k of blur.keyframes) k.time = Math.max(0, k.time + (blur.start - was.start));
+        if (args.shift) {
+          /* keyframes a trim left before the start would pile up at 0 when shifted; one keyframe at the start stands in for them */
+          const delta = blur.start - was.start;
+          const before = blur.keyframes.filter(k => k.time + delta < 0);
+          if (before.length) {
+            const rect = blurRectAt(blur, -delta);
+            blur.keyframes = [{ time: -delta, rect }, ...blur.keyframes.filter(k => k.time + delta >= 0 && k.time > -delta)];
+          }
+          for (const k of blur.keyframes) k.time = Math.max(0, k.time + delta);
+        }
         touch(d, now);
       },
     };
@@ -615,8 +628,3 @@ export const commands = {
     };
   },
 };
-
-/** Snaps a pin to the nearest frame when the source has a constant frame rate. */
-export function pinTime(time: number, fps: number): number {
-  return snapToFrame(time, fps);
-}

@@ -8,7 +8,6 @@ import {
   frameLayout,
   nativeOutputSize,
   outputSizeForHeight,
-  outputToRecording,
   viewRect,
   zoomAmount,
   zoomBox,
@@ -212,6 +211,22 @@ describe('blur regions', () => {
     expect(p.blurs[0]!.keyframes).toEqual([{ time: 1, rect: [0.4, 0.1, 0.2, 0.1] }]);
   });
 
+  it('moving a trimmed region keeps its motion instead of piling keyframes up at 0', () => {
+    const blur: Blur = { ...newBlur(), start: 3.5, end: 9, keyframes: [{ time: 2, rect: [0, 0, 0.2, 0.2] }, { time: 4, rect: [0.4, 0, 0.2, 0.2] }, { time: 6, rect: [0.4, 0.4, 0.2, 0.2] }] };
+    const p = run(fresh(), commands.addBlur(blur, 3), commands.placeBlur('b1', { start: 0, end: 5.5, shift: true }, 4));
+    const moved = p.blurs[0]!;
+    expect(moved.start).toBe(0);
+    expect(moved.keyframes.map(k => k.time)).toEqual([0, 0.5, 2.5]);
+    expect(blurRectAt(moved, 0)).toEqual(blurRectAt(blur, 3.5));
+  });
+
+  it('a short region trimmed at the end of the recording stays inside it', () => {
+    const p = run(fresh(), commands.addBlur({ ...newBlur(), start: 19.95, end: 20, keyframes: [{ time: 19.95, rect: [0.1, 0.1, 0.2, 0.1] }] }, 3));
+    const q = run(p, commands.placeBlur('b1', { start: 19.95, end: 20, shift: false }, 4));
+    expect(q.blurs[0]!.end).toBeLessThanOrEqual(20);
+    expect(q.blurs[0]!.end - q.blurs[0]!.start).toBeCloseTo(0.1, 6);
+  });
+
   it('settings change in one command, and the name is kept short', () => {
     const p = run(fresh(), commands.addBlur(newBlur(), 3), commands.updateBlur('b1', { opacity: 0.5, name: 'x'.repeat(80) }, 4));
     expect(p.blurs[0]).toMatchObject({ opacity: 0.5 });
@@ -242,6 +257,28 @@ describe('zoom', () => {
   });
 });
 
+describe('loading a project checks how its fields fit together', () => {
+  it('refuses a clip that ends before it starts, a missing recording and references to nothing', () => {
+    const p = fresh();
+    expect(() => parseProject({ ...p, timeline: [{ ...p.timeline[0]!, in: 8, out: 2 }] })).toThrow(/timeline\.0/);
+    expect(() => parseProject({ ...p, sources: [] })).toThrow(/sources/);
+    expect(() => parseProject({ ...p, timeline: [{ ...p.timeline[0]!, source: 'other' }] })).toThrow(/timeline\.0\.source/);
+    expect(() => parseProject({ ...p, logo: { asset: 'nope', corner: 'br', size: 0.1, opacity: 1 } })).toThrow(/logo|valid/);
+  });
+
+  it('refuses a clip, step or blur that runs past the end of its recording', () => {
+    const p = fresh();
+    expect(() => parseProject({ ...p, timeline: [{ ...p.timeline[0]!, out: 99 }] })).toThrow(/timeline\.0\.out/);
+    expect(() => parseProject({ ...p, steps: [{ id: 's', anchor: { source: 'src1', time: 99 }, title: '', body: '', annotations: [] }] })).toThrow(/anchor/);
+  });
+
+  it('a step never moves off the clips, where it would drop out of the guide', () => {
+    let p = run(fresh(), clipCommands.trimClip('c_src1', 'out', 5, true, 3), pin('s1', 5));
+    p = run(p, commands.moveStep('s1', 5 + 1 / 30, 4));
+    expect(p.steps[0]!.anchor.time).toBe(5);
+  });
+});
+
 describe('framing', () => {
   it('without padding the output is the recording; padding grows it so the recording keeps its pixels', () => {
     expect(nativeOutputSize({ aspect: 'source', padding: 0 }, [1280, 800])).toEqual([1280, 800]);
@@ -252,17 +289,21 @@ describe('framing', () => {
     expect(layout.inner[3]).toBeGreaterThanOrEqual(799);
   });
 
+  it('padding on a wide recording leaves it room instead of growing the frame without bound', () => {
+    for (const padding of [0.2, 0.25]) {
+      const [w, h] = nativeOutputSize({ aspect: 'source', padding }, [3440, 1440]);
+      expect(w).toBeLessThan(3440 * 3);
+      const layout = frameLayout({ aspect: 'source', padding }, [3440, 1440], [w, h]);
+      expect(layout.inner[3]).toBeGreaterThanOrEqual(1439);
+      expect(layout.inner[3]).toBeGreaterThanOrEqual(h / 2 - 1);
+    }
+  });
+
   it('a 16:9 frame letterboxes a 16:10 recording, and presets keep the shape', () => {
     const [w, h] = nativeOutputSize({ aspect: '16:9', padding: 0 }, [1280, 800]);
     expect(w / h).toBeCloseTo(16 / 9, 2);
     expect(frameLayout({ aspect: '16:9', padding: 0 }, [1280, 800], [w, h]).inset).toBe(true);
     expect(outputSizeForHeight({ aspect: '16:9' }, [1280, 800], 2160)).toEqual([3840, 2160]);
-  });
-
-  it('maps a pointer on the output back onto the recording', () => {
-    const layout = frameLayout({ aspect: 'source', padding: 0.1 }, [1000, 1000], [1000, 1000]);
-    expect(outputToRecording([500, 500], layout)).toEqual([0.5, 0.5]);
-    expect(outputToRecording([100, 100], layout)).toEqual([0, 0]);
   });
 });
 

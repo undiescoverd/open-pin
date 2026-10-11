@@ -34,8 +34,8 @@ export function createMediaClient(): MediaClient {
       try {
         result = await api.open(file);
       } catch (error) {
-        const e = error as Error & { unsupported?: boolean };
-        throw e.unsupported ? new MediaUnsupportedError(e.message) : error;
+        const e = error as Error;
+        throw e?.name === 'UnsupportedMediaError' ? new MediaUnsupportedError(e.message) : error;
       }
       const { handle, info, times } = result;
       return {
