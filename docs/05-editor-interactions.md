@@ -57,7 +57,7 @@ Narration length is the clip's real length for a recording or an imported file. 
 ## 3. Selection
 
 - **Kinds:** step, annotation, zoom box, clip, gap, blur, voice, music. One thing is selected at a time. The Inspector always shows the selection.
-- **Selecting from the timeline** also moves the playhead where that makes the selection visible: a pin moves it to the pin; a blur moves it into the blur if it was outside.
+- **Selecting from the timeline never moves the playhead**, so you can park it on a frame and pick up a pin, a clip or a hidden area without losing your place. Dragging a pin shows the frame under it while it moves, then puts the playhead back. **Double-click** a pin to go to it, or a hidden area to go into it if the playhead is outside. (Selecting a step in the Steps list still goes to it.)
 - **Clicking empty space in a timeline lane** selects the step at the playhead (or nothing). It never moves the playhead.
 - **Esc**, in order: leave a drawing tool, then clear the "stopped at a step" state, then leave the Viewer view, then step an annotation or zoom selection back up to its step.
 - **Delete** removes the selection: a zoom (removes the zoom), an annotation, a step, a blur, narration (sets it to none), music, or a gap (closes it).

@@ -188,7 +188,8 @@ export function Filmstrip() {
                   aria-pressed={selected}
                   data-hidden-area={blur.id}
                   onPointerDown={e => e.stopPropagation()}
-                  onClick={() => selectBlur(blur.id, { seek: true })}
+                  onClick={() => selectBlur(blur.id)}
+                  onDoubleClick={() => selectBlur(blur.id, { seek: true })}
                   className={cx(
                     'absolute inset-y-0 border-x border-fg-muted bg-fg/25 [background-image:repeating-linear-gradient(135deg,var(--wp-hatch)_0_4px,transparent_4px_8px)]',
                     selected && 'ring-2 ring-sel ring-inset',

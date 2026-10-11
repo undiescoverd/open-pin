@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clickFrame, openRecording, playheadSeconds, watchErrors } from './helpers';
+import { clickFrame, openRecording, playheadSeconds, seekTo, watchErrors } from './helpers';
 
 /** Phase 4, item 2: the filmstrip under the frame, and Trim & edit video opening the full timeline. The fixture is 6 seconds long. */
 
@@ -80,5 +80,22 @@ test.describe('filmstrip', () => {
     await page.getByRole('button', { name: 'Done' }).click();
     await expect(track(page).locator('[data-hidden-area]')).toHaveCount(1);
     await expect(track(page).getByRole('button', { name: /^Hidden/ })).toBeVisible();
+  });
+
+  test('clicking a hidden area selects it without moving the playhead; a double-click goes into it', async ({ page }) => {
+    await openRecording(page);
+    await seekTo(page, 4);
+    await page.getByRole('button', { name: 'Add an effect region at the playhead' }).click(); /* 0:04 to the end */
+    await seekTo(page, 1);
+    /* in the full timeline's Effects lane too */
+    await page.getByTestId('effects-lane').locator('[data-blur]').click();
+    expect(await playheadSeconds(page)).toBeCloseTo(1, 2);
+    await page.getByRole('button', { name: 'Done' }).click();
+    const bar = track(page).getByRole('button', { name: /^Hidden/ });
+    await bar.click();
+    await expect(bar).toHaveAttribute('aria-pressed', 'true');
+    expect(await playheadSeconds(page)).toBeCloseTo(1, 2);
+    await bar.dblclick();
+    await expect.poll(() => playheadSeconds(page)).toBeCloseTo(4, 2);
   });
 });

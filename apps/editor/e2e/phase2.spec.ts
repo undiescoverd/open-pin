@@ -161,7 +161,7 @@ test.describe('Phase 2: timeline editing', () => {
       await page.getByRole('group', { name: 'Speed presets' }).getByRole('button', { name: '2×' }).click();
       expect(await guideLength(page)).toBeCloseTo(before - 1.5, 1);
       await expect(clips(page).nth(1)).toContainText('2×');
-      await page.getByRole('button', { name: /^Step 1/ }).click();
+      await page.getByRole('button', { name: /^Step 1/ }).dblclick(); /* a double-click goes to the pin */
       await expect.poll(() => playheadSeconds(page)).toBeCloseTo(before - 1.5 - 0.75, 1);
     });
     expect(errors).toEqual([]);

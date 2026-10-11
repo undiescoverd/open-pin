@@ -392,8 +392,10 @@ export function StepsLane({ project, geometry }: { project: Project | null; geom
   const down = (e: ReactPointerEvent<HTMLButtonElement>, step: Step) => {
     if (e.button !== 0 || !project || !media) return;
     e.preventDefault();
-    selectStep(step.id);
+    /* selecting a step leaves the playhead where it is; a drag shows the frame under the marker, then puts the playhead back */
+    selectStep(step.id, { seek: false });
     const start = timelineTimeOf(project, step);
+    const playheadBefore = getEditor().playhead;
     let last = step.anchor.time;
     follow(e, {
       move: (dx, ev) => {
@@ -413,7 +415,9 @@ export function StepsLane({ project, geometry }: { project: Project | null; geom
       end: moved => {
         geometry.setDragging(false);
         setDrag(null);
-        if (moved) moveStep(step.id, last); /* one undo step for the whole drag */
+        if (!moved) return;
+        moveStep(step.id, last); /* one undo step for the whole drag */
+        seekTimeline(playheadBefore);
       },
     });
   };
@@ -432,7 +436,7 @@ export function StepsLane({ project, geometry }: { project: Project | null; geom
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       e.stopPropagation();
-      selectStep(step.id);
+      selectStep(step.id, { seek: false });
     }
   };
 
@@ -449,6 +453,7 @@ export function StepsLane({ project, geometry }: { project: Project | null; geom
             aria-pressed={active}
             data-step-marker={step.id}
             onPointerDown={e => down(e, step)}
+            onDoubleClick={() => selectStep(step.id)}
             onKeyDown={e => key(e, step)}
             className={cx(
               'absolute top-0.5 z-10 grid size-6 -translate-x-1/2 cursor-grab touch-none place-items-center rounded-pill border-2 text-xs font-semibold',
@@ -673,7 +678,7 @@ function EffectsLane({ blurs, layers, geometry }: { blurs: readonly Blur[]; laye
     if (e.button !== 0 || !project) return;
     e.preventDefault();
     e.stopPropagation();
-    selectBlur(blur.id, { seek: true });
+    selectBlur(blur.id);
     const s0 = tl(blur.start), e0 = tl(blur.end);
     const y0 = e.clientY;
     const key = nextDragKey('blur');
@@ -734,10 +739,11 @@ function EffectsLane({ blurs, layers, geometry }: { blurs: readonly Blur[]; laye
             onPointerDown={e => {
               if (!(e.target as HTMLElement).dataset.edge) down(e, blur, 'move');
             }}
+            onDoubleClick={() => selectBlur(blur.id, { seek: true })}
             onKeyDown={e => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                selectBlur(blur.id, { seek: true });
+                selectBlur(blur.id);
               }
             }}
             className={cx(

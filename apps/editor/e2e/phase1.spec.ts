@@ -368,7 +368,7 @@ test.describe('transport', () => {
 });
 
 test.describe('the timeline', () => {
-  test('only the ruler moves the playhead, and dragging a step moves it as one undo step', async ({ page }) => {
+  test('only the ruler moves the playhead: selecting or dragging a step leaves it, a double-click goes there, and a drag is one undo step', async ({ page }) => {
     await openRecording(page);
     await seekTo(page, 1);
     await page.keyboard.press('Shift+P');
@@ -379,14 +379,22 @@ test.describe('the timeline', () => {
     expect(await playheadSeconds(page)).toBeCloseTo(3, 2); /* a click in a lane doesn't scrub */
 
     const marker = page.getByRole('button', { name: /^Step 1/ });
+    await marker.click();
+    await expect(marker).toHaveAttribute('aria-pressed', 'true');
+    expect(await playheadSeconds(page)).toBeCloseTo(3, 2); /* selected, and the playhead stays put */
+
     const mb = (await marker.boundingBox())!;
     await page.mouse.move(mb.x + mb.width / 2, mb.y + mb.height / 2);
     await page.mouse.down();
     await page.mouse.move(lb.x + lb.width * 0.75, mb.y + mb.height / 2, { steps: 8 });
     await page.mouse.up();
     await expect(page.getByRole('button', { name: /^Step 1/ })).toHaveAccessibleName(/at 0:0?[4-5]/);
+    expect(await playheadSeconds(page)).toBeCloseTo(3, 2); /* the drag showed the frame under the pin, then put the playhead back */
     await page.keyboard.press('ControlOrMeta+Z');
     await expect(page.getByRole('button', { name: /^Step 1/ })).toHaveAccessibleName(/at 0:01\.00/);
+
+    await page.getByRole('button', { name: /^Step 1/ }).dblclick();
+    await expect.poll(() => playheadSeconds(page)).toBeCloseTo(1, 2);
   });
 
   test('a step marker snaps to the end of the guide with an amber line, unless Alt is held', async ({ page }) => {
