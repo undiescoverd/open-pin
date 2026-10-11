@@ -76,13 +76,22 @@ One **Export** button, one dialog.
 - **Button at the end:** a tick box, its text and its link.
 - The dialog doesn't ask for a web address up front. After an interactive guide is saved, it gives the link and the embed code, with plain-words help for GitHub Pages, Netlify and Cloudflare Pages.
 - **Publish online, coming later** sits at the bottom, so people know it's planned (Phase 7).
-- These settings replace the Guide tab's Player section. Frame, background and logo move to the Export dialog's **Advanced**.
+- These settings replace the Guide tab's Player section. (Frame, background and logo were first put under Export's Advanced; they now live with the canvas, in the bar above the frame and the Canvas tab, because they change what you see while editing. See "The canvas" below.)
 
 ### 5. Preview
 
 - **Preview** in the top bar opens the full player **at the selected step**, not at the start. Esc returns to that step in the editor.
 - Playback in the editor already shows each step as the viewer sees it (zoom easing in and out, annotations in order) and stops at every step.
 - The Edit / Viewer switch from [open-pin#11](https://github.com/undiescoverd/open-pin/pull/11) goes, because there's no tool palette for it to sit beside. On the frame, the selected step is shown with every annotation and handle visible (today's Edit view).
+
+## The canvas
+
+Added after Phase 4's first build, when finding the shape of the picture turned out to be hard: it was two clicks deep in a dialog about exporting.
+
+- **What you set while editing is what comes out.** The editor draws what every export draws; Export has no canvas controls.
+- **Always in view:** a bar directly above the frame holds the shape (**Original, 16:9, 4:3, 1:1, 4:5**) and a **Style** button. The rest (background, frame, annotation colour, logo) is the **Canvas** tab of the right panel, beside the frame so changes can be watched, replacing the old Guide tab.
+- **Look first, or steps first:** a new project is 16:9 on a gradient and opens on the Canvas tab, so the look can be chosen straight away. Starting on steps is just as easy: **+ Add step** shows the Inspector, and the bar is still there.
+- **"Guide" means the finished thing** (the interactive guide you export), not the picture you edit. The picture is the **canvas**.
 
 ## Other decisions
 

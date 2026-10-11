@@ -24,7 +24,7 @@ describe('the guide bundle', () => {
     expect(s.link).toBe('https://me.github.io/guides/connect/');
     expect(s.script).toBe('<div data-waypost="https://me.github.io/guides/connect/guide.json"></div>\n<script src="https://me.github.io/guides/connect/player.js" async></script>');
     expect(s.iframe).toContain('src="https://me.github.io/guides/connect/"');
-    expect(s.iframe).toContain('height="696"');
+    expect(s.iframe).toContain('height="636"'); /* a 16:9 picture 960 wide is 540 tall, plus 96 for the controls */
     expect(s.iframe).toContain('title="Connect &lt;your&gt; calendar"');
   });
 

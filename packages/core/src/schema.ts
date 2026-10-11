@@ -175,7 +175,11 @@ export const LogoSchema = z.object({
   opacity: z.number().min(0.1).max(1).default(0.9),
 });
 
+/** What a project saved without a frame has, so old files open as they were: the recording on its own, no background. */
 export const DEFAULT_FRAME: z.infer<typeof FrameSchema> = { aspect: 'source', padding: 0, background: { type: 'none' }, cornerRadius: 12, shadow: true };
+
+/** What a new project starts with: widescreen on a gradient. A 16:9 recording fills it; any other shape sits on the gradient. */
+export const NEW_PROJECT_FRAME: z.infer<typeof FrameSchema> = { aspect: '16:9', padding: 0, background: { type: 'gradient', preset: 'dusk' }, cornerRadius: 12, shadow: true };
 
 /** F9: how the interactive guide plays. Guided stops at every step until the viewer moves on; auto pauses on each step for its
     pause time; video plays straight through, with step markers on its progress bar. */

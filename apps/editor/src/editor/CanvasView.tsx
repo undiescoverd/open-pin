@@ -5,6 +5,7 @@ import { Playback, type PlaybackHost } from '../engine/playback';
 import { currentPlayback, setPlayback } from '../engine/session';
 import { getEditor, selectProject, setPlaybackState, setPlayhead, timelineTimeOf, useEditor } from '../state/store';
 import { AnnotationOverlay } from './AnnotationOverlay';
+import { CanvasBar } from './CanvasBar';
 import { QuickActions } from './QuickActions';
 import { easeOutOf, leavingUntil, presentation, projectForDrawing, rememberViewer } from './visible';
 import { useFitSize } from './useFitSize';
@@ -62,6 +63,8 @@ export function CanvasView({ children }: { children?: ReactNode }) {
           look: shown.look,
           annotationList: shown.annotations,
           assets: state.assetImages,
+          /* what the exports draw where there is no background, so the canvas is never see-through */
+          opaque: true,
         });
         composeScene(ctx, el.width, el.height, scene);
       },
@@ -125,13 +128,15 @@ export function CanvasView({ children }: { children?: ReactNode }) {
   const inner = layout?.inner ?? [0, 0, width, height];
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center gap-2">
+      {/* the canvas controls sit above the frame, as wide as it is, where they can't be missed */}
+      {source && <CanvasBar width={fit.width} />}
       <div ref={wrap} className="relative flex min-h-0 w-full min-w-0 flex-1 items-start justify-center">
         {/* the video element only feeds the canvas while playing forward; it is never shown */}
         <video ref={video} className="hidden" playsInline preload="auto" muted={false} />
         {/* always mounted, so the playback effect finds its canvas; it has no size until the space around it is measured */}
         {source && (
           <div
-            className="relative overflow-hidden rounded-md shadow-pop outline outline-1 outline-line [background:repeating-conic-gradient(var(--wp-raised)_0_25%,var(--wp-panel)_0_50%)_0_0/16px_16px]"
+            className="relative overflow-hidden rounded-md shadow-pop outline outline-1 outline-line bg-raised"
             style={{ width: fit.width, height: fit.height }}
           >
             <canvas ref={canvas} width={width} height={height} role="img" aria-label={`Recording frame at ${formatTimecode(playhead)}`} data-testid="frame-canvas" className="block size-full" />

@@ -60,9 +60,8 @@ import {
   cx,
   focusRing,
 } from '@waypost/ui';
-import { ChevronDown, ChevronUp, Download, EyeOff, Scissors, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, EyeOff, Scissors, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { saveWaypost } from '../state/project';
 import {
   addEffect,
   blurKeyframeHere,
@@ -86,7 +85,7 @@ import {
   setBlurRectHere,
   setClipAudio,
   setClipSpeed,
-  setExportDialog,
+  setRightTab,
   setGap,
   setHideLook,
   setHideSpan,
@@ -102,12 +101,13 @@ import {
   useEditor,
 } from '../state/store';
 import { AddButtons } from './AddPanel';
+import { CanvasPanel } from './CanvasPanel';
 import { useEditSession } from './useEditSession';
 import { switchView } from './visible';
 
 const TABS = [
   { id: 'selection', label: 'Inspector' },
-  { id: 'guide', label: 'Guide' },
+  { id: 'canvas', label: 'Canvas' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -115,21 +115,19 @@ const tc = (t: number): string => formatTimecode(t);
 const refuse = (m: string): void => notify(m, 'error');
 
 /* Context inspector (docs/03-design-system.md; docs/05-editor-interactions.md, section 7): the first tab edits whatever is
-   selected, the second describes the recording and saving; guide-wide settings are in Export. Selecting something new scrolls the panel to the top. */
+   selected, the second is the canvas: its background, frame and logo, and the recording and saving. A new project opens on the
+   canvas; selecting something shows the Inspector. Selecting something new scrolls the panel to the top. */
 export function Inspector() {
-  const [tab, setTab] = useState<TabId>('selection');
-  const refs = useRef<Record<TabId, HTMLButtonElement | null>>({ selection: null, guide: null });
+  const tab = useEditor(s => s.rightTab);
+  const setTab = setRightTab;
+  const refs = useRef<Record<TabId, HTMLButtonElement | null>>({ selection: null, canvas: null });
   const panel = useRef<HTMLDivElement>(null);
   const selection = useEditor(s => s.selection);
   const selectionKey = selection ? JSON.stringify(selection) : '';
 
   /* a new selection shows the Inspector tab, scrolled to the top */
-  const [shownKey, setShownKey] = useState(selectionKey);
-  if (shownKey !== selectionKey) {
-    setShownKey(selectionKey);
-    if (selectionKey) setTab('selection');
-  }
   useEffect(() => {
+    if (selectionKey) setRightTab('selection');
     if (panel.current) panel.current.scrollTop = 0;
   }, [selectionKey]);
 
@@ -176,7 +174,7 @@ export function Inspector() {
           tabIndex={0}
           className={cx('flex-1 overflow-auto p-4', focusRing)}
         >
-          {t.id === 'selection' ? <SelectionPanel /> : <GuidePanel />}
+          {t.id === 'selection' ? <SelectionPanel /> : <CanvasPanel />}
         </div>
       ))}
     </Surface>
@@ -753,59 +751,6 @@ function HidePanel({ project, blur, source }: { project: Project; blur: Blur; so
           Remove hidden area
         </Button>
       </div>
-    </div>
-  );
-}
-
-// ----- the Guide tab: the recording and saving -----------------------------------------------------------------------
-
-function GuidePanel() {
-  const project = useEditor(selectProject);
-  const save = useEditor(s => s.save);
-  const source = project?.sources[0];
-  if (!project || !source) {
-    return (
-      <>
-        <h3 className="m-0 mb-1 text-md font-semibold text-fg">Guide settings</h3>
-        <p className="m-0 text-fg-muted">Details of the recording appear here once one is open.</p>
-      </>
-    );
-  }
-  return (
-    <div>
-      <h3 className="m-0 mb-1 text-md font-semibold text-fg">Guide settings</h3>
-      <div className="flex flex-col gap-2 py-2">
-        <Help>How the guide plays, the button at the end, the player's look, framing, background and logo are in Export.</Help>
-        <ButtonRow>
-          <Button size="sm" icon={<Icon icon={Download} />} onClick={() => setExportDialog('choose')}>
-            Open Export
-          </Button>
-        </ButtonRow>
-      </div>
-      <InspectorSection id="guide-recording" title="Recording">
-        <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-          <dt className="text-fg-muted">File</dt>
-          <dd className="m-0 truncate text-fg" title={source.name}>
-            {source.name}
-          </dd>
-          <dt className="text-fg-muted">Size</dt>
-          <dd className="m-0 text-fg">
-            {source.size[0]} × {source.size[1]}
-          </dd>
-          <dt className="text-fg-muted">Length</dt>
-          <dd className="m-0 font-mono text-fg">{tc(source.duration)}</dd>
-          <dt className="text-fg-muted">Frame rate</dt>
-          <dd className="m-0 text-fg">{Math.round(source.fps * 100) / 100} fps</dd>
-          <dt className="text-fg-muted">Steps</dt>
-          <dd className="m-0 text-fg">{project.steps.length}</dd>
-        </dl>
-      </InspectorSection>
-      <InspectorSection id="guide-storage" title="Saving">
-        <p className="m-0 text-fg-muted">
-          {save === 'saving' ? 'Saving…' : save === 'error' ? 'Could not save to this browser.' : 'Saved in this browser.'} Projects live in this browser. Save a .waypost file to keep a copy.
-        </p>
-        <Button onClick={() => void saveWaypost()}>Save project file…</Button>
-      </InspectorSection>
     </div>
   );
 }

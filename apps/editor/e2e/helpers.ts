@@ -13,12 +13,18 @@ export function watchErrors(page: Page): string[] {
 }
 
 /** Opens the editor and drops in the 6 second test recording (640×400, 30 fps, VP9). */
-export async function openRecording(page: Page, options: { fullTimeline?: boolean } = {}): Promise<void> {
+export async function openRecording(page: Page, options: { fullTimeline?: boolean; defaultCanvas?: boolean } = {}): Promise<void> {
   await page.goto('/');
   await page.getByTestId('file-input').setInputFiles(FIXTURE);
   await expect(page.getByRole('img', { name: /Recording frame/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add step' })).toBeEnabled();
   await waitForFrame(page);
+  /* a new project is widescreen on a gradient and opens on the Canvas tab; most specs measure the recording itself and use the
+     Add buttons, so they start on its own shape with the Inspector showing */
+  if (!options.defaultCanvas) {
+    await originalShape(page);
+    await page.getByRole('tab', { name: 'Inspector' }).click();
+  }
   /* the Phase 1 to 3 specs drive the lanes, which live in the full timeline behind Trim & edit video */
   if (options.fullTimeline ?? true) {
     await page.getByRole('button', { name: 'Trim & edit video' }).click();
@@ -154,4 +160,23 @@ export async function deselectAll(page: Page): Promise<void> {
   const title = stepRail(page).getByRole('textbox', { name: 'Title' });
   for (let i = 0; i < 4 && (await title.count()) > 0; i++) await page.keyboard.press('Escape');
   await expect(title).toHaveCount(0);
+}
+
+/** The canvas bar above the frame: its shape buttons (Original, 16:9, 4:3, 1:1, 4:5) and the Style button. */
+export const canvasBar = (page: Page): Locator => page.getByRole('toolbar', { name: 'Canvas' });
+
+/** Picks the recording's own shape for the canvas, and waits for the frame to take it. */
+export async function originalShape(page: Page): Promise<void> {
+  await canvasBar(page).getByRole('button', { name: 'Original', exact: true }).click();
+  await expect(canvasBar(page).getByRole('button', { name: 'Original', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => page.getByTestId('frame-canvas').evaluate((c: HTMLCanvasElement) => Math.abs(c.width / c.height - 640 / 400))).toBeLessThan(0.01);
+  await waitForFrame(page);
+}
+
+/** Shows the Canvas tab (background, padding, corners, shadow, annotation colour, logo) with the bar's Style button. */
+export async function openStyle(page: Page): Promise<Locator> {
+  await canvasBar(page).getByRole('button', { name: /^Style/ }).click();
+  const panel = page.getByRole('tabpanel', { name: 'Canvas' });
+  await expect(panel).toBeVisible();
+  return panel;
 }

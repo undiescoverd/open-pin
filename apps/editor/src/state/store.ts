@@ -120,6 +120,8 @@ export interface EditorState {
   quick: { stepId: string; at: Point } | null;
   /** whether the guide has been previewed or Export opened since the project opened, after which the next-step hint has no more to say */
   looked: boolean;
+  /** the right panel: what is selected (with the Add buttons), or the canvas (its background, frame, logo, and the recording) */
+  rightTab: 'selection' | 'canvas';
 }
 
 const INITIAL: EditorState = {
@@ -149,6 +151,7 @@ const INITIAL: EditorState = {
   previewOpen: false,
   quick: null,
   looked: false,
+  rightTab: 'canvas',
 };
 
 export const useEditor = create<EditorState>(() => INITIAL);
@@ -322,6 +325,11 @@ export function setView(view: EditorState['view']): void {
 export function setProjectsOpen(open: boolean): void {
   set({ projectsOpen: open });
 }
+/** Shows the Inspector or the Canvas in the right panel. */
+export function setRightTab(rightTab: EditorState['rightTab']): void {
+  set({ rightTab });
+}
+
 export function setExportDialog(view: EditorState['exportDialog']): void {
   set(view === 'closed' ? { exportDialog: view } : { exportDialog: view, looked: true });
 }

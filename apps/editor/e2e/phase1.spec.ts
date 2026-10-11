@@ -519,11 +519,18 @@ test.describe('projects and files', () => {
     await openRecording(page);
     await seekTo(page, 1);
     await page.keyboard.press('Shift+P');
-    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
-
-    await page.getByRole('button', { name: 'Projects' }).click();
     const dialog = page.getByRole('dialog', { name: 'Projects' });
-    await expect(dialog.getByRole('button', { name: /^demo/ })).toContainText('1 step');
+    /* the list is read when the dialog opens, and the step is saved a moment after it is pinned: look again until it has */
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Projects' }).click();
+      try {
+        await expect(dialog.getByRole('button', { name: /^demo/ })).toContainText('1 step', { timeout: 1500 });
+      } catch (error) {
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+        throw error;
+      }
+    }).toPass({ timeout: 15_000 });
 
     /* a second project from the same recording */
     await dialog.getByTestId('projects-file-input').setInputFiles(FIXTURE);
@@ -554,7 +561,7 @@ test.describe('projects and files', () => {
     await page.getByRole('textbox', { name: 'Title' }).fill('A saved step');
     await page.getByRole('textbox', { name: 'Guide name' }).fill('Round trip');
 
-    await page.getByRole('tab', { name: 'Guide' }).click();
+    await page.getByRole('tab', { name: 'Canvas' }).click();
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save project file…' }).click()]);
     expect(download.suggestedFilename()).toBe('Round trip.waypost');
     const file = await download.path();
@@ -592,14 +599,19 @@ test.describe('layout', () => {
   });
 
   for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 720 }]) {
-    test(`the frame starts level with the Steps and Inspector panels at ${size.width} px wide`, async ({ page }) => {
+    test(`the canvas bar starts level with the Steps and Inspector panels, with the frame right under it, at ${size.width} px wide`, async ({ page }) => {
       await page.setViewportSize(size);
       await openRecording(page);
+      const bar = (await page.getByRole('toolbar', { name: 'Canvas' }).boundingBox())!;
       const frame = (await page.getByTestId('frame-canvas').boundingBox())!;
       const steps = (await page.getByRole('complementary', { name: /Steps/ }).boundingBox())!;
       const inspector = (await page.getByRole('complementary', { name: 'Inspector' }).boundingBox())!;
-      expect(Math.abs(frame.y - steps.y)).toBeLessThanOrEqual(1);
-      expect(Math.abs(frame.y - inspector.y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(bar.y - steps.y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(bar.y - inspector.y)).toBeLessThanOrEqual(1);
+      /* the frame follows the bar and is as wide as it, so the bar reads as the frame's own controls */
+      expect(frame.y).toBeGreaterThanOrEqual(bar.y + bar.height);
+      expect(frame.y - (bar.y + bar.height)).toBeLessThanOrEqual(12);
+      expect(Math.abs(bar.width - frame.width)).toBeLessThanOrEqual(2);
     });
   }
 

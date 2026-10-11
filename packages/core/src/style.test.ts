@@ -43,3 +43,17 @@ describe('the guide annotation colour', () => {
     expect(h.present.steps[0]!.annotations.map(a => ('color' in a ? a.color : null))).toEqual(['#FF5A4E', '#ff5a4e', IRIS, null]);
   });
 });
+
+describe('what a new project starts with', () => {
+  it('is widescreen on a gradient, filling the canvas with no padding, so the look can be chosen first', () => {
+    const p = createProject({ id: 'p1', name: 'Demo', source, now: 1 });
+    expect(p.frame).toEqual({ aspect: '16:9', padding: 0, background: { type: 'gradient', preset: 'dusk' }, cornerRadius: 12, shadow: true });
+  });
+
+  it('leaves a project saved without a frame as it was: the recording on its own, no background', () => {
+    const p = createProject({ id: 'p1', name: 'Demo', source, now: 1 });
+    const old: Partial<Project> = { ...p };
+    delete old.frame;
+    expect(parseProject(old).frame).toEqual({ aspect: 'source', padding: 0, background: { type: 'none' }, cornerRadius: 12, shadow: true });
+  });
+});

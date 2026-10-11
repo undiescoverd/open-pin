@@ -159,7 +159,9 @@ describe('guide helpers', () => {
     const [w, h] = guideSize(big);
     expect(w).toBe(1920);
     expect(h % 2).toBe(0);
-    expect(guideSize(fresh())).toEqual([1280, 800]);
+    /* a new project is widescreen, so a 1280 × 800 recording gets a 16:9 canvas as tall as it is; "Original" keeps its own shape */
+    expect(guideSize(fresh())).toEqual([1422, 800]);
+    expect(guideSize({ ...fresh(), frame: { ...fresh().frame, aspect: 'source' } })).toEqual([1280, 800]);
   });
 
   it('makes step ids safe and unique file names, never "outro"', () => {
