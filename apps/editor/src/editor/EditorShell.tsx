@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { openFile, restoreLastProject, startAutosave } from '../state/project';
+import { ClickReview } from './ClickReview';
 import { ExportDialog } from './ExportDialog';
 import { Filmstrip } from './Filmstrip';
 import { FirstRun } from './FirstRun';
@@ -62,6 +63,7 @@ export function EditorShell() {
       <ProjectsDialog />
       <ExportDialog />
       <PreviewDialog />
+      <ClickReview />
     </div>
   );
 }

@@ -49,8 +49,10 @@ MPL-2.0 is file-level copyleft: we can use Mediabunny in a closed-source commerc
 ```
 waypost/
 ├─ apps/
-│  └─ editor/              React app: screens, panels, timeline, canvas interactions
+│  ├─ editor/              React app: screens, panels, timeline, canvas interactions
+│  └─ extension/           Chrome click-capture extension (Manifest V3), built with Vite
 ├─ packages/
+│  ├─ capture/             Click capture: editor↔extension messages, clicks → proposed steps
 │  ├─ core/                Pure TS: project model, schemas, time mapping, segments/holds,
 │  │                       commands + undo. No DOM, no media. Fast unit tests.
 │  ├─ render/              Canvas compositor: background, blur, zoom, annotations, logo,

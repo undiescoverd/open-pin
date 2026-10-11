@@ -6,6 +6,7 @@ import { blurRectAt } from './geometry';
 import {
   NEW_PROJECT_FRAME,
   DEFAULT_GUIDE,
+  REVEAL_GROUPS,
   SCHEMA_VERSION,
   type Annotation,
   type Asset,
@@ -135,6 +136,41 @@ export const commands = {
           d.steps.push({ id: args.stepId, anchor: { source: args.source, time }, title: '', body: '', minHold: 2.5, zoom: null, annotations: m ? [m] : [] });
           sortSteps(d);
         }
+        touch(d, args.now);
+      },
+    };
+  },
+
+  /**
+   * Adds the steps proposed from a recording's captured clicks, in one undo step. Each gets a click marker at `at` and its title;
+   * `more` are further clicks folded into the same step, which appear one after another. A frame that already has a step is left
+   * alone, and a time past the end of the recording is brought back to it.
+   */
+  addClickSteps(args: {
+    source: string;
+    steps: ReadonlyArray<{ stepId: string; annotationIds: string[]; time: number; at: Point; title: string; more?: Point[] }>;
+    now: number;
+  }): Command<Project> {
+    return {
+      label: args.steps.length === 1 ? 'Add step' : 'Add steps from clicks',
+      run: d => {
+        const src = d.sources.find(s => s.id === args.source);
+        if (!src) throw new Error(`No source ${args.source}`);
+        for (const proposed of args.steps) {
+          const time = Math.min(Math.max(0, proposed.time), src.duration);
+          if (!canPinAt(d, args.source, time)) continue;
+          if (d.steps.some(s => s.anchor.source === args.source && sameFrame(s.anchor.time, time, src.fps))) continue;
+          const points = [proposed.at, ...(proposed.more ?? [])];
+          const annotations: ClickAnnotation[] = points.map((at, i) => ({
+            id: proposed.annotationIds[i] ?? `${proposed.stepId}_c${i}`,
+            type: 'click',
+            at: clampPoint(at),
+            color: d.guide.annotationColor,
+            reveal: Math.min(i, REVEAL_GROUPS - 1),
+          }));
+          d.steps.push({ id: proposed.stepId, anchor: { source: args.source, time }, title: proposed.title.slice(0, 120), body: '', minHold: 2.5, zoom: null, annotations });
+        }
+        sortSteps(d);
         touch(d, args.now);
       },
     };

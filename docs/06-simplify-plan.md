@@ -19,7 +19,7 @@ This document is the design for making Waypost simple by default. It takes an ou
 
 ### 1. First run (board 1)
 
-The whole window is one drop zone: **Drop a screen recording here** with *Choose a recording* and *Open a project file*. Under it, the shape of the whole job in three numbered lines: **Add steps · Explain each one · Export**. Nothing else is on screen until there is a recording.
+The whole window is one drop zone: **Drop a screen recording here** with *Choose a recording* and *Open a project file*, and (from Phase 5) *Record a tab* beside them, with one quiet line about the click-capture extension that **Not now** puts away for good. Under it, the shape of the whole job in three numbered lines: **Add steps · Explain each one · Export**. Nothing else is on screen until there is a recording.
 
 ### 2. Editing a step (board 2)
 

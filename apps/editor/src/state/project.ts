@@ -112,11 +112,11 @@ export function isRecording(file: File): boolean {
   return file.type.startsWith('video/') || RECORDING_TYPES.test(file.name);
 }
 
-/** Starts a new project from a recording the person dropped or chose. */
-export async function importRecording(file: File): Promise<void> {
+/** Starts a new project from a recording the person dropped, chose or recorded. Returns it, or null if it couldn't be opened. */
+export async function importRecording(file: File, options: { quiet?: boolean } = {}): Promise<Project | null> {
   if (!isRecording(file)) {
     notify("That doesn't look like a video. Choose an MP4, MOV, WebM or MKV recording.", 'error');
-    return;
+    return null;
   }
   patchEditor({ busy: 'Reading the recording…' });
   let id: string | undefined;
@@ -141,11 +141,13 @@ export async function importRecording(file: File): Promise<void> {
     await present(project);
     const media = getEditor().media;
     await putEntry(entryFor(project, media ? await thumbnailOf(media) : undefined));
-    notify('Recording ready. Press P, then click the frame where viewers should click.');
+    if (!options.quiet) notify('Recording ready. Press P, then click the frame where viewers should click.');
+    return project;
   } catch (error) {
     patchEditor({ busy: null });
     if (id) await discardUnopened(id);
     notify(describe(error, "Couldn't open that recording."), 'error');
+    return null;
   }
 }
 

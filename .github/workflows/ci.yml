@@ -35,6 +35,13 @@ jobs:
       - run: pnpm build
       - name: Player size budget (under 60 KB gzipped)
         run: pnpm --filter @waypost/player size
+      - name: Build the click-capture extension
+        run: pnpm build:extension
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waypost-click-capture
+          path: apps/extension/waypost-click-capture.zip
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: editor-dist
