@@ -84,6 +84,8 @@ Pushes to the default branch then go to production, and every pull request branc
 | [03 — Design system and editor UI](docs/03-design-system.md) | What's wrong with FramePin's editor, our layout, "Coral & Graphite" tokens, PinKit components |
 | [04 — Roadmap](docs/04-roadmap.md) | Phased build plan with acceptance criteria |
 | [05 — Editor interactions](docs/05-editor-interactions.md) | Exact timeline, canvas, Inspector and keyboard behaviour proven in the mockup: time model, trimming and ripple, snapping, playback, undo, acceptance checks |
+| [06 — Simplify plan](docs/06-simplify-plan.md) | The steps-first editor design behind Phase 4: screens, principles and what moves under Advanced |
+| [07 — Hosting and payment options](docs/07-business-model.md) | Online storage options for published guides (R2), how FramePin charges, payment structures and a recommendation |
 | [Editor mockup](design/mockup/editor.html) | Clickable single-file mockup of the editor and guide preview (open in Chrome) |
 
 Waypost is an independent clean-room project built from FramePin's public product descriptions. It isn't affiliated with FramePin and uses none of its code or assets.
