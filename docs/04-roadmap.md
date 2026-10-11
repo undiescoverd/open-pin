@@ -137,6 +137,17 @@ Make the editor simple by default, as designed in [06-simplify-plan.md](06-simpl
 
 **Done when** a guide with recorded narration plays in sync in the player and in the MP4.
 
+## Phase 8 — Click capture
+
+Pinning every click by hand is the slowest part of making a guide. Capture the clicks while recording, so a guide starts with a step at each one, already in the right place. A web page can't see clicks outside its own tab, so this needs a small browser extension (Chrome first).
+
+- **Record in the app:** *Record a tab* records a browser tab straight into a new project (`getDisplayMedia` + `MediaRecorder`). Recording in the app keeps the clicks and the video on one clock, so every click lands on the right frame.
+- **Waypost click-capture extension:** while recording, it logs each click in the recorded tab with its time, its position in the page and the label of what was clicked (button text, link text or `aria-label`). It sends them to the editor and never leaves the browser. It only runs while a recording is going and says so in its icon.
+- **A step at every click:** when recording stops, the editor proposes a step at each click, with a click marker where the click was and a title from the label ("Click Invite"). A short review list lets you keep, merge or drop them before they're added. Proposed steps are ordinary steps afterwards: move, retitle or delete them as usual.
+- **Without the extension** everything works as today: the Pin tool and **+ Add step** stay the way to make steps by hand, and recordings made elsewhere import as before.
+
+**Done when** someone records a five-click task in a browser tab with the extension on and gets five steps, each with its click marker on what was clicked and a sensible title, without pinning anything by hand.
+
 ## Later
 
 Kept for when people ask for them, not planned:
@@ -145,7 +156,7 @@ Kept for when people ask for them, not planned:
 - Viewer analytics (player beacons, a collector and a per-step funnel).
 - OCR title suggestions and auto-redaction suggestions.
 - Click-to-reveal annotations, time-stretched sound for sped-up clips, PDF visual regression tests, a ProRes editing proxy.
-- Record the screen inside the app, a click-capture browser extension, PWA polish.
+- Recording a whole screen or window inside the app (Phase 8 records a browser tab), click capture in desktop apps, PWA polish.
 
 ## Open questions for the owner
 

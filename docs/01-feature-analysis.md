@@ -302,8 +302,8 @@ Optional extras after parity. Each one is cheap in the browser.
 
 | Bonus | How |
 |---|---|
-| **Record in the app** | `getDisplayMedia` + `MediaRecorder` records a screen, window or tab straight into a new project. |
-| **Click-capture extension** | A web page can't see clicks outside its own tab. An optional Waypost browser extension can log clicks inside the web apps you're recording and propose a step at each click, Arcade/Scribe-style. |
+| **Record in the app** | `getDisplayMedia` + `MediaRecorder` records a screen, window or tab straight into a new project. Recording a tab is planned for Phase 8. |
+| **Click-capture extension** | A web page can't see clicks outside its own tab. An optional Waypost browser extension can log clicks inside the web apps you're recording and propose a step at each click, Arcade/Scribe-style. Planned as Phase 8 of the roadmap, together with recording a tab in the app. |
 | **Auto-redaction suggestions** | OCR + patterns (F7). |
 | **Auto step titles** | OCR the text under each click marker ("Click 'Settings'"). Optional polish with an LLM using your own API key. |
 | **Markdown/HTML SOP export** | A docs-style page per guide (title, numbered steps, annotated images) that pastes cleanly into help centers and wikis. |
