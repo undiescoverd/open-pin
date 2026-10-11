@@ -13,7 +13,7 @@ import { getEditor, notify, patchEditor, selectProject, sourceTimeAt, stepAtPlay
 /* The exporters (pdf-lib and its font engine are big) load the first time someone exports, not with the editor. */
 const exporters = () => import('@waypost/export');
 
-/* The Export menu: PDF, screenshots, and copying or saving the frame on screen. All of them draw with @waypost/render, the same
+/* The Export dialog: PDF, screenshots, and copying or saving the frame on screen. All of them draw with @waypost/render, the same
    code as the canvas, from full-size frames decoded in the media worker. */
 
 function jobFor(): ExportJob | null {
@@ -180,17 +180,17 @@ async function workerAssets(project: NonNullable<ReturnType<typeof selectProject
 /**
  * Exports the interactive guide: the export worker renders each step's still and the motion between steps from the recording,
  * then guide.json, the player, a standalone page, the fonts, the logo and background, a light PDF copy and the embed snippets join
- * them, written into a folder or zipped (docs/02-architecture.md, "The published guide bundle").
+ * them, written into a folder or zipped (docs/02-architecture.md, "The published guide bundle"). True once the guide is saved.
  */
-export async function exportGuide(options: GuideExportOptions): Promise<void> {
+export async function exportGuide(options: GuideExportOptions): Promise<boolean> {
   const state = getEditor();
   const project = selectProject(state);
   const source = project?.sources[0];
-  if (!project || !source || state.exporting) return;
+  if (!project || !source || state.exporting) return false;
   const plan = planGuide(project, { pdf: !!options.pdf });
   if (plan.guide.steps.length === 0) {
     notify('Pin at least one step first (P), then export the guide.', 'error');
-    return;
+    return false;
   }
   currentPlayback()?.pause();
   const exporter = await exporters();
@@ -214,7 +214,7 @@ export async function exportGuide(options: GuideExportOptions): Promise<void> {
     );
     if (media.cancelled || cancelled) {
       notify('Export cancelled.');
-      return;
+      return false;
     }
 
     show('Exporting guide…', 0.9, 'Adding the player and the PDF');
@@ -246,7 +246,7 @@ export async function exportGuide(options: GuideExportOptions): Promise<void> {
     }
     if (cancelled) {
       notify('Export cancelled.');
-      return;
+      return false;
     }
 
     show('Exporting guide…', 0.97, options.dir ? 'Writing the folder' : 'Zipping');
@@ -259,8 +259,10 @@ export async function exportGuide(options: GuideExportOptions): Promise<void> {
       downloadBlob(await exporter.zipBundle(files, slug), `${slug}.zip`);
       notify(`Exported the guide (${count}) as ${slug}.zip. Unzip it and upload the folder to any web host.${codecNote}`);
     }
+    return true;
   } catch (error) {
     notify(error instanceof Error ? `Couldn't export the guide: ${error.message}` : "Couldn't export the guide.", 'error');
+    return false;
   } finally {
     patchEditor({ exporting: null });
   }

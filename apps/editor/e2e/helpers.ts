@@ -130,3 +130,21 @@ export async function openItemAdvanced(page: Page): Promise<void> {
   if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator(':scope > summary').click();
   await expect(details).toHaveAttribute('open', '');
 }
+
+/** The Export dialog. */
+export const exportDialog = (page: Page): Locator => page.getByRole('dialog', { name: 'Export' });
+
+/** Opens Export from the top bar and picks what to export: Interactive guide, Video, PDF or Images. */
+export async function openExport(page: Page, kind: 'Interactive guide' | 'Video' | 'PDF' | 'Images' = 'Interactive guide'): Promise<Locator> {
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const dialog = exportDialog(page);
+  await dialog.getByRole('group', { name: 'What to export' }).getByRole('button', { name: new RegExp(`^${kind}`) }).click();
+  return dialog;
+}
+
+/** Opens the Export dialog's Advanced section if it is closed. */
+export async function openExportAdvanced(page: Page): Promise<void> {
+  const details = exportDialog(page).locator('details', { has: page.locator(':scope > summary', { hasText: /^Advanced/ }) });
+  if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator(':scope > summary').click();
+  await expect(details).toHaveAttribute('open', '');
+}

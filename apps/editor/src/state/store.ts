@@ -113,9 +113,8 @@ export interface EditorState {
   message: Message | null;
   save: 'idle' | 'saving' | 'saved' | 'error';
   projectsOpen: boolean;
-  exportOpen: boolean;
-  /** the Share dialog: export the interactive guide and copy its embed snippets */
-  shareOpen: boolean;
+  /** the Export dialog: closed, choosing what to export, or the link and embed code once a guide is saved */
+  exportDialog: 'closed' | 'choose' | 'saved';
   /** the guide preview, playing in the real player */
   previewOpen: boolean;
 }
@@ -143,8 +142,7 @@ const INITIAL: EditorState = {
   message: null,
   save: 'idle',
   projectsOpen: false,
-  exportOpen: false,
-  shareOpen: false,
+  exportDialog: 'closed',
   previewOpen: false,
 };
 
@@ -314,11 +312,8 @@ export function setView(view: EditorState['view']): void {
 export function setProjectsOpen(open: boolean): void {
   set({ projectsOpen: open });
 }
-export function setExportOpen(open: boolean): void {
-  set({ exportOpen: open });
-}
-export function setShareOpen(open: boolean): void {
-  set({ shareOpen: open });
+export function setExportDialog(view: EditorState['exportDialog']): void {
+  set({ exportDialog: view });
 }
 /** Opens the guide preview (⌘↩), once there is a step to show. */
 export function setPreviewOpen(open: boolean): void {

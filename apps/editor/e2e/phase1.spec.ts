@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
 import { unzipSync } from 'fflate';
-import { FIXTURE, clickFrame, dragOnFrame, frameBox, openItemAdvanced, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepCards, stepChip, stepRail, waitForFrame, watchErrors } from './helpers';
+import { FIXTURE, clickFrame, dragOnFrame, frameBox, openExport, openItemAdvanced, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepCards, stepChip, stepRail, waitForFrame, watchErrors } from './helpers';
 
 /** The Phase 1 acceptance test (docs/04-roadmap.md): drop in a recording, pin 5 steps, annotate them, reload without losing
     anything, and export a PDF and PNGs that match the canvas. */
@@ -88,8 +88,9 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
       await stepCards(page).nth(0).getByRole('button').first().click();
       await expect.poll(() => playheadSeconds(page)).toBeCloseTo(0.5, 2);
       await waitForFrame(page);
-      await page.getByRole('button', { name: 'Export' }).click();
-      const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'PNG images (zip)' }).click()]);
+      const dialog = await openExport(page, 'Images');
+      await dialog.getByRole('group', { name: 'Format' }).getByRole('button', { name: 'PNG' }).click();
+      const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Export images' }).click()]);
       expect(download.suggestedFilename()).toBe('demo screenshots.zip');
       const files = unzipSync(new Uint8Array(await readFile((await download.path())!)));
       expect(Object.keys(files).sort()).toEqual([
@@ -120,16 +121,18 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
     });
 
     await test.step('WebP export zips the same steps', async () => {
-      await page.getByRole('button', { name: 'Export' }).click();
-      const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'WebP images (zip)' }).click()]);
+      const dialog = await openExport(page, 'Images');
+      await dialog.getByRole('group', { name: 'Format' }).getByRole('button', { name: 'WebP' }).click();
+      const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Export images' }).click()]);
       const files = unzipSync(new Uint8Array(await readFile((await download.path())!)));
       expect(Object.keys(files)).toHaveLength(5);
       expect(Object.keys(files).every(name => name.endsWith('.webp'))).toBe(true);
     });
 
     await test.step('PDF export has a page per step at the chosen size', async () => {
-      await page.getByRole('button', { name: 'Export' }).click();
-      const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'PDF · A4' }).click()]);
+      const dialog = await openExport(page, 'PDF');
+      await dialog.getByRole('group', { name: 'Page size' }).getByRole('button', { name: 'A4' }).click();
+      const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Export PDF' }).click()]);
       expect(download.suggestedFilename()).toBe('demo (A4).pdf');
       const pdf = await PDFDocument.load(await readFile((await download.path())!));
       expect(pdf.getPageCount()).toBe(5);
@@ -145,9 +148,10 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
     });
 
     const slide = await test.step('PDF export in 16:9 and Letter', async () => {
-      for (const [item, w, h] of [['PDF · Letter', 612, 792], ['PDF · 16:9 slides', 960, 540]] as const) {
-        await page.getByRole('button', { name: 'Export' }).click();
-        const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: item }).click()]);
+      for (const [item, w, h] of [['Letter', 612, 792], ['16:9 slides', 960, 540]] as const) {
+        const dialog = await openExport(page, 'PDF');
+        await dialog.getByRole('group', { name: 'Page size' }).getByRole('button', { name: item }).click();
+        const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Export PDF' }).click()]);
         const pdf = await PDFDocument.load(await readFile((await download.path())!));
         expect(pdf.getPageCount()).toBe(5);
         expect([Math.round(pdf.getPage(0).getWidth()), Math.round(pdf.getPage(0).getHeight())]).toEqual([w, h]);
@@ -158,11 +162,16 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the export menu says what to do when nothing is pinned', async ({ page }) => {
+  test('Export says to add a step first when nothing is pinned, except for a video', async ({ page }) => {
     await openRecording(page);
-    await page.getByRole('button', { name: 'Export' }).click();
-    await page.getByRole('menuitem', { name: 'PNG images (zip)' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Pin at least one step' })).toBeVisible();
+    for (const kind of ['Interactive guide', 'PDF', 'Images'] as const) {
+      const dialog = await openExport(page, kind);
+      await expect(dialog.getByText('Add a step first, then export.')).toBeVisible();
+      await expect(dialog.getByRole('button', { name: /^Export (guide|PDF|images)$/ })).toBeDisabled();
+      await page.keyboard.press('Escape');
+    }
+    const dialog = await openExport(page, 'Video');
+    await expect(dialog.getByRole('button', { name: 'Export video' })).toBeEnabled();
   });
 });
 
@@ -207,14 +216,13 @@ test.describe('copying and saving a frame', () => {
     await page.keyboard.press('p');
     await clickFrame(page, 0.5, 0.5);
 
-    await page.getByRole('button', { name: 'Export' }).click();
-    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'Save frame as PNG' }).click()]);
+    const dialog = await openExport(page, 'Images');
+    const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Save frame as PNG' }).click()]);
     expect(download.suggestedFilename()).toBe('demo 0-02.00.png');
     const header = (await readFile((await download.path())!)).subarray(0, 8);
     expect([...header]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-    await page.getByRole('button', { name: 'Export' }).click();
-    await page.getByRole('menuitem', { name: 'Copy frame' }).click();
+    await dialog.getByRole('button', { name: 'Copy frame' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Copied the frame' })).toBeVisible();
     const type = await page.evaluate(async () => (await navigator.clipboard.read())[0]!.types.join(','));
     expect(type).toContain('image/png');
@@ -539,8 +547,8 @@ test.describe('projects and files', () => {
     await page.getByRole('textbox', { name: 'Title' }).fill('A saved step');
     await page.getByRole('textbox', { name: 'Guide name' }).fill('Round trip');
 
-    await page.getByRole('button', { name: 'Export' }).click();
-    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Save project file/ }).click()]);
+    await page.getByRole('tab', { name: 'Guide' }).click();
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save project file…' }).click()]);
     expect(download.suggestedFilename()).toBe('Round trip.waypost');
     const file = await download.path();
     const zipped = unzipSync(new Uint8Array(await readFile(file!)));

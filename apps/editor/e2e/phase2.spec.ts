@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { blurAlphaAt, blurRectAt, exportPlan, frameLayout, parseProject, planAt, tlToSrc, type Project } from '@waypost/core';
 import { readFile } from 'node:fs/promises';
-import { dragOnFrame, frameBox, openItemAdvanced, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepChip, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
+import { dragOnFrame, frameBox, openExport, openExportAdvanced, openItemAdvanced, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepChip, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
 
 /** The Phase 2 acceptance tests (docs/04-roadmap.md, "Phase 2 — Edit and polish"; the checks in docs/05-editor-interactions.md,
     section 10). The fixture is 6 seconds long, 640 × 400, at 30 fps. */
@@ -438,7 +438,8 @@ test.describe('Phase 2: zoom, framing and logo', () => {
 
   test('framing changes the output; a logo is stored with the project and comes back after a reload', async ({ page }) => {
     await openRecording(page);
-    await page.getByRole('tab', { name: 'Guide' }).click();
+    await openExport(page);
+    await openExportAdvanced(page);
     await page.getByLabel('Shape').selectOption('16:9');
     await typeInto(page.getByLabel('Padding', { exact: true }), '10');
     await page.getByRole('group', { name: 'Background' }).getByRole('button', { name: 'Gradient' }).click();
@@ -459,6 +460,7 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     });
     await page.locator('input[type=file][aria-label="Add a logo…"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(logo, 'base64') });
     await expect(page.getByText('logo.png in a corner of every frame')).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect.poll(() => canvasHash(page, corner)).not.toBe(plain);
     const withLogo = await canvasHash(page, corner);
 
@@ -529,10 +531,12 @@ test.describe('Phase 2: MP4 export', () => {
     });
 
     await test.step('a gradient background', async () => {
-      await page.getByRole('tab', { name: 'Guide' }).click();
+      await openExport(page, 'Video');
+      await openExportAdvanced(page);
       await typeInto(page.getByLabel('Padding', { exact: true }), '6');
       await page.getByRole('group', { name: 'Background' }).getByRole('button', { name: 'Gradient' }).click();
       await leaveField(page);
+      await page.keyboard.press('Escape');
     });
 
     const project = await savedProject(page);
@@ -540,10 +544,9 @@ test.describe('Phase 2: MP4 export', () => {
     expect(project.steps).toHaveLength(10);
 
     const file = await test.step('export the MP4', async () => {
-      await page.getByRole('button', { name: 'Export' }).click();
-      await page.getByRole('menuitem', { name: 'MP4 video…' }).click();
-      await page.getByRole('group', { name: 'Size' }).getByRole('button', { name: '720p' }).click();
-      const [download] = await Promise.all([page.waitForEvent('download', { timeout: 200_000 }), page.getByRole('dialog').getByRole('button', { name: 'Export', exact: true }).click()]);
+      const dialog = await openExport(page, 'Video');
+      await dialog.getByRole('group', { name: 'Size' }).getByRole('button', { name: '720p' }).click();
+      const [download] = await Promise.all([page.waitForEvent('download', { timeout: 200_000 }), dialog.getByRole('button', { name: 'Export video' }).click()]);
       expect(download.suggestedFilename()).toBe('demo.mp4');
       await expect(page.getByRole('status').filter({ hasText: /Exported a \d+ × 720 MP4/ })).toBeVisible();
       return readFile((await download.path())!);
@@ -638,12 +641,11 @@ test.describe('Phase 2: MP4 export', () => {
     await seekTo(page, 1);
     await page.keyboard.press('Shift+P');
     const exportOnce = async (sound: boolean) => {
-      await page.getByRole('button', { name: 'Export' }).click();
-      await page.getByRole('menuitem', { name: 'MP4 video…' }).click();
-      await page.getByRole('group', { name: 'Size' }).getByRole('button', { name: '720p' }).click();
-      const toggle = page.getByRole('switch', { name: "The recording's own sound" });
+      const dialog = await openExport(page, 'Video');
+      await dialog.getByRole('group', { name: 'Size' }).getByRole('button', { name: '720p' }).click();
+      const toggle = dialog.getByRole('switch', { name: "The recording's own sound" });
       if ((await toggle.getAttribute('aria-checked')) !== String(sound)) await toggle.click();
-      const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('dialog').getByRole('button', { name: 'Export', exact: true }).click()]);
+      const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Export video' }).click()]);
       return readFile((await download.path())!);
     };
     /* an audio track's sample entry names its codec: mp4a for AAC, Opus for Opus */
@@ -657,12 +659,11 @@ test.describe('Phase 2: MP4 export', () => {
     await openRecording(page);
     await seekTo(page, 1);
     await page.keyboard.press('Shift+P');
-    await page.getByRole('button', { name: 'Export' }).click();
-    await page.getByRole('menuitem', { name: 'MP4 video…' }).click();
-    await page.getByRole('group', { name: 'Size' }).getByRole('button', { name: '4K' }).click();
+    const dialog = await openExport(page, 'Video');
+    await dialog.getByRole('group', { name: 'Size' }).getByRole('button', { name: '4K' }).click();
     let downloaded = false;
     page.on('download', () => (downloaded = true));
-    await page.getByRole('dialog').getByRole('button', { name: 'Export', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Export video' }).click();
     await expect(page.getByRole('progressbar', { name: 'Export progress' })).toBeVisible();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Export cancelled' })).toBeVisible();

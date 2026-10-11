@@ -8,7 +8,7 @@ import { getEditor, selectProject, setPreviewOpen, useEditor } from '../state/st
 /* Preview (⌘↩): the guide in the same player a published guide uses, with its playback mode, controls, accent and call to action,
    so what you see here is what viewers get. Pictures and motion come from the recording directly (preview/media.ts). */
 
-const MODE_TEXT = { guided: 'Guided: each step waits for the viewer.', auto: 'Auto: steps move on by themselves after their pause.', video: 'Video: plays straight through.' };
+const MODE_TEXT = { guided: 'Viewer clicks Next: each step waits for the viewer.', auto: 'Plays by itself: steps move on after their pause.', video: 'Plain video: plays straight through.' };
 
 function PreviewPlayer({ aspect }: { aspect: number }) {
   const [host, setHost] = useState<HTMLDivElement | null>(null);
@@ -49,7 +49,7 @@ export function PreviewDialog() {
       <div className="flex flex-col gap-2">
         {open && <PreviewPlayer aspect={w / h} />}
         <p className="m-0 text-sm text-fg-muted">
-          {MODE_TEXT[mode]} Change the playback mode, controls, accent and call to action in the Guide tab.
+          {MODE_TEXT[mode]} Change how it plays, the end button and the player's look in Export.
         </p>
       </div>
     </Dialog>

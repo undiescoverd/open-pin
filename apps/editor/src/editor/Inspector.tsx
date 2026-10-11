@@ -1,9 +1,7 @@
 import {
-  ASPECTS,
   EFFECTS,
   EFFECT_COLORS,
   EFFECT_TYPES,
-  GRADIENT_PRESETS,
   HIDE_LOOKS,
   HIDE_MIN_STRENGTH,
   MAX_SPEED,
@@ -30,24 +28,20 @@ import {
   zoomAmount,
   zoomBox,
   type Annotation,
-  type Aspect,
   type Blur,
   type CalloutPlacement,
   type Clip,
   type ClipEdge,
   type Effect,
   type EffectType,
-  type GradientPreset,
   type HideLook,
   type HideSpan,
-  type LogoCorner,
-  type PlaybackMode,
   type Project,
   type Rect,
   type Source,
   type Step,
 } from '@waypost/core';
-import { ANNOTATION_COLORS, GRADIENTS } from '@waypost/render';
+import { ANNOTATION_COLORS } from '@waypost/render';
 import {
   Advanced,
   Button,
@@ -66,9 +60,9 @@ import {
   cx,
   focusRing,
 } from '@waypost/ui';
-import { ChevronDown, ChevronUp, EyeOff, ImagePlus, Scissors, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, EyeOff, Scissors, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { addImage, saveWaypost } from '../state/project';
+import { saveWaypost } from '../state/project';
 import {
   addEffect,
   blurKeyframeHere,
@@ -92,15 +86,12 @@ import {
   setBlurRectHere,
   setClipAudio,
   setClipSpeed,
-  setFrame,
+  setExportDialog,
   setGap,
-  setGuide,
   setHideLook,
   setHideSpan,
   setHighlightKind,
-  setLogo,
   setStepZoom,
-  setPreviewOpen,
   sourceTimeAt,
   splitAtPlayhead,
   totalDuration,
@@ -124,7 +115,7 @@ const tc = (t: number): string => formatTimecode(t);
 const refuse = (m: string): void => notify(m, 'error');
 
 /* Context inspector (docs/03-design-system.md; docs/05-editor-interactions.md, section 7): the first tab edits whatever is
-   selected, the second holds guide-wide settings. Selecting something new scrolls the panel to the top. */
+   selected, the second describes the recording and saving; guide-wide settings are in Export. Selecting something new scrolls the panel to the top. */
 export function Inspector() {
   const [tab, setTab] = useState<TabId>('selection');
   const refs = useRef<Record<TabId, HTMLButtonElement | null>>({ selection: null, guide: null });
@@ -766,234 +757,7 @@ function HidePanel({ project, blur, source }: { project: Project; blur: Blur; so
   );
 }
 
-// ----- the Guide tab: framing, logo, player and call to action -------------------------------------------------------
-
-const ASPECT_LABEL: Record<Aspect, string> = { source: 'Same as the recording', '16:9': '16:9 widescreen', '4:3': '4:3', '1:1': '1:1 square', '4:5': '4:5 portrait' };
-const BACKGROUND_COLORS = [
-  { id: 'paper', name: 'Paper', value: '#F6F7F9' },
-  { id: 'white', name: 'White', value: '#FFFFFF' },
-  { id: 'ink', name: 'Ink', value: '#0E1116' },
-  { id: 'coral', name: 'Coral', value: '#FF5A4E' },
-  { id: 'lagoon', name: 'Lagoon', value: '#13B8A6' },
-  { id: 'iris', name: 'Iris', value: '#6E6BFF' },
-];
-const CORNERS: ReadonlyArray<{ value: LogoCorner; label: string }> = [
-  { value: 'tl', label: '↖ Top left' },
-  { value: 'tr', label: '↗ Top right' },
-  { value: 'bl', label: '↙ Bottom left' },
-  { value: 'br', label: '↘ Bottom right' },
-];
-
-/** A button that opens a file picker for an image. */
-function ImagePicker({ label, onFile }: { label: string; onFile: (file: File) => void }) {
-  const input = useRef<HTMLInputElement>(null);
-  return (
-    <>
-      <input
-        ref={input}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif,image/avif"
-        hidden
-        aria-label={label}
-        onChange={e => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (file) onFile(file);
-        }}
-      />
-      <Button size="sm" icon={<Icon icon={ImagePlus} />} onClick={() => input.current?.click()}>
-        {label}
-      </Button>
-    </>
-  );
-}
-
-function FramingSection({ project }: { project: Project }) {
-  const frame = project.frame;
-  const session = useEditSession();
-  const bg = frame.background;
-  const kind = bg.type;
-  const image = bg.type === 'image' ? project.assets.find(a => a.id === bg.asset) : undefined;
-  return (
-    <InspectorSection id="guide-frame" title="Background and framing">
-      <SelectField label="Shape" value={frame.aspect} options={ASPECTS.map(a => ({ value: a, label: ASPECT_LABEL[a] }))} onChange={v => setFrame({ aspect: v as Aspect }, 'Change shape')} />
-      <div {...session.bind} className="flex flex-col gap-3">
-        <ParamRow label="Padding" value={Math.round(frame.padding * 100)} min={0} max={25} unit="%" defaultValue={0} onChange={v => setFrame({ padding: v / 100 }, 'Change padding', session.key())} />
-        <ParamRow label="Corner radius" value={frame.cornerRadius} min={0} max={40} unit="px" defaultValue={12} onChange={v => setFrame({ cornerRadius: v }, 'Change corner radius', session.key())} />
-      </div>
-      <Segmented
-        label="Background"
-        options={[
-          { value: 'none', label: 'None' },
-          { value: 'color', label: 'Colour' },
-          { value: 'gradient', label: 'Gradient' },
-          { value: 'image', label: 'Image' },
-        ]}
-        value={kind}
-        onChange={v => {
-          if (v === 'none') setFrame({ background: { type: 'none' } }, 'Remove background');
-          else if (v === 'color') setFrame({ background: { type: 'color', color: '#F6F7F9' } }, 'Change background');
-          else if (v === 'gradient') setFrame({ background: { type: 'gradient', preset: 'dusk' } }, 'Change background');
-          else {
-            const last = [...project.assets].reverse().find(a => a.id !== project.logo?.asset);
-            if (last) setFrame({ background: { type: 'image', asset: last.id } }, 'Change background');
-            else notify('Choose an image for the background.');
-          }
-        }}
-      />
-      {bg.type === 'color' && <ColorSwatchPicker label="Background colour" colors={BACKGROUND_COLORS} value={bg.color} onChange={color => setFrame({ background: { type: 'color', color } }, 'Change background')} />}
-      {bg.type === 'gradient' && (
-        <div role="group" aria-label="Gradient" className="grid grid-cols-4 gap-1.5">
-          {GRADIENT_PRESETS.map((g: GradientPreset) => (
-            <button
-              key={g}
-              type="button"
-              aria-pressed={bg.preset === g}
-              onClick={() => setFrame({ background: { type: 'gradient', preset: g } }, 'Change background')}
-              className={cx('flex flex-col items-center gap-1 rounded-md p-1 text-xs text-fg-muted aria-pressed:outline-2 aria-pressed:outline-sel', focusRing)}
-            >
-              <span className="h-8 w-full rounded-sm border border-line" style={{ background: `linear-gradient(135deg, ${GRADIENTS[g].stops[0]}, ${GRADIENTS[g].stops[1]})` }} />
-              {GRADIENTS[g].name}
-            </button>
-          ))}
-        </div>
-      )}
-      {(kind === 'image' || kind === 'none') && (
-        <div className="flex flex-col gap-1">
-          {image && <Help>Image: {image.name}</Help>}
-          <ButtonRow>
-            <ImagePicker label={image ? 'Replace background image…' : 'Choose a background image…'} onFile={file => void addImage(file, 'background')} />
-          </ButtonRow>
-        </div>
-      )}
-      <Switch label="Shadow" checked={frame.shadow} onChange={shadow => setFrame({ shadow }, shadow ? 'Add shadow' : 'Remove shadow')} />
-      <Help>{frame.padding > 0 || frame.aspect !== 'source' ? 'The recording sits on the background with rounded corners.' : 'Add padding or pick a shape to put the recording on a background.'}</Help>
-    </InspectorSection>
-  );
-}
-
-function LogoSection({ project }: { project: Project }) {
-  const logo = project.logo;
-  const session = useEditSession();
-  const asset = logo ? project.assets.find(a => a.id === logo.asset) : undefined;
-  return (
-    <InspectorSection id="guide-logo" title="Logo">
-      {logo ? (
-        <>
-          <Help>{asset?.name ?? 'Logo'} in a corner of every frame, the video and the guide.</Help>
-          <Segmented label="Corner" options={CORNERS.map(c => ({ value: c.value, label: c.label.split(' ')[0]!, title: c.label.slice(2) }))} value={logo.corner} onChange={corner => setLogo({ ...logo, corner: corner as LogoCorner }, 'Move logo')} />
-          <div {...session.bind} className="flex flex-col gap-3">
-            <ParamRow label="Size" value={Math.round(logo.size * 100)} min={3} max={30} unit="%" defaultValue={10} onChange={v => setLogo({ ...logo, size: v / 100 }, 'Resize logo', session.key())} />
-            <ParamRow label="Margin" value={Math.round(logo.margin * 1000) / 10} min={0} max={10} step={0.5} unit="%" defaultValue={3} onChange={v => setLogo({ ...logo, margin: v / 100 }, 'Change logo margin', session.key())} />
-            <ParamRow label="Opacity" value={Math.round(logo.opacity * 100)} min={10} max={100} unit="%" defaultValue={90} onChange={v => setLogo({ ...logo, opacity: v / 100 }, 'Change logo opacity', session.key())} />
-          </div>
-          <ButtonRow>
-            <ImagePicker label="Replace logo…" onFile={file => void addImage(file, 'logo')} />
-            <Button size="sm" variant="ghost" onClick={() => setLogo(null)}>
-              Remove logo
-            </Button>
-          </ButtonRow>
-        </>
-      ) : (
-        <>
-          <Help>Put your logo in a corner of every frame. A PNG or SVG with a transparent background works best.</Help>
-          <ButtonRow>
-            <ImagePicker label="Add a logo…" onFile={file => void addImage(file, 'logo')} />
-          </ButtonRow>
-        </>
-      )}
-    </InspectorSection>
-  );
-}
-
-/* the accents offered for the player (docs/03-design-system.md); each reads with white or ink text, picked for contrast */
-const ACCENTS = [
-  { id: 'coral', name: 'Coral', value: '#D13A30' },
-  { id: 'lagoon', name: 'Lagoon', value: '#0B7568' },
-  { id: 'iris', name: 'Iris', value: '#4F4BD6' },
-  { id: 'marigold', name: 'Marigold', value: '#FFB020' },
-];
-const MODE_HELP: Record<PlaybackMode, string> = {
-  guided: 'Stops at every step until the viewer clicks Next.',
-  auto: 'Pauses on each step for its pause time, then carries on. Viewers can pause it.',
-  video: 'Plays straight through, with the steps marked on its progress bar in time.',
-};
-
-function PlayerSection({ project }: { project: Project }) {
-  const g = project.guide;
-  return (
-    <InspectorSection id="guide-player" title="Player">
-      <div className="flex flex-col gap-1">
-        <Segmented
-          label="Playback"
-          options={[
-            { value: 'guided', label: 'Guided' },
-            { value: 'auto', label: 'Auto' },
-            { value: 'video', label: 'Video' },
-          ]}
-          value={g.mode}
-          onChange={mode => setGuide({ mode }, 'Change playback mode')}
-        />
-        <Help>{MODE_HELP[g.mode]}</Help>
-      </div>
-      <ColorSwatchPicker label="Accent" colors={ACCENTS} value={g.accent} onChange={accent => setGuide({ accent }, 'Change accent')} />
-      <Segmented
-        label="Player colours"
-        options={[
-          { value: 'auto', label: 'Auto', title: "Light or dark, following the viewer's system" },
-          { value: 'light', label: 'Light' },
-          { value: 'dark', label: 'Dark' },
-        ]}
-        value={g.chrome}
-        onChange={chrome => setGuide({ chrome }, 'Change player colours')}
-      />
-      <Switch label="Step counter" checked={g.controls.counter} onChange={counter => setGuide({ controls: { ...g.controls, counter } }, counter ? 'Show step counter' : 'Hide step counter')} />
-      <Switch label="Progress bar" checked={g.controls.progress} onChange={progress => setGuide({ controls: { ...g.controls, progress } }, progress ? 'Show progress bar' : 'Hide progress bar')} />
-      <Switch label="Fullscreen button" checked={g.controls.fullscreen} onChange={fullscreen => setGuide({ controls: { ...g.controls, fullscreen } }, fullscreen ? 'Show fullscreen button' : 'Hide fullscreen button')} />
-      <ButtonRow>
-        <Button size="sm" onClick={() => setPreviewOpen(true)}>
-          Preview guide
-        </Button>
-      </ButtonRow>
-    </InspectorSection>
-  );
-}
-
-function CtaSection({ project }: { project: Project }) {
-  const cta = project.guide.cta;
-  const session = useEditSession();
-  const url = cta?.url.trim() ?? '';
-  const urlProblem = cta && url !== '' && !/^https?:\/\/\S+$/i.test(url) ? 'Start the address with https:// so the button can open it.' : null;
-  const showAt = [{ value: 'end', label: 'On the end card' }, ...project.steps.map((s, i) => ({ value: s.id, label: `From step ${i + 1}${s.title.trim() ? `, ${s.title.trim()}` : ''}` }))];
-  return (
-    <InspectorSection id="guide-cta" title="Call to action">
-      <Switch
-        label="Show a button"
-        checked={!!cta}
-        onChange={on => setGuide({ cta: on ? { label: 'Try it yourself', url: '', newTab: true, showAt: 'end' } : null }, on ? 'Add call to action' : 'Remove call to action')}
-        hint={cta ? undefined : 'A button to a signup, booking or documentation page, in the accent colour.'}
-      />
-      {cta && (
-        <>
-          <div {...session.bind} className="flex flex-col gap-3">
-            <TextField label="Button text" value={cta.label} maxLength={40} onChange={e => setGuide({ cta: { ...cta, label: e.target.value } }, 'Change button text', session.key())} />
-            <TextField
-              label="Link"
-              type="url"
-              placeholder="https://example.com/signup"
-              value={cta.url}
-              maxLength={2000}
-              onChange={e => setGuide({ cta: { ...cta, url: e.target.value } }, 'Change button link', session.key())}
-              hint={urlProblem ?? (url ? undefined : 'The button appears once it has a link.')}
-            />
-          </div>
-          <SelectField label="Show it" value={showAt.some(o => o.value === cta.showAt) ? cta.showAt : 'end'} options={showAt} onChange={v => setGuide({ cta: { ...cta, showAt: v } }, 'Move call to action')} />
-          <Switch label="Open in a new tab" checked={cta.newTab} onChange={newTab => setGuide({ cta: { ...cta, newTab } }, 'Change call to action')} />
-        </>
-      )}
-    </InspectorSection>
-  );
-}
+// ----- the Guide tab: the recording and saving -----------------------------------------------------------------------
 
 function GuidePanel() {
   const project = useEditor(selectProject);
@@ -1003,17 +767,21 @@ function GuidePanel() {
     return (
       <>
         <h3 className="m-0 mb-1 text-md font-semibold text-fg">Guide settings</h3>
-        <p className="m-0 text-fg-muted">Background, framing, logo, audio and player settings appear here once a recording is open.</p>
+        <p className="m-0 text-fg-muted">Details of the recording appear here once one is open.</p>
       </>
     );
   }
   return (
     <div>
       <h3 className="m-0 mb-1 text-md font-semibold text-fg">Guide settings</h3>
-      <FramingSection project={project} />
-      <LogoSection project={project} />
-      <PlayerSection project={project} />
-      <CtaSection project={project} />
+      <div className="flex flex-col gap-2 py-2">
+        <Help>How the guide plays, the button at the end, the player's look, framing, background and logo are in Export.</Help>
+        <ButtonRow>
+          <Button size="sm" icon={<Icon icon={Download} />} onClick={() => setExportDialog('choose')}>
+            Open Export
+          </Button>
+        </ButtonRow>
+      </div>
       <InspectorSection id="guide-recording" title="Recording">
         <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           <dt className="text-fg-muted">File</dt>

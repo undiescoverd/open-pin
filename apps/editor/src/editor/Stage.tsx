@@ -142,7 +142,7 @@ function DropZone({ loading }: { loading: boolean }) {
           1. Pin the moments that matter <KeyCap keys={['p']} />
         </li>
         <li>2. Point things out</li>
-        <li>3. Share</li>
+        <li>3. Export</li>
       </ol>
       <p className="m-0 text-sm text-fg-muted">Your recording stays in this browser. Nothing is uploaded.</p>
       <MessageLine />
