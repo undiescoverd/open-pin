@@ -1,5 +1,6 @@
 import * as RadixTooltip from '@radix-ui/react-tooltip';
-import type { ReactElement, ReactNode } from 'react';
+import { useContext, useEffect, useState, type ReactElement, type ReactNode } from 'react';
+import { InDialog, openDialogs, tooltipClosers } from './layers';
 import { KeyCap } from './KeyCap';
 
 /** Wrap the app once. Moving between tooltips after the first one opens is instant. */
@@ -22,8 +23,16 @@ export interface TooltipProps {
 
 /** A short label on hover or keyboard focus. Needs a TooltipProvider above it. */
 export function Tooltip({ content, shortcut, side = 'bottom', children }: TooltipProps) {
+  const inDialog = useContext(InDialog);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    tooltipClosers.add(close);
+    return () => void tooltipClosers.delete(close);
+  }, [open]);
   return (
-    <RadixTooltip.Root>
+    <RadixTooltip.Root open={open} onOpenChange={next => setOpen(next && (inDialog || openDialogs() === 0))}>
       <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
       <RadixTooltip.Portal>
         <RadixTooltip.Content

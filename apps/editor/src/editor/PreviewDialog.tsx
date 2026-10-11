@@ -1,14 +1,21 @@
 import { guideSize, planGuide } from '@waypost/core';
-import type { PlayerHandle } from '@waypost/player';
+import type { PlayerHandle, PlayerState } from '@waypost/player';
 import { loadRenderFonts } from '@waypost/render';
 import { Dialog } from '@waypost/ui';
 import { useEffect, useState } from 'react';
-import { getEditor, selectProject, setPreviewOpen, useEditor } from '../state/store';
+import { getEditor, selectionStepId, selectProject, selectStep, setPreviewOpen, useEditor } from '../state/store';
 
 /* Preview (⌘↩): the guide in the same player a published guide uses, with its playback mode, controls, accent and call to action,
-   so what you see here is what viewers get. Pictures and motion come from the recording directly (preview/media.ts). */
+   so what you see here is what viewers get. Pictures and motion come from the recording directly (preview/media.ts).
+   It opens at the selected step (on the start card when no step is selected), and closing it (Esc) selects the step it was
+   showing, so the editor picks up where the preview left off. */
 
 const MODE_TEXT = { guided: 'Viewer clicks Next: each step waits for the viewer.', auto: 'Plays by itself: steps move on after their pause.', video: 'Plain video: plays straight through.' };
+
+/** The step the player is on: none on the start and end cards; the motion into a step, or out of it, counts as that step. */
+function shownStep(state: PlayerState): number | null {
+  return state.kind === 'start' || state.kind === 'end' ? null : state.index;
+}
 
 function PreviewPlayer({ aspect }: { aspect: number }) {
   const [host, setHost] = useState<HTMLDivElement | null>(null);
@@ -18,7 +25,9 @@ function PreviewPlayer({ aspect }: { aspect: number }) {
     if (!host || !project || !state.media || !state.videoUrl) return;
     const { media: decoder, videoUrl, assetImages } = state;
     const plan = planGuide(project, { fonts: false });
-    if (plan.guide.steps.length === 0) return;
+    const steps = plan.guide.steps;
+    if (steps.length === 0) return;
+    const selected = steps.findIndex(s => s.id === selectionStepId(state.selection));
     let player: PlayerHandle | null = null;
     let dispose: (() => void) | null = null;
     let gone = false;
@@ -27,12 +36,15 @@ function PreviewPlayer({ aspect }: { aspect: number }) {
       if (gone) return;
       const media = previewMedia(project, plan, decoder, videoUrl, assetImages);
       dispose = media.dispose;
-      player = mount(host, plan.guide, { media, lazy: false });
+      player = mount(host, plan.guide, { media, lazy: false, start: selected >= 0 ? selected : undefined });
     });
     return () => {
       gone = true;
+      const at = player && shownStep(player.state);
       player?.destroy();
       dispose?.();
+      const id = at === null || at === undefined ? undefined : steps[at]?.id;
+      if (id && id !== selectionStepId(getEditor().selection)) selectStep(id);
     };
   }, [host]);
   /* as wide as the dialog, but never so tall that the controls drop below the screen */

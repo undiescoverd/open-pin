@@ -47,8 +47,10 @@ const TEMPLATE = `<div class="wp" tabindex="0" role="region" aria-roledescriptio
 export interface MountOptions {
   /** where pictures and motion come from; files next to guide.json by default */
   media?: GuideMedia;
-  /** skip the start card and play at once (the editor's preview) */
+  /** skip the start card and play at once */
   autostart?: boolean;
+  /** open on this step's still (0-based) instead of the start card, as the editor's preview does for the selected step */
+  start?: number;
   /** wait until the player is near the screen before loading pictures and motion (default true) */
   lazy?: boolean;
 }
@@ -273,9 +275,11 @@ export class Player implements PlayerHandle {
     const guide = this.guide!, media = this.media!;
     if (this.activated) return;
     this.activated = true;
-    const first = guide.steps[0]!;
-    if (first.segment) this.driver!.preload(first.segment.file);
-    void this.loadStill(0).catch(() => undefined);
+    const start = this.options.start;
+    const at = start !== undefined && guide.steps[start] ? start : null;
+    const first = guide.steps[at ?? 0]!;
+    if (first.segment && at === null) this.driver!.preload(first.segment.file);
+    void this.loadStill(at ?? 0).catch(() => undefined);
     const [poster, logo, background] = await Promise.allSettled([
       media.image(guide.poster),
       guide.logo ? media.image(guide.logo.image) : Promise.resolve(null),
@@ -287,7 +291,9 @@ export class Player implements PlayerHandle {
     this.logo = logo.status === 'fulfilled' ? logo.value : null;
     this.background = background.status === 'fulfilled' ? background.value : null;
     this.paint();
-    if (this.options.autostart && this.current.kind === 'start') this.dispatch({ type: 'next' });
+    if (this.current.kind !== 'start') return;
+    if (at !== null) this.goTo(at);
+    else if (this.options.autostart) this.dispatch({ type: 'next' });
   }
 
   private loadStill(index: number): Promise<CanvasImageSource> {
