@@ -599,19 +599,15 @@ test.describe('layout', () => {
   });
 
   for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 720 }]) {
-    test(`the canvas bar starts level with the Steps and Inspector panels, with the frame right under it, at ${size.width} px wide`, async ({ page }) => {
+    test(`the frame starts level with the Steps and Inspector panels, with nothing above it, at ${size.width} px wide`, async ({ page }) => {
       await page.setViewportSize(size);
       await openRecording(page);
-      const bar = (await page.getByRole('toolbar', { name: 'Canvas' }).boundingBox())!;
       const frame = (await page.getByTestId('frame-canvas').boundingBox())!;
       const steps = (await page.getByRole('complementary', { name: /Steps/ }).boundingBox())!;
       const inspector = (await page.getByRole('complementary', { name: 'Inspector' }).boundingBox())!;
-      expect(Math.abs(bar.y - steps.y)).toBeLessThanOrEqual(1);
-      expect(Math.abs(bar.y - inspector.y)).toBeLessThanOrEqual(1);
-      /* the frame follows the bar and is as wide as it, so the bar reads as the frame's own controls */
-      expect(frame.y).toBeGreaterThanOrEqual(bar.y + bar.height);
-      expect(frame.y - (bar.y + bar.height)).toBeLessThanOrEqual(12);
-      expect(Math.abs(bar.width - frame.width)).toBeLessThanOrEqual(2);
+      await expect(page.getByRole('toolbar', { name: 'Canvas' })).toHaveCount(0);
+      expect(Math.abs(frame.y - steps.y)).toBeLessThanOrEqual(12);
+      expect(Math.abs(frame.y - inspector.y)).toBeLessThanOrEqual(12);
     });
   }
 

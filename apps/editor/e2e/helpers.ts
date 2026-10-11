@@ -162,20 +162,21 @@ export async function deselectAll(page: Page): Promise<void> {
   await expect(title).toHaveCount(0);
 }
 
-/** The canvas bar above the frame: its shape buttons (Original, 16:9, 4:3, 1:1, 4:5) and the Style button. */
-export const canvasBar = (page: Page): Locator => page.getByRole('toolbar', { name: 'Canvas' });
+/** The Shape buttons at the top of the Canvas tab (Original, 16:9, 4:3, 1:1, 4:5). The tab must be showing: see openStyle. */
+export const canvasBar = (page: Page): Locator => page.getByRole('tabpanel', { name: 'Canvas' }).getByRole('group', { name: 'Shape' });
 
 /** Picks the recording's own shape for the canvas, and waits for the frame to take it. */
 export async function originalShape(page: Page): Promise<void> {
+  await openStyle(page);
   await canvasBar(page).getByRole('button', { name: 'Original', exact: true }).click();
   await expect(canvasBar(page).getByRole('button', { name: 'Original', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => page.getByTestId('frame-canvas').evaluate((c: HTMLCanvasElement) => Math.abs(c.width / c.height - 640 / 400))).toBeLessThan(0.01);
   await waitForFrame(page);
 }
 
-/** Shows the Canvas tab (background, padding, corners, shadow, annotation colour, logo) with the bar's Style button. */
+/** Shows the Canvas tab (shape, background, padding, corners, shadow, annotation colour, logo). */
 export async function openStyle(page: Page): Promise<Locator> {
-  await canvasBar(page).getByRole('button', { name: /^Style/ }).click();
+  await page.getByRole('tab', { name: 'Canvas' }).click();
   const panel = page.getByRole('tabpanel', { name: 'Canvas' });
   await expect(panel).toBeVisible();
   return panel;

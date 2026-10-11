@@ -125,9 +125,8 @@ test.describe('Export', () => {
     await expect(page.getByRole('tab', { name: 'Guide' })).toHaveCount(0);
     await expect(page.getByRole('tab', { name: 'Project' })).toHaveCount(0);
     await page.getByRole('tab', { name: 'Canvas' }).click();
-    await expect(page.getByText('What you see on the frame is what every export draws.')).toBeVisible();
+    await expect(page.getByRole('tabpanel', { name: 'Canvas' }).getByRole('group', { name: 'Shape' })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Playback' })).toHaveCount(0);
-    await expect(inspector(page).getByLabel('Shape')).toHaveCount(0);
     await expect(page.getByRole('tabpanel', { name: 'Canvas' }).getByText('Recording', { exact: false }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save project file…' })).toBeVisible();
   });

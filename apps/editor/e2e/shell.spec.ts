@@ -105,7 +105,7 @@ test.describe('editor shell', () => {
     await openRecording(page, { fullTimeline: false });
     await expect(page.getByRole('heading', { name: 'Nothing selected' })).toBeVisible();
     await page.getByRole('tab', { name: 'Canvas' }).click();
-    await expect(page.getByRole('heading', { name: 'Canvas', exact: true })).toBeVisible();
+    await expect(page.getByRole('tabpanel', { name: 'Canvas' }).getByRole('group', { name: 'Shape' })).toBeVisible();
     await page.keyboard.press('ArrowLeft');
     await expect(page.getByRole('tab', { name: 'Inspector' })).toBeFocused();
     await expect(page.getByRole('heading', { name: 'Nothing selected' })).toBeVisible();
