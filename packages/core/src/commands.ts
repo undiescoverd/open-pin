@@ -248,6 +248,21 @@ export const commands = {
     };
   },
 
+  /** Swaps an annotation for another of a different kind in the same place in the list, as when a highlight turns from a
+      spotlight into an outline. The replacement keeps the old one's id. */
+  replaceAnnotation(stepId: string, annotationId: string, annotation: Annotation, now: number, label = 'Change annotation'): Command<Project> {
+    return {
+      label,
+      run: d => {
+        const step = findStep(d, stepId);
+        const i = step.annotations.findIndex(a => a.id === annotationId);
+        if (i < 0) return;
+        step.annotations[i] = { ...annotation, id: annotationId };
+        touch(d, now);
+      },
+    };
+  },
+
   removeAnnotation(stepId: string, annotationId: string, now: number): Command<Project> {
     return {
       label: 'Delete annotation',

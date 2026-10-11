@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
 import { unzipSync } from 'fflate';
-import { FIXTURE, clickFrame, dragOnFrame, frameBox, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepCards, stepRail, waitForFrame, watchErrors } from './helpers';
+import { FIXTURE, clickFrame, dragOnFrame, frameBox, openItemAdvanced, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepCards, stepChip, stepRail, waitForFrame, watchErrors } from './helpers';
 
 /** The Phase 1 acceptance test (docs/04-roadmap.md): drop in a recording, pin 5 steps, annotate them, reload without losing
     anything, and export a PDF and PNGs that match the canvas. */
@@ -49,7 +49,7 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
       await stepCards(page).nth(0).getByRole('button').first().click();
       await page.keyboard.press('c');
       await clickFrame(page, 0.35, 0.55);
-      await page.getByRole('textbox', { name: 'Text' }).fill('Start here');
+      await page.getByRole('textbox', { name: 'Words' }).fill('Start here');
       await page.keyboard.press('Escape'); /* leaves the text field... */
       await page.getByTestId('annotation-overlay').click({ position: { x: 2, y: 2 } }); /* ...and a click on empty frame selects the step */
       await page.keyboard.press('a');
@@ -58,13 +58,13 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
       await dragOnFrame(page, [0.55, 0.45], [0.8, 0.7]);
       await page.keyboard.press('s');
       await dragOnFrame(page, [0.05, 0.75], [0.3, 0.95]);
-      await expect(page.getByRole('heading', { name: 'Spotlight' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Highlight' })).toBeVisible();
     });
 
     await test.step('annotation changes show on the canvas and in the step card', async () => {
       await stepCards(page).nth(0).getByRole('button').first().click();
-      await expect(page.getByRole('button', { name: /Delete Callout “Start here”/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Delete Spotlight' })).toBeVisible();
+      await expect(stepChip(page, /Callout “Start here”/)).toBeVisible();
+      await expect(stepChip(page, 'Spotlight')).toBeVisible();
       await page.getByTestId('annotation-overlay').click({ position: { x: 630, y: 5 } }); /* deselect, so no handles are in the way */
       await expect(page.getByTestId('frame-canvas')).toHaveScreenshot('step-1-annotated.png', { maxDiffPixelRatio: 0.002 });
     });
@@ -78,8 +78,8 @@ test.describe('Phase 1: pin, annotate, export stills', () => {
       await expect(stepCards(page).nth(0)).toContainText('Open the menu');
       await expect(page.getByRole('textbox', { name: 'Guide name' })).toHaveValue('demo');
       await stepCards(page).nth(0).getByRole('button').first().click();
-      await expect(page.getByRole('heading', { name: 'Step 1' })).toBeVisible();
-      await expect(page.getByRole('button', { name: /Delete Callout “Start here”/ })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Step 1', exact: true })).toBeVisible();
+      await expect(stepChip(page, /Callout “Start here”/)).toBeVisible();
       await waitForFrame(page);
       await expect(page.getByTestId('frame-canvas')).toHaveScreenshot('step-1-annotated.png', { maxDiffPixelRatio: 0.002 });
     });
@@ -228,11 +228,12 @@ test.describe('the frame and the Pin tool', () => {
     await page.keyboard.press('p');
     await clickFrame(page, 0.25, 0.25);
     await expect(stepCards(page)).toHaveCount(1);
-    await expect(page.getByRole('heading', { name: 'Step 1' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Step 1', exact: true })).toBeVisible();
     await page.keyboard.press('p');
     await clickFrame(page, 0.75, 0.75);
     await expect(stepCards(page)).toHaveCount(1);
-    await page.locator('#panel-selection').getByRole('button', { name: 'Click marker', exact: true }).click();
+    await stepChip(page, 'Click marker').click();
+    await openItemAdvanced(page);
     await expect(page.getByRole('spinbutton', { name: 'X' })).toHaveValue('480'); /* 0.75 of 640 px */
   });
 
@@ -242,7 +243,7 @@ test.describe('the frame and the Pin tool', () => {
     await page.getByRole('button', { name: 'Add step' }).click();
     await page.keyboard.press('Shift+P');
     await expect(stepCards(page)).toHaveCount(1);
-    await expect(page.getByText('None yet')).toBeVisible();
+    await expect(stepRail(page).getByText('Nothing added yet')).toBeVisible();
   });
 
   test('drawing tools need a pinned frame first', async ({ page }) => {
@@ -260,6 +261,7 @@ test.describe('the frame and the Pin tool', () => {
     await page.keyboard.press('Shift+P');
     await page.keyboard.press('b');
     await dragOnFrame(page, [0.2, 0.2], [0.4, 0.4]);
+    await openItemAdvanced(page);
     const x = page.getByRole('spinbutton', { name: 'X' });
     const width = page.getByRole('spinbutton', { name: 'Width' });
     await expect(x).toHaveValue('128');
@@ -286,14 +288,14 @@ test.describe('the frame and the Pin tool', () => {
     await page.keyboard.press('Shift+P');
     await page.keyboard.press('b');
     await dragOnFrame(page, [0.2, 0.2], [0.4, 0.4]);
-    await expect(page.getByRole('heading', { name: 'Box' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Highlight' })).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('heading', { name: 'Step 1' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Step 1', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('heading', { name: 'Nothing selected' })).toBeVisible();
     await clickFrame(page, 0.3, 0.3); /* the box's outline is the only part of an unselected box that is hit... */
     await clickFrame(page, 0.9, 0.9); /* ...so empty space selects the step */
-    await expect(page.getByRole('heading', { name: 'Step 1' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Step 1', exact: true })).toBeVisible();
     await page.keyboard.press('Delete');
     await expect(stepCards(page)).toHaveCount(0);
     await page.keyboard.press('ControlOrMeta+Z');
@@ -361,7 +363,7 @@ test.describe('transport', () => {
     await title.pressSequentially('jkl=-pb ');
     await expect(title).toHaveValue('jkl=-pb ');
     expect(await playheadSeconds(page)).toBeCloseTo(1, 2);
-    await expect(page.getByRole('toolbar', { name: 'Tools' }).getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-armed]')).toHaveCount(0); /* no tool was picked */
   });
 });
 
@@ -467,7 +469,7 @@ test.describe('the Inspector', () => {
     await title.click();
     await title.pressSequentially('Open the menu');
     await page.getByRole('textbox', { name: 'Note' }).click(); /* focus leaves, so the session ends */
-    await page.getByRole('heading', { name: 'Step 1' }).click();
+    await page.getByRole('heading', { name: 'Step 1', exact: true }).click();
     await page.keyboard.press('ControlOrMeta+Z');
     await expect(title).toHaveValue('');
   });
@@ -478,11 +480,12 @@ test.describe('the Inspector', () => {
     await page.keyboard.press('Shift+P');
     await page.keyboard.press('c');
     await clickFrame(page, 0.5, 0.5);
-    await page.getByRole('textbox', { name: 'Text' }).fill('Hello there');
+    await page.getByRole('textbox', { name: 'Words' }).fill('Hello there');
     await page.getByRole('button', { name: 'Marigold' }).click();
     await expect(page.getByRole('button', { name: 'Marigold' })).toHaveAttribute('aria-pressed', 'true');
+    await openItemAdvanced(page);
     await page.getByRole('spinbutton', { name: 'Pointer X' }).fill('64');
-    await expect(page.getByRole('textbox', { name: 'Text' })).toHaveValue('Hello there');
+    await expect(page.getByRole('textbox', { name: 'Words' })).toHaveValue('Hello there');
     await page.getByRole('heading', { name: 'Callout' }).click();
     await expect(page.getByTestId('frame-canvas')).toHaveScreenshot('callout-marigold.png', { maxDiffPixelRatio: 0.002 });
   });
@@ -577,46 +580,29 @@ test.describe('layout', () => {
     });
   }
 
-  test('the tools and the View switch are docked under the frame, and the timecode and transport have not moved', async ({ page }) => {
+  test('nothing sits between the frame and the timeline but one status line, and the timecode and transport have not moved', async ({ page }) => {
     await openRecording(page);
     const box = async (loc: Locator) => (await loc.boundingBox())!;
-    const toolbar = page.getByRole('toolbar', { name: 'Tools' });
     const frame = await box(page.getByTestId('frame-canvas'));
-    const tools = await box(toolbar);
-    const view = await box(page.getByRole('group', { name: 'View' }));
     const timeline = await box(page.getByRole('region', { name: 'Timeline' }));
     const transport = await box(page.getByRole('group', { name: 'Transport' }));
     const readout = await box(page.getByLabel('Playhead position and length'));
-    /* under the frame and above the timeline, inside the frame's width: tools at the left, the switch at the right */
-    expect(tools.y).toBeGreaterThanOrEqual(frame.y + frame.height);
-    expect(view.y + view.height).toBeLessThanOrEqual(timeline.y);
-    expect(tools.x).toBeGreaterThanOrEqual(frame.x);
-    expect(tools.x + tools.width).toBeLessThanOrEqual(view.x);
-    expect(view.x + view.width).toBeLessThanOrEqual(frame.x + frame.width + 1);
+    await expect(page.getByRole('toolbar', { name: 'Tools' })).toHaveCount(0);
+    await expect(page.getByRole('group', { name: 'View' })).toHaveCount(0);
+    /* the frame takes the height the tools had: under it is only the status line, then the timeline */
+    const status = await box(page.getByRole('main', { name: 'Canvas' }).getByRole('status'));
+    expect(status.y).toBeGreaterThanOrEqual(frame.y + frame.height);
+    expect(status.height).toBeLessThanOrEqual(34);
+    expect(status.y + status.height).toBeLessThanOrEqual(timeline.y);
     /* the timeline's header is as it was: the timecode at the left, the transport in the middle, both in the header */
     expect(readout.x - timeline.x).toBeLessThan(40);
     expect(readout.x + readout.width).toBeLessThan(transport.x);
     expect(Math.abs(transport.x + transport.width / 2 - (timeline.x + timeline.width / 2))).toBeLessThan(2);
     expect(transport.y).toBeGreaterThanOrEqual(timeline.y);
     expect(readout.y).toBeGreaterThanOrEqual(timeline.y);
-
-    /* the picked tool says its name; the others are icons */
-    const select = toolbar.getByRole('button', { name: 'Select' });
-    await expect(select).toContainText('Select');
-    await expect(toolbar.getByRole('button', { name: 'Pin' })).not.toContainText('Pin');
-    await page.keyboard.press('p');
-    await expect(toolbar.getByRole('button', { name: 'Pin' })).toContainText('Pin');
-    await expect(select).not.toContainText('Select');
-
-    /* the selected option is bold; its label must still fit inside its button */
-    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Viewer' }).click();
-    for (const name of ['Edit', 'Viewer']) {
-      const fits = await page.getByRole('group', { name: 'View' }).getByRole('button', { name }).evaluate((el: HTMLElement) => el.scrollWidth <= el.clientWidth);
-      expect(fits, `${name} fits its button`).toBe(true);
-    }
   });
 
-  test('a message in the dock never resizes the frame', async ({ page }) => {
+  test('a message under the frame never resizes it', async ({ page }) => {
     await openRecording(page);
     const before = (await page.getByTestId('frame-canvas').boundingBox())!;
     await page.keyboard.press('z');
@@ -627,19 +613,19 @@ test.describe('layout', () => {
     expect(during.y).toBe(before.y);
   });
 
-  test('in a narrow window the dock wraps instead of overflowing', async ({ page }) => {
+  test('in a narrow window the Add buttons stay inside the right panel', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 720 });
     await openRecording(page);
-    const stage = (await page.getByRole('main', { name: 'Canvas' }).boundingBox())!;
-    const buttons = page.getByRole('toolbar', { name: 'Tools' }).getByRole('button');
-    await expect(buttons).toHaveCount(8);
-    for (let i = 0; i < 8; i++) {
+    const panel = (await page.getByRole('complementary', { name: 'Inspector' }).boundingBox())!;
+    const buttons = page.getByRole('group', { name: /^Add to/ }).getByRole('button');
+    await expect(buttons).toHaveCount(6);
+    for (let i = 0; i < 6; i++) {
       const b = (await buttons.nth(i).boundingBox())!;
-      expect(b.x).toBeGreaterThanOrEqual(stage.x - 1);
-      expect(b.x + b.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
+      expect(b.x).toBeGreaterThanOrEqual(panel.x);
+      expect(b.x + b.width).toBeLessThanOrEqual(panel.x + panel.width);
+      const fits = await buttons.nth(i).evaluate((el: HTMLElement) => el.scrollWidth <= el.clientWidth);
+      expect(fits, 'its label fits').toBe(true);
     }
-    const view = (await page.getByRole('group', { name: 'View' }).boundingBox())!;
-    expect(view.x + view.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   });
 });

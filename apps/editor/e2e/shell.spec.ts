@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openRecording, watchErrors } from './helpers';
+import { addButton, openRecording, watchErrors } from './helpers';
 
 test.describe('editor shell', () => {
   test('shows the empty editor with every pane', async ({ page }) => {
@@ -12,7 +12,7 @@ test.describe('editor shell', () => {
     await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Filmstrip' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Drop a screen recording' })).toBeVisible();
-    await expect(page.getByRole('toolbar', { name: 'Tools' }).getByRole('button')).toHaveCount(8);
+    await expect(page.getByRole('group', { name: 'Add to a step' }).getByRole('button')).toHaveCount(6);
     for (const lane of ['Steps lane', 'Filmstrip']) await expect(page.getByLabel(`${lane}, empty`)).toBeVisible();
     await expect(page.getByText('0:00.000 / 0:00.000')).toBeVisible();
     expect(errors).toEqual([]);
@@ -25,43 +25,41 @@ test.describe('editor shell', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('tools wait for a recording, then keys pick them, but not while typing', async ({ page }) => {
+  test('Add buttons wait for a recording, then keys pick the drawing tools, but not while typing', async ({ page }) => {
     await page.goto('/');
-    const tools = page.getByRole('toolbar', { name: 'Tools' });
-    await expect(tools.getByRole('button', { name: 'Pin' })).toBeDisabled();
+    await expect(addButton(page, 'Click')).toBeDisabled();
     await page.keyboard.press('p');
-    await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
+    const armed = page.locator('[data-armed]');
+    await expect(armed).toHaveCount(0);
 
     await openRecording(page);
     await page.keyboard.press('p');
-    await expect(tools.getByRole('button', { name: 'Pin' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(armed).toHaveText('Click');
     await page.keyboard.press('Shift+X'); /* Shift isn't a tool chord, so nothing changes */
-    await expect(tools.getByRole('button', { name: 'Pin' })).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('b');
-    await expect(tools.getByRole('button', { name: 'Box' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(armed).toHaveText('Click');
+    await page.keyboard.press('h');
+    await expect(armed).toHaveText('Highlight');
 
     const name = page.getByRole('textbox', { name: 'Guide name' });
     await name.fill('');
     await name.pressSequentially('vpc');
     await expect(name).toHaveValue('vpc');
-    await expect(tools.getByRole('button', { name: 'Box' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(armed).toHaveText('Highlight');
 
-    await tools.getByRole('button', { name: 'Callout' }).click();
-    await expect(tools.getByRole('button', { name: 'Callout' })).toHaveAttribute('aria-pressed', 'true');
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press('Escape');
-    await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(armed).toHaveCount(0);
   });
 
-  test('Z and X pick the Zoom and Blur tools', async ({ page }) => {
+  test('Z and X pick the Zoom and Hide tools', async ({ page }) => {
     await openRecording(page);
-    const tools = page.getByRole('toolbar', { name: 'Tools' });
+    const armed = page.locator('[data-armed]');
     await page.keyboard.press('z');
-    await expect(tools.getByRole('button', { name: 'Zoom' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(armed).toHaveText('Zoom');
     await page.keyboard.press('x');
-    await expect(tools.getByRole('button', { name: 'Blur' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(armed).toHaveText('Hide');
     await page.keyboard.press('Escape');
-    await expect(tools.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(armed).toHaveCount(0);
   });
 
   test('N toggles snapping and Shift+R toggles ripple trim', async ({ page }) => {
@@ -75,9 +73,9 @@ test.describe('editor shell', () => {
     await expect(ripple).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('icon buttons show their tooltip and shortcut on keyboard focus', async ({ page }) => {
+  test('Add buttons show their tooltip and shortcut on keyboard focus', async ({ page }) => {
     await openRecording(page);
-    await page.getByRole('toolbar', { name: 'Tools' }).getByRole('button', { name: 'Callout' }).focus();
+    await addButton(page, 'Callout').focus();
     await expect(page.getByRole('tooltip')).toHaveText(/^Callout/);
     /* the visible tooltip carries the key cap */
     await expect(page.locator('[data-radix-popper-content-wrapper] kbd')).toHaveText(/^C/);

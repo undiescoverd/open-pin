@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
-import { clickFrame, openRecording, seekTo, stepCards, watchErrors } from './helpers';
+import { addButton, clickFrame, openRecording, seekTo, stepCards, watchErrors } from './helpers';
 import { serveStatic, type StaticHost } from './static-server';
 
 /** The Phase 3 acceptance tests (docs/04-roadmap.md, "Phase 3 — Interactive guide"): the player settings, the in-editor preview,
@@ -34,10 +34,10 @@ async function makeGuide(page: Page): Promise<void> {
   await pin(page, 1, [0.3, 0.3], 'Open the menu');
   await page.keyboard.press('c');
   await clickFrame(page, 0.6, 0.6);
-  await page.getByRole('textbox', { name: 'Text' }).fill('Start here');
+  await page.getByRole('textbox', { name: 'Words' }).fill('Start here');
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await pin(page, 2.5, [0.5, 0.5], 'Pick a colour');
-  await page.getByRole('button', { name: 'Zoom in on this step' }).click();
+  await addButton(page, 'Zoom').click();
   await pin(page, 4, [0.7, 0.4], 'Save it');
   await expect(stepCards(page)).toHaveCount(3);
 }

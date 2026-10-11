@@ -114,7 +114,7 @@ function StepCard({ project, step, number }: { project: Project; step: Step; num
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-fg-muted">On this step</span>
         {chips.length === 0 ? (
-          <span className="text-sm text-fg-muted">Nothing yet. Use the tools under the frame.</span>
+          <span className="text-sm text-fg-muted">Nothing yet. Add a callout, highlight or zoom from the panel on the right.</span>
         ) : (
           <div role="group" aria-label="On this step" className="flex flex-wrap gap-1">
             {chips.map(c => (

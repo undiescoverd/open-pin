@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { blurAlphaAt, blurRectAt, exportPlan, frameLayout, parseProject, planAt, tlToSrc, type Project } from '@waypost/core';
 import { readFile } from 'node:fs/promises';
-import { dragOnFrame, frameBox, openRecording, openStepAdvanced, playheadSeconds, seekTo, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
+import { dragOnFrame, frameBox, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepChip, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
 
 /** The Phase 2 acceptance tests (docs/04-roadmap.md, "Phase 2 — Edit and polish"; the checks in docs/05-editor-interactions.md,
     section 10). The fixture is 6 seconds long, 640 × 400, at 30 fps. */
@@ -337,7 +337,7 @@ test.describe('Phase 2: effect regions', () => {
 });
 
 test.describe('Phase 2: zoom, framing and logo', () => {
-  test('a zoom box keeps the frame shape, owns its area, and the Viewer view eases into it (checks 8 and 9)', async ({ page }) => {
+  test('a zoom box keeps the frame shape, owns its area, and See it zoomed eases into it (checks 8 and 9)', async ({ page }) => {
     await openRecording(page);
     await seekTo(page, 2);
     await page.keyboard.press('p');
@@ -351,13 +351,13 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     expect(before.width / before.height).toBeCloseTo(1.6, 1);
 
     /* check 9: dragging the right edge in shrinks it, keeps its left edge and its shape, and raises the amount */
-    const amount = Number(await page.getByLabel('Amount', { exact: true }).inputValue());
+    const amount = Number(await page.getByLabel('How close', { exact: true }).inputValue());
     await drag(page, { x: before.x + before.width - 2, y: before.y + before.height / 2 }, { x: before.x + before.width * 0.75, y: before.y + before.height / 2 });
     const after = (await box.boundingBox())!;
     expect(after.x).toBeCloseTo(before.x, 0);
     expect(after.width).toBeLessThan(before.width);
     expect(after.width / after.height).toBeCloseTo(1.6, 1);
-    expect(Number(await page.getByLabel('Amount', { exact: true }).inputValue())).toBeGreaterThan(amount);
+    expect(Number(await page.getByLabel('How close', { exact: true }).inputValue())).toBeGreaterThan(amount);
 
     /* check 8: dragging inside the selected box, over the click marker, moves the box and leaves the marker */
     await drag(page, { x: after.x + after.width / 2, y: after.y + after.height / 2 }, { x: after.x + after.width / 2 - 40, y: after.y + after.height / 2 - 20 });
@@ -365,11 +365,12 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     expect(moved.x).toBeLessThan(after.x - 20);
     await expect(page.getByRole('heading', { name: 'Zoom' })).toBeVisible();
     await page.getByRole('button', { name: /^Step 1/ }).click();
-    await expect(page.getByRole('button', { name: 'Delete Click marker' })).toBeVisible();
+    await expect(stepChip(page, 'Click marker')).toBeVisible();
 
-    /* the Viewer view shows the step zoomed */
+    /* See it zoomed shows the step as the guide will */
+    await stepChip(page, 'Zoom').click();
     const edit = await canvasHash(page, [0, 0, 1, 1]);
-    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Viewer' }).click();
+    await page.getByRole('button', { name: 'See it zoomed' }).click();
     await expect.poll(() => canvasHash(page, [0, 0, 1, 1])).not.toBe(edit);
   });
 
@@ -383,7 +384,7 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     await page.keyboard.press('z');
     await dragOnFrame(page, [0.3, 0.3], [0.75, 0.75]);
     await expect(page.getByRole('heading', { name: 'Zoom' })).toBeVisible();
-    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Viewer' }).click();
+    await page.getByRole('button', { name: 'See it zoomed' }).click();
     /* the entrance has finished once the yellow bar sits near the left edge (it is a third of the way across when not zoomed) */
     await expect.poll(async () => (await watchYellowEdge(page, 60)).at(-1)!, { timeout: 5000 }).toBeLessThan(0.12);
   }
@@ -397,10 +398,10 @@ test.describe('Phase 2: zoom, framing and logo', () => {
     for (let i = 1; i < edges.length; i++) expect(edges[i]!).toBeGreaterThanOrEqual(edges[i - 1]! - 0.01);
   }
 
-  test('switching from the Viewer back to Edit eases out of the zoom instead of cutting', async ({ page }) => {
+  test('Back to editing eases out of the zoom instead of cutting', async ({ page }) => {
     await zoomedViewerStep(page);
     const watching = watchYellowEdge(page, 900);
-    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: 'Back to editing' }).click();
     expectEasedOut(await watching);
   });
 

@@ -5,8 +5,10 @@ import {
   canRedo,
   canSplit,
   canUndo,
+  clamp01,
   clipCommands,
   commands,
+  DEFAULT_COLOR,
   newId,
   redo as redoHistory,
   spotAt,
@@ -41,7 +43,8 @@ import { create } from 'zustand';
 import { currentPlayback } from '../engine/session';
 import { timelineEdges } from '../editor/snapping';
 import type { PlaybackState } from '../engine/playback';
-import type { ToolId } from '../editor/tools';
+import { createAnnotation } from '../editor/annotationEdit';
+import type { AddKind, ToolId } from '../editor/tools';
 import { rememberTimelineView } from '../storage/library';
 
 export type Selection =
@@ -619,6 +622,61 @@ export function addAnnotationAtPlayhead(annotation: Annotation): boolean {
   run(commands.addAnnotation(step.id, annotation, Date.now()));
   set({ selection: { kind: 'annotation', stepId: step.id, id: annotation.id }, tool: 'select' });
   return true;
+}
+
+const MIDDLE: Point = [0.5, 0.5];
+/** How far a second item of the same kind sits from the first, so repeated adds don't land on top of each other. */
+const STAGGER = 0.03;
+
+/**
+ * One click on an Add button (docs/06-simplify-plan.md, "Add, then adjust"): the item goes on the step at the playhead, selected,
+ * around the step's click when it has one and otherwise in the middle. With no step on this frame, the frame becomes one first.
+ * Hide isn't tied to a step: it starts at the playhead, in the middle of the frame.
+ */
+export function addToStep(kind: AddKind): void {
+  const playback = currentPlayback();
+  const project = selectProject(getEditor());
+  if (!project || !playback) return;
+  playback.pause();
+  set({ tool: 'select' });
+  if (kind === 'hide') return addBlurInMiddle();
+
+  const existing = stepAtPlayhead(project, playback.time);
+  const hasClick = !!existing?.annotations.some(a => a.type === 'click');
+  /* Click on a step without one gives it its marker in the middle, the way the Pin tool would */
+  const stepId = existing && !(kind === 'click' && !hasClick) ? existing.id : pinAtPlayhead(kind === 'click' ? MIDDLE : undefined);
+  const step = stepId ? selectProject(getEditor())?.steps.find(s => s.id === stepId) : undefined;
+  if (!step) return;
+  const click = step.annotations.find(a => a.type === 'click');
+
+  if (kind === 'click') {
+    if (click) set({ selection: { kind: 'annotation', stepId: step.id, id: click.id } });
+    if (click && hasClick) notify('This step already has its click. Drag it to where the viewer clicks.');
+    return;
+  }
+  if (kind === 'zoom') return step.zoom ? selectZoom(step.id) : addZoom(step.id);
+
+  const type = kind === 'highlight' ? 'spotlight' : kind;
+  const near = click?.type === 'click' ? click.at : MIDDLE;
+  const k = step.annotations.filter(a => a.type === type).length * STAGGER;
+  const at: Point = [clamp01(near[0] + k), clamp01(near[1] + k)];
+  let annotation = createAnnotation(type, at, at, DEFAULT_COLOR);
+  if (annotation.type === 'arrow') {
+    /* the tip on the point, the tail up and to the left, or the other way where there's no room */
+    const from: Point = [at[0] + (at[0] < 0.15 ? 0.12 : -0.12), at[1] + (at[1] < 0.15 ? 0.1 : -0.1)];
+    annotation = { ...annotation, from, to: at };
+  }
+  if (annotation.type === 'callout' && step.title.trim()) annotation = { ...annotation, text: step.title.trim().slice(0, 300) };
+  run(commands.addAnnotation(step.id, annotation, Date.now()));
+  set({ selection: { kind: 'annotation', stepId: step.id, id: annotation.id } });
+}
+
+/** A highlight is a spotlight (the rest of the frame dimmed) or an outline (a box around it); switching keeps its place. */
+export function setHighlightKind(stepId: string, id: string, kind: 'spotlight' | 'box'): void {
+  const a = selectProject(getEditor())?.steps.find(s => s.id === stepId)?.annotations.find(x => x.id === id);
+  if (!a || (a.type !== 'spotlight' && a.type !== 'box') || a.type === kind) return;
+  const next: Annotation = kind === 'box' ? { id, type: 'box', rect: a.rect, color: DEFAULT_COLOR, reveal: a.reveal } : { id, type: 'spotlight', rect: a.rect, reveal: a.reveal };
+  run(commands.replaceAnnotation(stepId, id, next, Date.now(), kind === 'box' ? 'Change to outline' : 'Change to spotlight'));
 }
 
 export function updateAnnotation(stepId: string, id: string, patch: Partial<Annotation>, label?: string, coalesceKey?: string): void {

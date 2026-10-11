@@ -115,3 +115,18 @@ export async function openStepAdvanced(page: Page): Promise<void> {
   if (!(await position.isVisible())) await stepRail(page).getByText('Advanced', { exact: true }).click();
   await expect(position).toBeVisible();
 }
+
+export const inspector = (page: Page): Locator => page.getByRole('complementary', { name: 'Inspector' });
+
+/** One of the Add buttons at the top of the right panel (Callout, Arrow, Highlight, Zoom, Hide, Click). */
+export const addButton = (page: Page, name: string): Locator => page.getByRole('group', { name: /^Add to/ }).getByRole('button', { name, exact: true });
+
+/** A chip in the selected step's "On this step" row. */
+export const stepChip = (page: Page, name: string | RegExp): Locator => stepRail(page).getByRole('group', { name: 'On this step' }).getByRole('button', { name });
+
+/** Opens the Advanced section at the end of the selected item's panel (exact position, when it appears) if it is closed. */
+export async function openItemAdvanced(page: Page): Promise<void> {
+  const details = inspector(page).locator('details', { has: page.locator('summary', { hasText: /^Advanced/ }) });
+  if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator('summary').click();
+  await expect(details).toHaveAttribute('open', '');
+}

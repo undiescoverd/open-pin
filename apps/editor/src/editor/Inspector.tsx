@@ -42,6 +42,7 @@ import {
 } from '@waypost/core';
 import { ANNOTATION_COLORS, GRADIENTS } from '@waypost/render';
 import {
+  Advanced,
   Button,
   ColorSwatchPicker,
   Icon,
@@ -63,7 +64,6 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { addImage, saveWaypost } from '../state/project';
 import {
   addEffect,
-  addZoom,
   blurKeyframeHere,
   deleteClip,
   flattenBlurHere,
@@ -78,18 +78,17 @@ import {
   removeEffect,
   removeStep,
   seekTimeline,
-  selectAnnotation,
   selectedAnnotation,
   selectedBlur,
   selectedStep,
   selectProject,
-  selectZoom,
   setBlurRectHere,
   setClipAudio,
   setClipSpeed,
   setFrame,
   setGap,
   setGuide,
+  setHighlightKind,
   setLogo,
   setStepZoom,
   setPreviewOpen,
@@ -102,7 +101,7 @@ import {
   updateEffect,
   useEditor,
 } from '../state/store';
-import { TYPE_LABEL, annotationName } from './annotationNames';
+import { AddButtons } from './AddPanel';
 import { useEditSession } from './useEditSession';
 import { switchView } from './visible';
 
@@ -200,13 +199,24 @@ const Help = ({ children }: { children: ReactNode }) => <p className="m-0 text-s
 const ButtonRow = ({ children }: { children: ReactNode }) => <div className="flex flex-wrap gap-2">{children}</div>;
 
 function SelectionPanel() {
+  return (
+    <div className="flex flex-col gap-4">
+      <AddButtons />
+      <div className="border-t border-line pt-3">
+        <SelectedItem />
+      </div>
+    </div>
+  );
+}
+
+function SelectedItem() {
   const project = useEditor(selectProject);
   const selection = useEditor(s => s.selection);
   if (!project || !selection) {
     return (
       <>
         <h3 className="m-0 mb-1 text-md font-semibold text-fg">Nothing selected</h3>
-        <p className="m-0 text-fg-muted">Click a step, an annotation on the frame, or anything on the timeline to edit it here.</p>
+        <p className="m-0 text-fg-muted">Add something above, or click a step or something on the frame to adjust it here.</p>
       </>
     );
   }
@@ -226,86 +236,51 @@ function SelectionPanel() {
     default: {
       const step = selectedStep(project, selection);
       if (!step) return null;
-      if (selection.kind === 'zoom' && step.zoom) return <ZoomPanel project={project} step={step} />;
+      const number = project.steps.findIndex(s => s.id === step.id) + 1;
+      if (selection.kind === 'zoom' && step.zoom) return <ZoomPanel step={step} number={number} source={source} />;
       const annotation = selectedAnnotation(project, selection);
-      return annotation ? <AnnotationPanel step={step} annotation={annotation} source={source} /> : <StepPanel project={project} step={step} />;
+      return annotation ? <AnnotationPanel key={annotation.id} step={step} number={number} annotation={annotation} source={source} /> : <StepPanel step={step} number={number} />;
     }
   }
+}
+
+/** Remove, at the end of every item's panel. */
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <div className="pt-3">
+      <Button variant="danger" icon={<Icon icon={Trash2} />} onClick={onClick}>
+        {label}
+      </Button>
+    </div>
+  );
 }
 
 // ----- step -----------------------------------------------------------------------------------------------------------
 
 const REVEAL_OPTIONS = Array.from({ length: REVEAL_GROUPS }, (_, g) => ({ value: String(g), label: g === 0 ? 'With the step' : `Then, group ${g + 1}` }));
 
-function StepPanel({ project, step }: { project: Project; step: Step }) {
-  const number = project.steps.findIndex(s => s.id === step.id) + 1;
-  const zoom = useEditSession();
-
+/* A step with nothing on it selected: its words, pause and what's on it are on the step card, so this only says where things are. */
+function StepPanel({ step, number }: { step: Step; number: number }) {
   return (
     <div>
-      <Title icon={<span className="grid size-6 place-items-center rounded-pill bg-pin text-sm font-semibold text-on-pin">{number}</span>} title={`Step ${number}`} />
-      <Help>Title, note, pause and position are on the step card in the Steps list.</Help>
-      <InspectorSection id="step-zoom" title="Zoom">
-        {step.zoom ? (
-          <div {...zoom.bind} className="flex flex-col gap-3">
-            <ZoomAmount step={step} sessionKey={zoom.key} />
-            <ButtonRow>
-              <Button size="sm" onClick={() => selectZoom(step.id)}>
-                Edit zoom box
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setStepZoom(step.id, null)}>
-                Remove zoom
-              </Button>
-            </ButtonRow>
-          </div>
-        ) : (
-          <>
-            <Help>Ease in on part of the frame when viewers reach this step. Draw a box with the Zoom tool (Z), or:</Help>
-            <ButtonRow>
-              <Button size="sm" onClick={() => addZoom(step.id)}>
-                Zoom in on this step
-              </Button>
-            </ButtonRow>
-          </>
-        )}
-      </InspectorSection>
-      <InspectorSection id="step-annotations" title="Annotations">
-        {step.annotations.length === 0 ? (
-          <p className="m-0 text-fg-muted">None yet. Pick Callout, Arrow, Spotlight or Box (C, A, S, B) and draw on the frame.</p>
-        ) : (
-          <>
-            <Help>When each appears is under Advanced on the step card.</Help>
-            <ul className="m-0 flex list-none flex-col gap-1 p-0">
-              {step.annotations.map(a => (
-                <li key={a.id} className="flex items-center gap-1 rounded-md bg-raised p-1">
-                  <button type="button" onClick={() => selectAnnotation(step.id, a.id)} className={cx('h-7 min-w-0 flex-1 truncate rounded-sm px-2 text-left hover:bg-panel', focusRing)}>
-                    {annotationName(a)}
-                  </button>
-                  <button type="button" aria-label={`Delete ${annotationName(a)}`} onClick={() => removeAnnotation(step.id, a.id)} className={cx('grid size-7 place-items-center rounded-sm text-fg-muted hover:bg-panel hover:text-danger', focusRing)}>
-                    <Icon icon={Trash2} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </InspectorSection>
-      <div className="pt-3">
-        <Button variant="danger" icon={<Icon icon={Trash2} />} onClick={() => removeStep(step.id)}>
-          Delete step
-        </Button>
-      </div>
+      <Title icon={<span className="grid size-6 place-items-center rounded-pill bg-pin text-sm font-semibold text-on-pin">{number}</span>} title={`Step ${number}`} sub={step.title.trim() || undefined} />
+      <Help>
+        {step.annotations.length || step.zoom
+          ? 'Click something on the frame, or a chip on the step card, to adjust it here.'
+          : 'Add a callout, a highlight or a zoom above. The title and note are on the step card.'}
+      </Help>
+      <RemoveButton label="Delete step" onClick={() => removeStep(step.id)} />
     </div>
   );
 }
 
-/** Zoom amount, 1.25× to 4×: the box grows or shrinks about its centre. */
+/** How close the zoom is, 1.25× to 4×: the box grows or shrinks about its centre. */
 function ZoomAmount({ step, sessionKey }: { step: Step; sessionKey: () => string }) {
   const rect = step.zoom!.rect;
   const amount = Math.round(zoomAmount(rect) * 100) / 100;
   return (
     <ParamRow
-      label="Amount"
+      label="How close"
       value={amount}
       min={Math.round((1 / ZOOM_MAX) * 100) / 100}
       max={1 / ZOOM_MIN}
@@ -317,34 +292,43 @@ function ZoomAmount({ step, sessionKey }: { step: Step; sessionKey: () => string
   );
 }
 
-function ZoomPanel({ project, step }: { project: Project; step: Step }) {
-  const number = project.steps.findIndex(s => s.id === step.id) + 1;
+function ZoomPanel({ step, number, source }: { step: Step; number: number; source: Source }) {
   const session = useEditSession();
+  const exact = useEditSession();
   const view = useEditor(s => s.view);
   const click = step.annotations.find(a => a.type === 'click');
   const rect = step.zoom!.rect;
+  const [W, H] = source.size;
+  /** the box's left or top edge, in pixels of the recording, kept on the frame */
+  const moveTo = (i: 0 | 1, px: number) => {
+    const r: Rect = [...rect];
+    r[i] = Math.min(Math.max(0, px / (i === 0 ? W : H)), 1 - r[i + 2]!);
+    setStepZoom(step.id, r, 'Move zoom', exact.key());
+  };
   return (
     <div>
       <Title title="Zoom" sub={`Step ${number} · ${Math.round(zoomAmount(rect) * 100) / 100}×`} />
-      <Help>When viewers reach the step the view eases into this box, keeping the frame's shape. Drag it or its handles on the frame.</Help>
-      <InspectorSection id="zoom-amount" title="Zoom">
-        <div {...session.bind}>
-          <ZoomAmount step={step} sessionKey={session.key} />
+      <Help>When viewers reach the step the view eases into the box. Drag it or its handles on the frame.</Help>
+      <div {...session.bind} className="flex flex-col gap-3 pt-3">
+        <ZoomAmount step={step} sessionKey={session.key} />
+        <ButtonRow>
+          <Button size="sm" aria-pressed={view === 'viewer'} onClick={() => switchView(view === 'viewer' ? 'edit' : 'viewer')}>
+            {view === 'viewer' ? 'Back to editing' : 'See it zoomed'}
+          </Button>
+        </ButtonRow>
+      </div>
+      <Advanced id="zoom" summary="Exact area, centre on the click" className="mt-3">
+        <div {...exact.bind} className="flex flex-col gap-3">
+          <ParamRow label="Left" value={Math.round(rect[0] * W)} min={0} max={W} unit="px" onChange={v => moveTo(0, v)} />
+          <ParamRow label="Top" value={Math.round(rect[1] * H)} min={0} max={H} unit="px" onChange={v => moveTo(1, v)} />
         </div>
         <ButtonRow>
           <Button size="sm" disabled={click?.type !== 'click'} onClick={() => click?.type === 'click' && setStepZoom(step.id, zoomBox(click.at, rect[2]), 'Centre zoom')}>
             Centre on the click
           </Button>
-          <Button size="sm" aria-pressed={view === 'viewer'} onClick={() => switchView(view === 'viewer' ? 'edit' : 'viewer')}>
-            {view === 'viewer' ? 'Back to editing' : 'Preview zoomed'}
-          </Button>
         </ButtonRow>
-      </InspectorSection>
-      <div className="pt-3">
-        <Button variant="danger" icon={<Icon icon={Trash2} />} onClick={() => setStepZoom(step.id, null)}>
-          Remove zoom
-        </Button>
-      </div>
+      </Advanced>
+      <RemoveButton label="Remove zoom" onClick={() => setStepZoom(step.id, null)} />
     </div>
   );
 }
@@ -358,9 +342,24 @@ const PLACEMENTS: ReadonlyArray<{ value: CalloutPlacement; label: string }> = [
 
 const SWATCHES = ANNOTATION_COLORS.map(c => ({ id: c.id, name: c.name, value: c.stroke }));
 
-function AnnotationPanel({ step, annotation: a, source }: { step: Step; annotation: Annotation; source: Source }) {
+/** What each kind of annotation is called in its panel: spotlights and outlines are both Highlights, as on the Add button. */
+const ITEM_NAME: Record<Annotation['type'], string> = { callout: 'Callout', arrow: 'Arrow', spotlight: 'Highlight', box: 'Highlight', click: 'Click' };
+/** What's under each panel's Advanced, for its closed line. */
+const ADVANCED_SUMMARY: Record<Annotation['type'], string> = {
+  callout: 'Side, position, when it appears',
+  arrow: 'Exact ends, when it appears',
+  spotlight: 'Exact box, when it appears',
+  box: 'Exact box, when it appears',
+  click: 'Position, colour, when it appears',
+};
+
+/** The step's title and note, as a callout's words. */
+const stepWords = (step: Step): string => [step.title.trim(), step.body.trim()].filter(Boolean).join('\n').slice(0, 300);
+
+function AnnotationPanel({ step, number, annotation: a, source }: { step: Step; number: number; annotation: Annotation; source: Source }) {
   const session = useEditSession();
   const [W, H] = source.size;
+  const name = ITEM_NAME[a.type];
   const edit = (patch: Partial<Annotation>, label?: string) => updateAnnotation(step.id, a.id, patch, label, session.key());
 
   /** a px field bound to one coordinate of a point or rect */
@@ -394,35 +393,47 @@ function AnnotationPanel({ step, annotation: a, source }: { step: Step; annotati
     ];
   })();
 
+  const colour = 'color' in a && <ColorSwatchPicker label="Colour" colors={SWATCHES} value={a.color} onChange={color => edit({ color }, 'Change colour')} />;
+  const words = stepWords(step);
+
   return (
     <div>
-      <Title title={TYPE_LABEL[a.type]} />
+      <Title title={name} sub={`Step ${number}`} />
       <Help>Drag it on the frame to move it.</Help>
-      <div {...session.bind}>
+      <div {...session.bind} className="flex flex-col gap-3 pt-3">
         {a.type === 'callout' && (
-          <InspectorSection id="ann-text" title="Text">
-            <TextArea label="Text" maxLength={300} value={a.text} onChange={e => edit({ text: e.target.value })} />
-            <SelectField label="Bubble placement" value={a.placement} options={PLACEMENTS} onChange={v => edit({ placement: v as CalloutPlacement })} />
-          </InspectorSection>
+          <>
+            <TextArea label="Words" maxLength={300} value={a.text} onChange={e => edit({ text: e.target.value })} />
+            <ButtonRow>
+              <Button size="sm" disabled={!words || words === a.text} onClick={() => updateAnnotation(step.id, a.id, { text: words }, "Use the step's words")}>
+                Use the step's title and note
+              </Button>
+            </ButtonRow>
+          </>
         )}
-        {a.type !== 'spotlight' && (
-          <InspectorSection id="ann-color" title="Colour">
-            <ColorSwatchPicker label="Colour" colors={SWATCHES} value={a.color} onChange={color => edit({ color }, 'Change colour')} />
-          </InspectorSection>
+        {(a.type === 'spotlight' || a.type === 'box') && (
+          <Segmented
+            label="Look"
+            options={[
+              { value: 'spotlight', label: 'Spotlight', title: 'The rest of the frame is dimmed' },
+              { value: 'box', label: 'Outline', title: 'A box drawn around it' },
+            ]}
+            value={a.type}
+            onChange={kind => setHighlightKind(step.id, a.id, kind)}
+          />
         )}
-        <InspectorSection id="ann-reveal" title="Reveal">
-          <SelectField label="Appears" value={String(a.reveal)} options={REVEAL_OPTIONS} onChange={v => updateAnnotation(step.id, a.id, { reveal: Number(v) }, 'Change reveal order')} />
-          <Help>Groups appear one after another when the guide reaches the step. Empty groups take no time.</Help>
-        </InspectorSection>
-        <InspectorSection id="ann-geometry" title="Position and size">
+        {a.type !== 'click' && colour}
+      </div>
+      <Advanced id={`annotation-${a.type}`} summary={ADVANCED_SUMMARY[a.type]} className="mt-3">
+        {a.type === 'callout' && <SelectField label="Bubble placement" value={a.placement} options={PLACEMENTS} onChange={v => edit({ placement: v as CalloutPlacement })} />}
+        {a.type === 'click' && colour}
+        <div {...session.bind} className="flex flex-col gap-3">
           {geometry}
-        </InspectorSection>
-      </div>
-      <div className="pt-3">
-        <Button variant="danger" icon={<Icon icon={Trash2} />} onClick={() => removeAnnotation(step.id, a.id)}>
-          Delete {TYPE_LABEL[a.type].toLowerCase()}
-        </Button>
-      </div>
+        </div>
+        <SelectField label="Appears" value={String(a.reveal)} options={REVEAL_OPTIONS} onChange={v => updateAnnotation(step.id, a.id, { reveal: Number(v) }, 'Change reveal order')} />
+        <Help>Groups appear one after another when the guide reaches the step.</Help>
+      </Advanced>
+      <RemoveButton label={`Remove ${name.toLowerCase()}`} onClick={() => removeAnnotation(step.id, a.id)} />
     </div>
   );
 }

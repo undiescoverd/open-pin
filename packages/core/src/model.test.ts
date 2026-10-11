@@ -162,6 +162,18 @@ describe('commands and undo', () => {
   });
 });
 
+describe('replaceAnnotation', () => {
+  it('swaps a spotlight for an outline in the same place, keeping its id, and undoes', () => {
+    let h = createHistory(fresh());
+    h = apply(h, commands.pinStep({ stepId: 'a', annotationId: 'a_click', source: 'src1', time: 1, at: [0.4, 0.4], now: 2 }));
+    h = apply(h, commands.addAnnotation('a', { id: 'h', type: 'spotlight', rect: [0.1, 0.1, 0.2, 0.2], reveal: 1 }, 3));
+    h = apply(h, commands.addAnnotation('a', { id: 'c', type: 'callout', anchor: [0.5, 0.5], text: 'Hi', placement: 'bottom', color: '#FF5A4E', reveal: 0 }, 4));
+    const after = apply(h, commands.replaceAnnotation('a', 'h', { id: 'other', type: 'box', rect: [0.1, 0.1, 0.2, 0.2], color: '#FF5A4E', reveal: 1 }, 5));
+    expect(after.present.steps[0]!.annotations.map(a => `${a.id}:${a.type}`)).toEqual(['a_click:click', 'h:box', 'c:callout']);
+    expect(undo(after).present.steps[0]!.annotations[1]!.type).toBe('spotlight');
+  });
+});
+
 describe('duplicateStep', () => {
   const setup = () => {
     let h = createHistory(fresh());
