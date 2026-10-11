@@ -117,6 +117,8 @@ export interface EditorState {
   exportDialog: 'closed' | 'choose' | 'saved';
   /** the guide preview, playing in the real player */
   previewOpen: boolean;
+  /** the quick actions offered next to a click marker just dropped (Add callout · Highlight · Zoom here), until anything else happens */
+  quick: { stepId: string; at: Point } | null;
 }
 
 const INITIAL: EditorState = {
@@ -144,11 +146,17 @@ const INITIAL: EditorState = {
   projectsOpen: false,
   exportDialog: 'closed',
   previewOpen: false,
+  quick: null,
 };
 
 export const useEditor = create<EditorState>(() => INITIAL);
 export const getEditor = useEditor.getState;
 const set = useEditor.setState;
+
+/* the quick actions go away as soon as anything else changes the project, the selection or the tool */
+useEditor.subscribe((s, prev) => {
+  if (s.quick && s.quick === prev.quick && (s.history !== prev.history || s.selection !== prev.selection || s.tool !== prev.tool)) set({ quick: null });
+});
 
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 8;
@@ -543,6 +551,7 @@ export function pinAtPlayhead(at?: Point): string | null {
   const stepId = existing?.id ?? newId('s');
   run(commands.pinStep({ stepId, annotationId: newId('a'), source: pos.source, time: pos.time, at, now: Date.now() }));
   set({ selection: { kind: 'step', stepId } });
+  if (at) set({ quick: { stepId, at } });
   if (!existing) notify(`Pinned step at ${formatSeconds(playback.time)}.`);
   return stepId;
 }
@@ -608,6 +617,11 @@ export function addZoom(stepId: string): void {
   setStepZoom(stepId, zoomBox(click?.type === 'click' ? click.at : [0.5, 0.5], DEFAULT_ZOOM_SIZE), 'Add zoom');
 }
 
+/** Puts away the quick actions offered after a pin. */
+export function dismissQuick(): void {
+  if (getEditor().quick) set({ quick: null });
+}
+
 // ----- annotations ----------------------------------------------------------------------------------------------------
 
 /** Adds an annotation to the step on the current frame. Returns false (with a message) if the frame isn't pinned. */
@@ -652,6 +666,7 @@ export function addToStep(kind: AddKind): void {
   if (kind === 'click') {
     if (click) set({ selection: { kind: 'annotation', stepId: step.id, id: click.id } });
     if (click && hasClick) notify('This step already has its click. Drag it to where the viewer clicks.');
+    else if (click?.type === 'click') set({ quick: { stepId: step.id, at: click.at } });
     return;
   }
   if (kind === 'zoom') return step.zoom ? selectZoom(step.id) : addZoom(step.id);

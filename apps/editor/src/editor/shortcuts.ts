@@ -4,6 +4,7 @@ import { saveWaypost } from '../state/project';
 import {
   clearSelection,
   deleteSelection,
+  duplicateStep,
   escapeSelection,
   getEditor,
   jumpSeconds,
@@ -11,9 +12,11 @@ import {
   jumpStep,
   jumpToEnd,
   jumpToStart,
+  notify,
   pinAtPlayhead,
   redo,
   selectLayer,
+  selectionStepId,
   setPreviewOpen,
   splitAtPlayhead,
   setTool,
@@ -60,6 +63,14 @@ export function useShortcuts(): void {
         if (key === ',') return act(() => jumpToStart(true));
         if (key === '.') return act(jumpToEnd);
         if (key === 'enter') return act(() => getEditor().phase === 'ready' && setPreviewOpen(true));
+        if (key === 'd') {
+          /* ⌘D copies the selected step onto the frame at the playhead (and never bookmarks the page) */
+          return act(() => {
+            const stepId = selectionStepId(getEditor().selection);
+            if (stepId) duplicateStep(stepId);
+            else notify('Select the step to copy first, then move to the frame the copy should go on.');
+          });
+        }
         return;
       }
       if (e.altKey) {

@@ -5,6 +5,7 @@ import { Playback, type PlaybackHost } from '../engine/playback';
 import { currentPlayback, setPlayback } from '../engine/session';
 import { getEditor, selectProject, setPlaybackState, setPlayhead, timelineTimeOf, useEditor } from '../state/store';
 import { AnnotationOverlay } from './AnnotationOverlay';
+import { QuickActions } from './QuickActions';
 import { easeOutOf, leavingUntil, presentation, projectForDrawing, rememberViewer } from './visible';
 import { useFitSize } from './useFitSize';
 
@@ -139,6 +140,7 @@ export function CanvasView({ children }: { children?: ReactNode }) {
               style={{ left: `${(inner[0] / width) * 100}%`, top: `${(inner[1] / height) * 100}%`, width: `${(inner[2] / width) * 100}%`, height: `${(inner[3] / height) * 100}%` }}
             >
               <AnnotationOverlay width={inner[2]} height={inner[3]} cssWidth={(fit.width * inner[2]) / width} />
+              <QuickActions />
             </div>
           </div>
         )}

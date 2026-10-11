@@ -127,7 +127,7 @@ function StepCard({ project, step, number }: { project: Project; step: Step; num
       </div>
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 text-sm text-fg-muted">{behaviour(step)}</span>
-        <Button size="sm" icon={<Icon icon={Copy} size={14} />} onClick={() => duplicateStep(step.id)}>
+        <Button size="sm" icon={<Icon icon={Copy} size={14} />} title="Copy this step onto the frame at the playhead (⌘D)" onClick={() => duplicateStep(step.id)}>
           Duplicate
         </Button>
       </div>
