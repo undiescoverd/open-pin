@@ -1,7 +1,7 @@
 import { clamp } from './geometry';
 import { REVEAL_GROUPS } from './constants';
 import type { Project, Step } from './schema';
-import { isOnTimeline, orderedSteps, srcToTl, timelineDuration } from './time';
+import { clipLength, clipStarts, isOnTimeline, orderedSteps, srcToTl, timelineDuration } from './time';
 
 /* How a guide plays out in time once every step gets its pause (F13 "holds"; F5 zoom; F6 reveal order). The MP4 export walks
    this plan frame by frame; the editor's Viewer view and (later) the player use the same timings for a step's entrance. */
@@ -165,14 +165,8 @@ export function audioPlan(project: Project, plan: Plan): AudioSegment[] {
     else segments.push({ start, duration, source });
   };
   const clips = project.timeline;
-  let clipStart = 0;
-  const spans = clips.map(c => {
-    const gapStart = clipStart;
-    clipStart += c.gap;
-    const start = clipStart;
-    clipStart += (c.out - c.in) / c.speed;
-    return { clip: c, gapStart, start, end: clipStart };
-  });
+  const starts = clipStarts(clips);
+  const spans = clips.map((c, i) => ({ clip: c, gapStart: starts[i]! - c.gap, start: starts[i]!, end: starts[i]! + clipLength(c) }));
   for (const item of plan.items) {
     if (item.kind === 'hold') {
       push(item.start, item.duration);

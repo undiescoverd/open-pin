@@ -1,4 +1,5 @@
 import type { Draft } from 'immer';
+import { touch } from './draft';
 import type { Command } from './history';
 import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, type LayerMove } from './effects';
 import { blurRectAt } from './geometry';
@@ -20,7 +21,7 @@ import {
   type Source,
   type Step,
 } from './schema';
-import { snapToFrame, srcToTl } from './time';
+import { isOnTimeline, srcToTl } from './time';
 
 /* The edits made to a project, apart from timeline editing (clips.ts). Each is a named command (see history.ts). They take every id they need as an argument,
    so they are deterministic and easy to test. Callers check preconditions with the `can*` helpers first. */
@@ -75,16 +76,12 @@ export function stepAtTime(project: Project, source: string, time: number): Step
 
 /** Pinning is possible on any frame the clips play. */
 export function canPinAt(project: Project, source: string, time: number): boolean {
-  return project.timeline.some(c => c.source === source && time >= c.in && time <= c.out);
+  return isOnTimeline(project.timeline, source, time);
 }
 
 function sortSteps(draft: Draft<Project>): void {
   const timeline = draft.timeline;
   draft.steps.sort((a, b) => srcToTl(timeline, a.anchor.source, a.anchor.time) - srcToTl(timeline, b.anchor.source, b.anchor.time));
-}
-
-function touch(draft: Draft<Project>, now: number): void {
-  draft.updatedAt = now;
 }
 
 export function stepIndex(project: Project, stepId: string): number {
@@ -547,8 +544,3 @@ export const commands = {
     };
   },
 };
-
-/** Snaps a pin to the nearest frame when the source has a constant frame rate. */
-export function pinTime(time: number, fps: number): number {
-  return snapToFrame(time, fps);
-}

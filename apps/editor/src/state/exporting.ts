@@ -12,6 +12,7 @@ import { getEditor, notify, patchEditor, selectProject, sourceTimeAt, stepAtPlay
 
 /* The exporters (pdf-lib and its font engine are big) load the first time someone exports, not with the editor. */
 const exporters = () => import('@waypost/export');
+type Exporters = Awaited<ReturnType<typeof exporters>>;
 
 /* The Export menu: PDF, screenshots, and copying or saving the frame on screen. All of them draw with @waypost/render, the same
    code as the canvas, from full-size frames decoded in the media worker. */
@@ -126,16 +127,18 @@ export async function exportMp4(options: Mp4Options): Promise<void> {
   const source = project?.sources[0];
   if (!project || !source || state.exporting) return;
   currentPlayback()?.pause();
-  const exporter = await exporters();
+  /* the export shows as started before the exporters load, so a second click can't start another one meanwhile */
+  let exporter: Exporters | undefined;
   let cancelled = false;
   const cancel = () => {
     cancelled = true;
-    exporter.cancelExport();
+    exporter?.cancelExport();
     patchEditor({ exporting: { label: 'Cancelling…', progress: getEditor().exporting?.progress ?? 0, detail: '', cancel } });
   };
   patchEditor({ exporting: { label: 'Exporting MP4…', progress: 0, detail: 'Starting', cancel } });
   const started = performance.now();
   try {
+    exporter = await exporters();
     const [recording, regular, semibold] = await Promise.all([readSource(project.id, source.file), fontBytes(figtree400), fontBytes(figtree600)]);
     const assets = await workerAssets(project, state.assetImages);
     /* a Cancel while the files were being read comes before the worker's job, which would otherwise forget it */
@@ -199,11 +202,11 @@ export async function exportGuide(options: GuideExportOptions): Promise<void> {
     return;
   }
   currentPlayback()?.pause();
-  const exporter = await exporters();
+  let exporter: Exporters | undefined;
   let cancelled = false;
   const cancel = () => {
     cancelled = true;
-    exporter.cancelExport();
+    exporter?.cancelExport();
     patchEditor({ exporting: { label: 'Cancelling…', progress: getEditor().exporting?.progress ?? 0, detail: '', cancel } });
   };
   const show = (label: string, progress: number, detail: string) => {
@@ -212,6 +215,7 @@ export async function exportGuide(options: GuideExportOptions): Promise<void> {
   show('Exporting guide…', 0, 'Starting');
   const slug = guideSlug(project.name);
   try {
+    exporter = await exporters();
     const guide = parseGuide(JSON.parse(JSON.stringify(plan.guide)));
     const recording = await readSource(project.id, source.file);
     const assets = await workerAssets(project, state.assetImages);

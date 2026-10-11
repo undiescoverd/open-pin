@@ -1,19 +1,10 @@
 import type { Annotation, ArrowAnnotation, BoxAnnotation, CalloutAnnotation, ClickAnnotation, SpotlightAnnotation } from '@waypost/core';
 import { arrowGeometry, calloutFont, layoutCallout, unit, type Ctx, type Size } from './geometry';
+import { makeCanvas } from './canvas';
 import { colourFor } from './palette';
 
 /* Draws annotations onto a canvas context, in output pixels. The editor canvas, the stills and (later) the player and the MP4
    all call this, so what you see is what you export. The shapes match the mockup (design/mockup/editor.html). */
-
-type LayerCanvas = OffscreenCanvas | HTMLCanvasElement;
-
-function makeLayer(width: number, height: number): LayerCanvas {
-  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(width, height);
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
-}
 
 function drawBox(ctx: Ctx, a: BoxAnnotation, size: Size, alpha: number): void {
   const u = unit(size);
@@ -145,10 +136,12 @@ function drawCallout(ctx: Ctx, a: CalloutAnnotation, size: Size, alpha: number):
 }
 
 /** Dims the frame except where spotlights are, with a feathered edge (black at 55%, 12 px feather in the design system). */
-function drawSpotlights(ctx: Ctx, spots: readonly SpotlightAnnotation[], size: Size, alpha: number): void {
+function drawSpotlights(ctx: Ctx, spots: readonly SpotlightAnnotation[], size: Size, alpha: (s: SpotlightAnnotation) => number): void {
   if (!spots.length) return;
+  /* the dim is one layer, so it fades in with the first of its spotlights to appear and stays while any is shown */
+  const dim = Math.max(...spots.map(alpha));
   const u = unit(size);
-  const layer = makeLayer(Math.ceil(size.width), Math.ceil(size.height));
+  const layer = makeCanvas(size.width, size.height);
   const lctx = layer.getContext('2d') as Ctx;
   lctx.fillStyle = 'rgba(14,17,22,0.55)';
   lctx.fillRect(0, 0, size.width, size.height);
@@ -158,12 +151,14 @@ function drawSpotlights(ctx: Ctx, spots: readonly SpotlightAnnotation[], size: S
   lctx.shadowColor = '#000';
   lctx.shadowBlur = 18 * u;
   for (const s of spots) {
+    /* a spotlight still fading in cuts its hole only as far as it is shown, relative to the dim around it */
+    lctx.globalAlpha = Math.min(1, alpha(s) / dim);
     lctx.beginPath();
     lctx.roundRect(s.rect[0] * size.width, s.rect[1] * size.height, s.rect[2] * size.width, s.rect[3] * size.height, 12 * u);
     lctx.fill();
   }
   ctx.save();
-  ctx.globalAlpha = alpha;
+  ctx.globalAlpha = dim;
   ctx.drawImage(layer, 0, 0, size.width, size.height);
   ctx.restore();
 }
@@ -178,8 +173,7 @@ export function drawAnnotations(ctx: Ctx, annotations: readonly Annotation[], si
   const alpha = (a: Annotation) => options.reveal?.[a.reveal] ?? 1;
   const shown = annotations.filter(a => alpha(a) > 0);
   const spots = shown.filter((a): a is SpotlightAnnotation => a.type === 'spotlight');
-  /* the dim is one layer, so it fades in with the first of its spotlights to appear and stays while any is shown */
-  if (spots.length) drawSpotlights(ctx, spots, size, Math.max(...spots.map(alpha)));
+  drawSpotlights(ctx, spots, size, alpha);
   for (const a of shown) {
     if (a.type === 'box') drawBox(ctx, a, size, alpha(a));
     else if (a.type === 'arrow') drawArrow(ctx, a, size, alpha(a));
