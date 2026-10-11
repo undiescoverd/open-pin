@@ -100,7 +100,7 @@ test.describe('Phase 3: player settings and preview', () => {
     await dialog.getByRole('group', { name: 'How it plays' }).getByRole('button', { name: 'Plays by itself' }).click();
     await expect(dialog.getByText('Pauses on each step for its pause time')).toBeVisible();
     await openExportAdvanced(page);
-    await dialog.getByRole('button', { name: 'Marigold' }).click();
+    await dialog.getByRole('group', { name: 'Accent' }).getByRole('button', { name: 'Marigold' }).click();
     await dialog.getByRole('switch', { name: 'Step counter' }).click();
     await dialog.getByRole('checkbox', { name: 'Show a button' }).check();
     await dialog.getByRole('textbox', { name: 'Button text' }).fill('Start free trial');
@@ -129,7 +129,7 @@ test.describe('Phase 3: player settings and preview', () => {
     await expect(dialog.getByRole('checkbox', { name: 'Show a button' })).not.toBeChecked();
     await expect(dialog.getByRole('group', { name: 'How it plays' }).getByRole('button', { name: 'Viewer clicks Next' })).toHaveAttribute('aria-pressed', 'true');
     await expect(dialog.getByRole('switch', { name: 'Step counter' })).toHaveAttribute('aria-checked', 'true');
-    await expect(dialog.getByRole('button', { name: 'Coral' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(dialog.getByRole('group', { name: 'Accent' }).getByRole('button', { name: 'Coral' })).toHaveAttribute('aria-pressed', 'true');
     expect(errors).toEqual([]);
   });
 

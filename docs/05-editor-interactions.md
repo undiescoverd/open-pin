@@ -216,7 +216,7 @@ A Hide region keeps every effect it had: projects saved before Phase 4 open with
 ### 7.3 Preview and Export
 
 - **Preview** (⌘↩, or the top-bar button) opens the guide in the real player at the selected step's still, or on the start card when no step is selected. Closing it (Esc or the close button) selects the step it was showing and moves the playhead there; closing from the start or end card leaves the editor as it was.
-- **Export** opens one dialog: what to export, then only what matters for it, with the rest under its Advanced ([03](03-design-system.md), "Editing a step"). Under the video's sound switch it says which parts will be silent: sped-up or slowed clips (how many, and for how long), muted clips, gaps and the pauses at steps. A recording without sound has the switch off and disabled.
+- **Export** opens one dialog: what to export, then only what matters for it, with the rest under its Advanced ([03](03-design-system.md), "Editing a step"). Under the video's sound switch it says which parts will be silent: sped-up or slowed clips (how many, and for how long), muted clips, gaps and the pauses at steps. A recording without sound has the switch off and disabled. Its Advanced also holds the guide's **annotation colour**: new arrows, outlines and click markers take it (callouts start as dark bubbles), and changing it recolours, in one undo step, every annotation still in the old colour; one given its own colour keeps it.
 
 ## 8. Undo and redo
 

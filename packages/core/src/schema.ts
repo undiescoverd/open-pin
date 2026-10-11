@@ -208,6 +208,8 @@ export const GuideSettingsSchema = z.object({
   cta: CtaSchema.nullable().default(null),
   /** where the guide's folder will be served from, for the embed snippets; empty until the person says */
   address: z.string().max(500).default(''),
+  /** the guide's annotation colour: new arrows, outlines and click markers take it (docs/06-simplify-plan.md, "Other decisions") */
+  annotationColor: colour.default('#FF5A4E'),
 });
 
 export const DEFAULT_GUIDE: z.infer<typeof GuideSettingsSchema> = {
@@ -217,6 +219,7 @@ export const DEFAULT_GUIDE: z.infer<typeof GuideSettingsSchema> = {
   chrome: 'auto',
   cta: null,
   address: '',
+  annotationColor: '#FF5A4E',
 };
 
 export const ProjectSchema = z.object({

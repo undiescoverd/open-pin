@@ -81,6 +81,8 @@ export function AnnotationOverlay({ width, height, cssWidth }: OverlayProps) {
   const tool = useEditor(s => s.tool);
   const selection = useEditor(s => s.selection);
   const project = useEditor(selectProject);
+  /* new annotations take the guide's colour (Export › Advanced) */
+  const annotationColor = project?.guide.annotationColor ?? DEFAULT_COLOR;
   const playhead = useEditor(s => s.playhead);
   const rate = useEditor(s => s.playback.rate);
   const draft = useEditor(s => s.draft);
@@ -168,7 +170,7 @@ export function AnnotationOverlay({ width, height, cssWidth }: OverlayProps) {
         return;
       }
       gesture.current = { kind: 'draw', tool, start: p, stepId: target.id };
-      setDraft({ stepId: target.id, annotation: { ...createAnnotation(tool, p, p, DEFAULT_COLOR), id: 'draft' } });
+      setDraft({ stepId: target.id, annotation: { ...createAnnotation(tool, p, p, annotationColor), id: 'draft' } });
       return;
     }
     if (tool !== 'select' || !paused) return;
@@ -253,7 +255,7 @@ export function AnnotationOverlay({ width, height, cssWidth }: OverlayProps) {
     }
     const far = origin.current && Math.hypot(e.clientX - origin.current.x, e.clientY - origin.current.y) >= DRAG_PIXELS;
     if (g.kind === 'draw') {
-      setDraft({ stepId: g.stepId, annotation: { ...createAnnotation(g.tool, g.start, p, DEFAULT_COLOR), id: 'draft' } });
+      setDraft({ stepId: g.stepId, annotation: { ...createAnnotation(g.tool, g.start, p, annotationColor), id: 'draft' } });
       return;
     }
     if (g.kind === 'draw-blur') {
@@ -300,7 +302,7 @@ export function AnnotationOverlay({ width, height, cssWidth }: OverlayProps) {
     const dragged = Math.hypot(end[0] - g.start[0], end[1] - g.start[1]) >= DRAW_THRESHOLD;
     switch (g.kind) {
       case 'draw':
-        addAnnotationAtPlayhead(createAnnotation(g.tool, g.start, end, DEFAULT_COLOR));
+        addAnnotationAtPlayhead(createAnnotation(g.tool, g.start, end, annotationColor));
         return;
       case 'draw-blur':
         addBlurAtPlayhead(dragged && shape?.kind === 'blur' ? shape.rect : defaultRect(g.start, [0.16, 0.08]));

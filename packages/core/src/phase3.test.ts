@@ -28,7 +28,7 @@ describe('schema version 3: player settings', () => {
   });
 
   it('new projects start guided, with every control, coral and no call to action', () => {
-    expect(fresh().guide).toEqual({ mode: 'guided', controls: { counter: true, progress: true, fullscreen: true }, accent: '#D13A30', chrome: 'auto', cta: null, address: '' });
+    expect(fresh().guide).toEqual({ mode: 'guided', controls: { counter: true, progress: true, fullscreen: true }, accent: '#D13A30', chrome: 'auto', cta: null, address: '', annotationColor: '#FF5A4E' });
   });
 
   it('setGuide changes settings in one undo step and does nothing when nothing changes', () => {
