@@ -1,4 +1,4 @@
-import { ArrowUpRight, EyeOff, Flashlight, Grid3x3, Highlighter, MapPin, MessageSquare, MousePointer2, MousePointerClick, Square, ZoomIn, type LucideIcon } from 'lucide-react';
+import { ArrowUpRight, EyeOff, Flashlight, Highlighter, MapPin, MessageSquare, MousePointer2, MousePointerClick, Square, ZoomIn, type LucideIcon } from 'lucide-react';
 
 /* The canvas tools and their keys, as in docs/05-editor-interactions.md (section 9). There is no palette for them any more: the Add
    buttons at the top of the right panel place things with one click, and a tool's key still picks it, to draw the thing exactly
@@ -22,7 +22,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'spotlight', label: 'Spotlight', key: 's', icon: Flashlight, hint: 'Drag over the area that should stay bright.' },
   { id: 'box', label: 'Box', key: 'b', icon: Square, hint: 'Drag a box around what matters.' },
   { id: 'zoom', label: 'Zoom', key: 'z', icon: ZoomIn, hint: 'Drag the part of the frame viewers should zoom into at this step.' },
-  { id: 'blur', label: 'Blur', key: 'x', icon: Grid3x3, hint: 'Drag over what should be hidden. It lasts from here to the end.' },
+  { id: 'blur', label: 'Hide', key: 'x', icon: EyeOff, hint: 'Drag over what should be hidden. It is hidden for this step.' },
 ];
 
 /** H picks the spotlight too, since Highlight starts as one. */

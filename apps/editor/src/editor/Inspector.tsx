@@ -4,6 +4,8 @@ import {
   EFFECT_COLORS,
   EFFECT_TYPES,
   GRADIENT_PRESETS,
+  HIDE_LOOKS,
+  HIDE_MIN_STRENGTH,
   MAX_SPEED,
   MIN_REGION,
   MIN_SPEED,
@@ -16,9 +18,12 @@ import {
   clipStarts,
   effectSummary,
   formatTimecode,
+  hideLook,
+  hideSpanOf,
   layerEnd,
   parseTimecode,
   srcToTl,
+  stepSpanAt,
   tlToSrc,
   topLayer,
   trimLimits,
@@ -33,6 +38,8 @@ import {
   type Effect,
   type EffectType,
   type GradientPreset,
+  type HideLook,
+  type HideSpan,
   type LogoCorner,
   type PlaybackMode,
   type Project,
@@ -59,7 +66,7 @@ import {
   cx,
   focusRing,
 } from '@waypost/ui';
-import { ChevronDown, ChevronUp, Grid3x3, ImagePlus, Scissors, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, EyeOff, ImagePlus, Scissors, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { addImage, saveWaypost } from '../state/project';
 import {
@@ -88,6 +95,8 @@ import {
   setFrame,
   setGap,
   setGuide,
+  setHideLook,
+  setHideSpan,
   setHighlightKind,
   setLogo,
   setStepZoom,
@@ -231,7 +240,7 @@ function SelectedItem() {
     }
     case 'blur': {
       const blur = selectedBlur(project, selection);
-      return blur ? <EffectPanel key={blur.id} project={project} blur={blur} source={source} /> : null;
+      return blur ? <HidePanel key={blur.id} project={project} blur={blur} source={source} /> : null;
     }
     default: {
       const step = selectedStep(project, selection);
@@ -535,7 +544,7 @@ function GapPanel({ project, clip, index }: { project: Project; clip: Clip; inde
   );
 }
 
-// ----- effect regions -------------------------------------------------------------------------------------------------
+// ----- hidden areas (effect regions) ---------------------------------------------------------------------------------
 
 const capital = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 
@@ -568,10 +577,25 @@ function EffectRow({ blur, effect, first, last }: { blur: Blur; effect: Effect; 
   );
 }
 
-function EffectPanel({ project, blur, source }: { project: Project; blur: Blur; source: Source }) {
+const LOOK_OPTIONS: ReadonlyArray<{ value: HideLook; label: string; title: string }> = [
+  { value: 'cover', label: 'Cover', title: 'A solid block: nothing shows through' },
+  { value: 'pixelate', label: 'Pixelate', title: 'Large blocks of colour' },
+  { value: 'blur', label: 'Blur', title: 'A heavy blur' },
+];
+const SPAN_OPTIONS: ReadonlyArray<{ value: HideSpan; label: string }> = [
+  { value: 'step', label: 'This step only' },
+  { value: 'rest', label: 'From here to the end' },
+  { value: 'all', label: 'The whole video' },
+];
+
+/* Hide (docs/06-simplify-plan.md, "Hiding something"): the look, its strength and how long, then everything an effect region can do
+   (its stack of effects, layer, exact timing, fades, position and keyframes) under Advanced. A region whose stack or timing isn't
+   one of the simple choices shows no choice picked there, and keeps what it has until one is picked. */
+function HidePanel({ project, blur, source }: { project: Project; blur: Blur; source: Source }) {
   const playhead = useEditor(s => s.playhead);
   const name = useEditSession();
   const look = useEditSession();
+  const strength = useEditSession();
   const fades = useEditSession();
   const geometry = useEditSession();
   const tl = (t: number) => srcToTl(project.timeline, source.id, t);
@@ -585,11 +609,15 @@ function EffectPanel({ project, blur, source }: { project: Project; blur: Blur; 
   const keyframeHere = blurKeyframeHere(blur);
   const [W, H] = source.size;
   const [adding, setAdding] = useState('');
+  const simpleLook = hideLook(blur);
+  const span = hideSpanOf(project, blur);
+  const effect = blur.effects[0];
+  const onStep = !!stepSpanAt(project, source.id, now);
 
   /** typed timing, in timeline time; refused when it would run past the end, into its neighbour or below the minimum length */
   const time = (from: number, to: number): boolean | string => {
     if (from < -1e-6 || to > total + 1e-6) return `That's outside the guide (0:00.00 to ${tc(total)}).`;
-    if (to - from < MIN_REGION - 1e-6) return 'An effect region needs to be at least 0.1 s long.';
+    if (to - from < MIN_REGION - 1e-6) return 'A hidden area needs to be at least 0.1 s long.';
     placeBlur(blur.id, { start: src(Math.max(0, from)), end: src(Math.min(total, to)), shift: false });
     const after = selectProject(getEditor())?.blurs.find(b => b.id === blur.id);
     if (after && (Math.abs(tl(after.start) - from) > 0.02 || Math.abs(tl(after.end) - to) > 0.02)) notify('It stops at the next region on its layer.', 'info');
@@ -602,104 +630,128 @@ function EffectPanel({ project, blur, source }: { project: Project; blur: Blur; 
     const r: Rect = [...rect];
     if (i < 2) r[i] = Math.min(Math.max(0, n), 1 - r[i + 2]!);
     else r[i] = Math.min(Math.max(8 / size, n), 1 - r[i - 2]!);
-    setBlurRectHere(blur.id, r, 'Resize effect region', geometry.key());
+    setBlurRectHere(blur.id, r, 'Resize hidden area', geometry.key());
   };
 
   return (
     <div>
-      <Title icon={<Icon icon={Grid3x3} />} title={blur.name || 'Effect region'} sub={`${tc(start)}–${tc(end)} · ${(end - start).toFixed(2)} s · layer ${blur.layer + 1}`} />
-      <div {...name.bind} className="pt-2">
-        <TextField label="Name" maxLength={60} value={blur.name} onChange={e => updateBlur(blur.id, { name: e.target.value }, 'Rename effect region', name.key())} />
-      </div>
-      <InspectorSection id="blur-fx" title={`Effects · ${blur.effects.length}`}>
-        {blur.effects.length ? (
-          <ol className="m-0 flex list-none flex-col gap-2 p-0" aria-label={`Effect stack: ${effectSummary(blur)}`}>
-            {blur.effects.map((e, i) => (
-              <EffectRow key={e.id} blur={blur} effect={e} first={i === 0} last={i === blur.effects.length - 1} />
-            ))}
-          </ol>
-        ) : (
-          <Help>No effects, so this region leaves the recording as it is. Add one below.</Help>
+      <Title icon={<Icon icon={EyeOff} />} title="Hide" sub={`${blur.name || 'Hidden area'} · ${tc(start)}–${tc(end)}`} />
+      <Help>Drag it on the frame to move it, or its handles to resize it.</Help>
+      <div className="flex flex-col gap-3 pt-3">
+        <Segmented label="Look" options={LOOK_OPTIONS} value={simpleLook} onChange={v => setHideLook(blur.id, v)} />
+        {simpleLook === null && <Help>It has its own mix of effects, under Advanced. Pick a look to replace it.</Help>}
+        {simpleLook === 'cover' && <Help>Nothing shows through a cover, so it can't leak.</Help>}
+        {(simpleLook === 'pixelate' || simpleLook === 'blur') && effect && (
+          <div {...strength.bind}>
+            <ParamRow label="Strength" value={effect.amount} min={HIDE_MIN_STRENGTH} max={100} unit="" defaultValue={HIDE_LOOKS[simpleLook].amount} onChange={v => updateEffect(blur.id, effect.id, { amount: v }, strength.key())} />
+          </div>
         )}
-        <SelectField
-          label="Add an effect"
-          value={adding}
-          options={[{ value: '', label: 'Choose…' }, ...EFFECT_TYPES.map(t => ({ value: t, label: EFFECTS[t].name }))]}
-          onChange={v => {
-            setAdding('');
-            if (v) addEffect(blur.id, v as EffectType);
-          }}
+        <Segmented
+          label="How long"
+          stacked
+          options={SPAN_OPTIONS.map(o => (o.value === 'step' && !onStep ? { ...o, title: 'Move to a step first' } : o))}
+          value={span}
+          onChange={v => setHideSpan(blur.id, v)}
         />
-        {blur.effects.length > 1 && <Help>Effects apply from the top of the list down. Untick one to compare without it.</Help>}
-        <div {...look.bind}>
-          <ParamRow label="Opacity" value={Math.round(blur.opacity * 100)} min={10} max={100} unit="%" defaultValue={100} onChange={v => updateBlur(blur.id, { opacity: v / 100 }, 'Change opacity', look.key())} />
-        </div>
-      </InspectorSection>
-      <InspectorSection id="blur-layer" title="Layer">
         <Help>
-          Layer {blur.layer + 1} of {layers}. Higher layers draw on top. You can also drag the bar up or down in the Effects lane.
+          Hidden from {tc(start)} to {tc(end)}
+          {span === null ? ', its own timing. Change it under Advanced.' : '.'}
         </Help>
-        <ButtonRow>
-          <Button size="sm" disabled={ends.top} onClick={() => moveBlurLayer(blur.id, 'up')}>
-            Bring forward
-          </Button>
-          <Button size="sm" disabled={ends.bottom} onClick={() => moveBlurLayer(blur.id, 'down')}>
-            Send backward
-          </Button>
-        </ButtonRow>
-        <ButtonRow>
-          <Button size="sm" variant="ghost" disabled={ends.top} onClick={() => moveBlurLayer(blur.id, 'front')}>
-            Bring to front
-          </Button>
-          <Button size="sm" variant="ghost" disabled={ends.bottom} onClick={() => moveBlurLayer(blur.id, 'back')}>
-            Send to back
-          </Button>
-        </ButtonRow>
-      </InspectorSection>
-      <InspectorSection id="blur-timing" title="Timing">
-        <div className="grid grid-cols-3 gap-2">
-          <TimecodeField label="Start" value={start} format={tc} parse={parseTimecode} onCommit={v => (v > end - MIN_REGION ? 'The start has to be before the end.' : time(v, end))} onRefuse={refuse} />
-          <TimecodeField label="End" value={end} format={tc} parse={parseTimecode} onCommit={v => (v < start + MIN_REGION ? 'The end has to be after the start.' : time(start, v))} onRefuse={refuse} />
-          <TimecodeField label="Length" value={end - start} format={tc} parse={parseTimecode} onCommit={v => time(start, start + v)} onRefuse={refuse} />
+        <Help>Hidden areas are burned into every export and the published guide. Nobody can remove them afterwards.</Help>
+      </div>
+      <Advanced id="hide" summary="Effects, layers, timing, fades, position" className="mt-3">
+        <div {...name.bind}>
+          <TextField label="Name" maxLength={60} value={blur.name} onChange={e => updateBlur(blur.id, { name: e.target.value }, 'Rename hidden area', name.key())} />
         </div>
-        <ButtonRow>
-          <Button size="sm" onClick={() => time(Math.min(playhead, end - MIN_REGION), end)}>
-            Start at playhead
-          </Button>
-          <Button size="sm" onClick={() => time(start, Math.max(playhead, start + MIN_REGION))}>
-            End at playhead
-          </Button>
-        </ButtonRow>
-        <div {...fades.bind} className="flex flex-col gap-3">
-          <ParamRow label="Fade in" value={blur.fadeIn} min={0} max={3} step={0.1} unit="s" defaultValue={0} onChange={v => updateBlur(blur.id, { fadeIn: v }, 'Change fade', fades.key())} />
-          <ParamRow label="Fade out" value={blur.fadeOut} min={0} max={3} step={0.1} unit="s" defaultValue={0} onChange={v => updateBlur(blur.id, { fadeOut: v }, 'Change fade', fades.key())} />
-        </div>
-      </InspectorSection>
-      <InspectorSection id="blur-geom" title="Position and size">
-        <div {...geometry.bind} className="flex flex-col gap-3">
-          <ParamRow label="X" value={Math.round(rect[0] * W)} min={0} max={W} unit="px" onChange={v => setRect(0, v)} />
-          <ParamRow label="Y" value={Math.round(rect[1] * H)} min={0} max={H} unit="px" onChange={v => setRect(1, v)} />
-          <ParamRow label="Width" value={Math.round(rect[2] * W)} min={8} max={W} unit="px" onChange={v => setRect(2, v)} />
-          <ParamRow label="Height" value={Math.round(rect[3] * H)} min={8} max={H} unit="px" onChange={v => setRect(3, v)} />
-          <ParamRow label="Corner radius" value={blur.radius} min={0} max={40} unit="px" defaultValue={4} onChange={v => updateBlur(blur.id, { radius: v }, 'Change corner radius', geometry.key())} />
-        </div>
-        <Help>
-          {blur.keyframes.length > 1
-            ? `It moves between ${blur.keyframes.length} keyframes. Scrub and drag it to add another.`
-            : 'Drag the box on the frame, or its handles to resize it. Scrub to another frame and drag it there to make it follow what it hides.'}
-        </Help>
-        {blur.keyframes.length > 1 && (
+        <InspectorSection id="blur-fx" title={`Effects · ${blur.effects.length}`}>
+          {blur.effects.length ? (
+            <ol className="m-0 flex list-none flex-col gap-2 p-0" aria-label={`Effect stack: ${effectSummary(blur)}`}>
+              {blur.effects.map((e, i) => (
+                <EffectRow key={e.id} blur={blur} effect={e} first={i === 0} last={i === blur.effects.length - 1} />
+              ))}
+            </ol>
+          ) : (
+            <Help>No effects, so this area leaves the recording as it is. Add one below.</Help>
+          )}
+          <SelectField
+            label="Add an effect"
+            value={adding}
+            options={[{ value: '', label: 'Choose…' }, ...EFFECT_TYPES.map(t => ({ value: t, label: EFFECTS[t].name }))]}
+            onChange={v => {
+              setAdding('');
+              if (v) addEffect(blur.id, v as EffectType);
+            }}
+          />
+          {blur.effects.length > 1 && <Help>Effects apply from the top of the list down. Untick one to compare without it.</Help>}
+          <div {...look.bind}>
+            <ParamRow label="Opacity" value={Math.round(blur.opacity * 100)} min={10} max={100} unit="%" defaultValue={100} onChange={v => updateBlur(blur.id, { opacity: v / 100 }, 'Change opacity', look.key())} />
+          </div>
+        </InspectorSection>
+        <InspectorSection id="blur-layer" title="Layer">
+          <Help>
+            Layer {blur.layer + 1} of {layers}. Higher layers draw on top. You can also drag the bar up or down in the Effects lane.
+          </Help>
           <ButtonRow>
-            <Button size="sm" disabled={keyframeHere === null} onClick={() => removeBlurKeyframeHere(blur)}>
-              Delete keyframe here
+            <Button size="sm" disabled={ends.top} onClick={() => moveBlurLayer(blur.id, 'up')}>
+              Bring forward
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => flattenBlurHere(blur.id)}>
-              Stop it moving
+            <Button size="sm" disabled={ends.bottom} onClick={() => moveBlurLayer(blur.id, 'down')}>
+              Send backward
             </Button>
           </ButtonRow>
-        )}
-      </InspectorSection>
-      <Help>Effects are burned into every export and the published guide. Nobody can remove them afterwards.</Help>
+          <ButtonRow>
+            <Button size="sm" variant="ghost" disabled={ends.top} onClick={() => moveBlurLayer(blur.id, 'front')}>
+              Bring to front
+            </Button>
+            <Button size="sm" variant="ghost" disabled={ends.bottom} onClick={() => moveBlurLayer(blur.id, 'back')}>
+              Send to back
+            </Button>
+          </ButtonRow>
+        </InspectorSection>
+        <InspectorSection id="blur-timing" title="Timing">
+          <div className="grid grid-cols-3 gap-2">
+            <TimecodeField label="Start" value={start} format={tc} parse={parseTimecode} onCommit={v => (v > end - MIN_REGION ? 'The start has to be before the end.' : time(v, end))} onRefuse={refuse} />
+            <TimecodeField label="End" value={end} format={tc} parse={parseTimecode} onCommit={v => (v < start + MIN_REGION ? 'The end has to be after the start.' : time(start, v))} onRefuse={refuse} />
+            <TimecodeField label="Length" value={end - start} format={tc} parse={parseTimecode} onCommit={v => time(start, start + v)} onRefuse={refuse} />
+          </div>
+          <ButtonRow>
+            <Button size="sm" onClick={() => time(Math.min(playhead, end - MIN_REGION), end)}>
+              Start at playhead
+            </Button>
+            <Button size="sm" onClick={() => time(start, Math.max(playhead, start + MIN_REGION))}>
+              End at playhead
+            </Button>
+          </ButtonRow>
+          <div {...fades.bind} className="flex flex-col gap-3">
+            <ParamRow label="Fade in" value={blur.fadeIn} min={0} max={3} step={0.1} unit="s" defaultValue={0} onChange={v => updateBlur(blur.id, { fadeIn: v }, 'Change fade', fades.key())} />
+            <ParamRow label="Fade out" value={blur.fadeOut} min={0} max={3} step={0.1} unit="s" defaultValue={0} onChange={v => updateBlur(blur.id, { fadeOut: v }, 'Change fade', fades.key())} />
+          </div>
+        </InspectorSection>
+        <InspectorSection id="blur-geom" title="Position and size">
+          <div {...geometry.bind} className="flex flex-col gap-3">
+            <ParamRow label="X" value={Math.round(rect[0] * W)} min={0} max={W} unit="px" onChange={v => setRect(0, v)} />
+            <ParamRow label="Y" value={Math.round(rect[1] * H)} min={0} max={H} unit="px" onChange={v => setRect(1, v)} />
+            <ParamRow label="Width" value={Math.round(rect[2] * W)} min={8} max={W} unit="px" onChange={v => setRect(2, v)} />
+            <ParamRow label="Height" value={Math.round(rect[3] * H)} min={8} max={H} unit="px" onChange={v => setRect(3, v)} />
+            <ParamRow label="Corner radius" value={blur.radius} min={0} max={40} unit="px" defaultValue={4} onChange={v => updateBlur(blur.id, { radius: v }, 'Change corner radius', geometry.key())} />
+          </div>
+          <Help>
+            {blur.keyframes.length > 1
+              ? `It moves between ${blur.keyframes.length} keyframes. Scrub and drag it to add another.`
+              : 'To follow something that moves, scrub to another frame and drag it there: it moves between the two.'}
+          </Help>
+          {blur.keyframes.length > 1 && (
+            <ButtonRow>
+              <Button size="sm" disabled={keyframeHere === null} onClick={() => removeBlurKeyframeHere(blur)}>
+                Delete keyframe here
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => flattenBlurHere(blur.id)}>
+                Stop it moving
+              </Button>
+            </ButtonRow>
+          )}
+        </InspectorSection>
+      </Advanced>
       <div className="flex flex-wrap gap-2 pt-3">
         {(now < blur.start || now > blur.end) && (
           <Button size="sm" onClick={() => seekTimeline(start)}>
@@ -707,7 +759,7 @@ function EffectPanel({ project, blur, source }: { project: Project; blur: Blur; 
           </Button>
         )}
         <Button variant="danger" icon={<Icon icon={Trash2} />} onClick={() => removeBlur(blur.id)}>
-          Delete effect region
+          Remove hidden area
         </Button>
       </div>
     </div>

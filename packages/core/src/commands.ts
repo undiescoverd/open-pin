@@ -1,6 +1,6 @@
 import { current, type Draft } from 'immer';
 import type { Command } from './history';
-import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, type LayerMove } from './effects';
+import { EFFECTS, compactLayers, dropOnLayer, freeLayer, layerRoom, moveLayer, overlapsOn, type LayerMove } from './effects';
 import { blurRectAt } from './geometry';
 import {
   DEFAULT_FRAME,
@@ -381,6 +381,46 @@ export const commands = {
         }
         if (Math.abs(blur.start - was.start) < 1e-9 && Math.abs(blur.end - was.end) < 1e-9 && d.blurs.map(b => b.layer).join() === layers) return;
         if (args.shift) for (const k of blur.keyframes) k.time = Math.max(0, k.time + (blur.start - was.start));
+        touch(d, now);
+      },
+    };
+  },
+
+  /**
+   * Hide's How long: sets a region's start and end outright (source seconds, kept on the recording and at least `MIN_REGION` long).
+   * Where that would overlap a neighbour on its layer, it moves to the lowest layer with room instead of stopping short, so the
+   * time asked for is the time it covers. Its keyframes stay where they are.
+   */
+  setBlurSpan(blurId: string, start: number, end: number, now: number, label = 'Change how long it is hidden'): Command<Project> {
+    return {
+      label,
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        const source = blur && d.sources.find(s => s.id === blur.source);
+        if (!blur || !source) return;
+        const D = source.duration;
+        let s = Math.min(Math.max(0, start), D), e = Math.min(Math.max(0, end), D);
+        if (e - s < MIN_REGION) [s, e] = e + MIN_REGION <= D ? [s, s + MIN_REGION] : [Math.max(0, D - MIN_REGION), D];
+        if (Math.abs(s - blur.start) < 1e-9 && Math.abs(e - blur.end) < 1e-9) return;
+        blur.start = s;
+        blur.end = e;
+        if (overlapsOn(d.blurs, blur.layer, s, e, blur.id)) {
+          blur.layer = freeLayer(d.blurs, s, e, blur.id);
+          compactLayers(d.blurs);
+        }
+        touch(d, now);
+      },
+    };
+  },
+
+  /** Replaces a region's whole stack of effects, as Hide's Look does with its one effect. */
+  setBlurEffects(blurId: string, effects: Effect[], now: number, label = 'Change look'): Command<Project> {
+    return {
+      label,
+      run: d => {
+        const blur = d.blurs.find(b => b.id === blurId);
+        if (!blur) return;
+        blur.effects = effects.map(e => ({ ...e }));
         touch(d, now);
       },
     };

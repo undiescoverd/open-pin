@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { blurAlphaAt, blurRectAt, exportPlan, frameLayout, parseProject, planAt, tlToSrc, type Project } from '@waypost/core';
 import { readFile } from 'node:fs/promises';
-import { dragOnFrame, frameBox, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepChip, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
+import { dragOnFrame, frameBox, openItemAdvanced, openRecording, openStepAdvanced, playheadSeconds, seekTo, stepChip, waitForFrame, watchErrors, watchYellowEdge } from './helpers';
 
 /** The Phase 2 acceptance tests (docs/04-roadmap.md, "Phase 2 — Edit and polish"; the checks in docs/05-editor-interactions.md,
     section 10). The fixture is 6 seconds long, 640 × 400, at 30 fps. */
@@ -12,6 +12,15 @@ const clips = (page: Page) => page.locator('[data-clip]');
 const bars = (page: Page) => effectsLane(page).locator('[data-blur]');
 const addRegion = (page: Page) => page.getByRole('button', { name: 'Add an effect region at the playhead' });
 const addEffect = (page: Page) => page.getByLabel('Add an effect', { exact: true });
+
+/** Draws a hidden area with the X tool, then gives it the Pixelate look, which is how the Phase 2 regions started, and opens its
+    Advanced (the stack, layer and timing). */
+async function drawPixelated(page: Page, from: [number, number], to: [number, number]): Promise<void> {
+  await page.keyboard.press('x');
+  await dragOnFrame(page, from, to);
+  await page.getByRole('group', { name: 'Look' }).getByRole('button', { name: 'Pixelate' }).click();
+  await openItemAdvanced(page);
+}
 
 /** The guide's length in seconds, from the readout. */
 async function guideLength(page: Page): Promise<number> {
@@ -207,8 +216,8 @@ test.describe('Phase 2: effect regions', () => {
     await seekTo(page, 1);
     const area: [number, number, number, number] = [0.15, 0.15, 0.3, 0.2];
     const bare = await canvasHash(page, area);
-    await page.keyboard.press('x');
-    await dragOnFrame(page, [0.1, 0.1], [0.5, 0.4]);
+    await drawPixelated(page, [0.1, 0.1], [0.5, 0.4]);
+    await expect(page.locator('[data-effect]')).toHaveAttribute('data-effect', 'pixelate');
     await expect.poll(() => canvasHash(page, area)).not.toBe(bare);
     const hashes = [await canvasHash(page, area)];
     for (const type of ['tint', 'desaturate', 'solid', 'blur']) {
@@ -253,27 +262,28 @@ test.describe('Phase 2: effect regions', () => {
     for (let i = 0; i < 5; i++) await addRegion(page).click();
     const layerOf = async (name: string) => Number(/layer (\d+)/.exec((await bars(page).filter({ hasText: name }).getAttribute('aria-label'))!)![1]);
     const layers = async () => (await bars(page).evaluateAll(els => els.map(e => Number(/layer (\d+)/.exec(e.getAttribute('aria-label')!)![1])))).sort((a, b) => a - b);
-    await bars(page).filter({ hasText: 'Blur 3' }).click();
+    await bars(page).filter({ hasText: 'Hidden area 3' }).click();
+    await openItemAdvanced(page);
     await page.getByRole('button', { name: 'Send to back' }).click();
-    expect(await layerOf('Blur 3')).toBe(1);
+    expect(await layerOf('Hidden area 3')).toBe(1);
     expect(await layers()).toEqual([1, 2, 3, 4, 5]);
     await page.getByRole('button', { name: 'Bring to front' }).click();
-    expect(await layerOf('Blur 3')).toBe(5);
+    expect(await layerOf('Hidden area 3')).toBe(5);
     await page.getByRole('button', { name: 'Send backward' }).click();
-    expect(await layerOf('Blur 3')).toBe(4);
+    expect(await layerOf('Hidden area 3')).toBe(4);
     expect(await layers()).toEqual([1, 2, 3, 4, 5]);
 
     /* two regions on one layer: a bar dragged into its neighbour stops at it */
-    await bars(page).filter({ hasText: 'Blur 1' }).click();
+    await bars(page).filter({ hasText: 'Hidden area 1' }).click();
     await typeInto(page.getByLabel('End', { exact: true }), '2');
     await seekTo(page, 3);
     await addRegion(page).click();
-    expect(await layerOf('Blur 6')).toBe(1);
-    const bar = bars(page).filter({ hasText: 'Blur 6' });
+    expect(await layerOf('Hidden area 6')).toBe(1);
+    const bar = bars(page).filter({ hasText: 'Hidden area 6' });
     const from = await middleOf(bar);
     await drag(page, from, { x: from.x - (await timeX(page, 2.5, 6)) + (await timeX(page, 0, 6)), y: from.y });
     await expect(page.getByLabel('Start', { exact: true })).toHaveValue('0:02.00');
-    expect(await layerOf('Blur 6')).toBe(1);
+    expect(await layerOf('Hidden area 6')).toBe(1);
   });
 
   test('bars: an edge trims one end, the body moves both, and edges snap to pins unless Alt is held (checks 2 and 3)', async ({ page }) => {
@@ -282,6 +292,7 @@ test.describe('Phase 2: effect regions', () => {
     await page.keyboard.press('Shift+P');
     await seekTo(page, 3);
     await addRegion(page).click();
+    await openItemAdvanced(page);
     const bar = bars(page).first();
     await drag(page, await edgeOf(bar, 'l'), { x: await timeX(page, 3.6, 6), y: (await edgeOf(bar, 'l')).y }, true);
     await expect(page.getByLabel('End', { exact: true })).toHaveValue('0:06.00');
@@ -318,7 +329,7 @@ test.describe('Phase 2: effect regions', () => {
     await page.keyboard.press('Shift+K');
     await expect(page.getByRole('heading', { name: 'Clip 1' })).toBeVisible();
     await page.keyboard.press('Shift+K');
-    await expect(page.getByRole('heading', { name: /^Blur \d/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Hide' })).toBeVisible();
     await page.keyboard.press('Shift+I');
     await expect(page.getByRole('heading', { name: 'Clip 1' })).toBeVisible();
   });
@@ -327,6 +338,7 @@ test.describe('Phase 2: effect regions', () => {
     await openRecording(page);
     await page.keyboard.press('x');
     await dragOnFrame(page, [0.1, 0.1], [0.3, 0.3]);
+    await openItemAdvanced(page);
     await seekTo(page, 4);
     await dragOnFrame(page, [0.2, 0.2], [0.6, 0.6]);
     await expect(page.getByRole('status').filter({ hasText: 'Added a keyframe at 0:04.00' })).toBeVisible();
@@ -476,8 +488,7 @@ test.describe('Phase 2: MP4 export', () => {
       for (const [from, to] of [[0, 2.5], [3, 6]] as const) {
         await seekTo(page, from);
         for (const spot of SPOTS) {
-          await page.keyboard.press('x');
-          await dragOnFrame(page, [spot.rect[0], spot.rect[1]], [spot.rect[0] + spot.rect[2], spot.rect[1] + spot.rect[3]]);
+          await drawPixelated(page, [spot.rect[0], spot.rect[1]], [spot.rect[0] + spot.rect[2], spot.rect[1] + spot.rect[3]]);
           for (const type of spot.effects) await addEffect(page).selectOption(type);
           if (spot.check === 'coral') await page.getByRole('group', { name: 'Solid fill colour' }).getByRole('button', { name: 'Coral' }).click();
           if (spot.check === 'lagoon') {

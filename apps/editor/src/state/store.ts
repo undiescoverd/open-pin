@@ -21,10 +21,15 @@ import {
   undo as undoHistory,
   zoomBox,
   MIN_REGION,
+  hideEffect,
+  hideSpanFor,
   newEffect,
   nextBlurName,
+  stepSpanAt,
   type Annotation,
   type EffectType,
+  type HideLook,
+  type HideSpan,
   type LayerMove,
   type Blur,
   type ClipEdge,
@@ -761,22 +766,28 @@ export function deleteClip(clipId: string): void {
 /** How many regions the lane's + button has added, to stagger them so repeated adds don't sit on top of each other. */
 let staggered = 0;
 
-/** A new effect region with one Pixelate effect, from the playhead to the end of the recording, on the lowest layer with room. */
+/**
+ * A new hidden area (Hide, the X tool, or the Effects lane's +): a Cover, for the step on screen (docs/06-simplify-plan.md,
+ * "Hiding something"). Past the last step, or with no steps, it lasts from the playhead to the end of the recording.
+ */
 export function addBlurAtPlayhead(rect: Rect): void {
   const state = getEditor();
   const project = selectProject(state);
   const source = project?.sources[0];
   if (!project || !source) return;
   currentPlayback()?.pause();
-  const start = Math.max(0, Math.min(sourceTimeAt(project, state.playhead), source.duration - MIN_REGION));
+  const here = sourceTimeAt(project, state.playhead);
+  const span = hideSpanFor(project, source.id, 'step', here) ?? hideSpanFor(project, source.id, 'rest', here)!;
+  const start = Math.max(0, Math.min(span.start, span.end - MIN_REGION, source.duration - MIN_REGION));
+  const end = Math.min(source.duration, Math.max(span.end, start + MIN_REGION));
   const blur: Blur = {
     id: newId('b'),
     name: nextBlurName(project.blurs),
     source: source.id,
     start,
-    end: source.duration,
+    end,
     layer: 0,
-    effects: [newEffect('pixelate', newId('f'))],
+    effects: [hideEffect('cover', newId('f'))],
     radius: 4,
     opacity: 1,
     fadeIn: 0,
@@ -785,13 +796,30 @@ export function addBlurAtPlayhead(rect: Rect): void {
   };
   run(commands.addBlur(blur, Date.now()));
   set({ selection: { kind: 'blur', blurId: blur.id }, tool: 'select' });
-  notify(`Added ${blur.name}. Scrub to where it should move and drag it there: it follows with a keyframe.`);
+  const step = stepSpanAt(project, source.id, here);
+  notify(step && end < source.duration ? `Hidden during step ${project.steps.indexOf(step.step) + 1}. Drag it over what should be hidden.` : 'Hidden from here to the end. Drag it over what should be hidden.');
 }
 
 /** The + on the Effects lane: a region in the middle of the frame, staggered. */
 export function addBlurInMiddle(): void {
   const k = staggered++ % 6;
   addBlurAtPlayhead([0.38 + k * 0.025, 0.44 + k * 0.025, 0.24, 0.08]);
+}
+
+/** Hide's Look: the region becomes one Cover, Pixelate or Blur, replacing whatever stack it had. */
+export function setHideLook(blurId: string, look: HideLook): void {
+  run(commands.setBlurEffects(blurId, [hideEffect(look, newId('f'))], Date.now(), `Hide with ${look === 'cover' ? 'a cover' : look}`));
+}
+
+/** Hide's How long, judged from the frame on screen: this step only, from the start of this step to the end, or the whole video. */
+export function setHideSpan(blurId: string, span: HideSpan): void {
+  const state = getEditor();
+  const project = selectProject(state);
+  const blur = project?.blurs.find(b => b.id === blurId);
+  if (!project || !blur) return;
+  const where = hideSpanFor(project, blur.source, span, sourceTimeAt(project, state.playhead));
+  if (!where) return notify('Move to a step first: this one is past the last step.', 'error');
+  run(commands.setBlurSpan(blurId, where.start, where.end, Date.now()));
 }
 
 export function updateBlur(blurId: string, patch: Parameters<typeof commands.updateBlur>[1], label?: string, coalesceKey?: string): void {

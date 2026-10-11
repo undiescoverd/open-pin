@@ -126,7 +126,7 @@ export const stepChip = (page: Page, name: string | RegExp): Locator => stepRail
 
 /** Opens the Advanced section at the end of the selected item's panel (exact position, when it appears) if it is closed. */
 export async function openItemAdvanced(page: Page): Promise<void> {
-  const details = inspector(page).locator('details', { has: page.locator('summary', { hasText: /^Advanced/ }) });
-  if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator('summary').click();
+  const details = inspector(page).locator('details', { has: page.locator(':scope > summary', { hasText: /^Advanced/ }) });
+  if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator(':scope > summary').click();
   await expect(details).toHaveAttribute('open', '');
 }

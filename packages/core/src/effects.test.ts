@@ -39,10 +39,10 @@ describe('effect stacks', () => {
   });
 
   it('names new regions with a number nobody uses', () => {
-    expect(nextBlurName([])).toBe('Blur 1');
-    expect(nextBlurName([{ name: 'Blur 1' }, { name: 'Blur 3' }])).toBe('Blur 4');
-    expect(nextBlurName([{ name: 'Blur 3' }, { name: 'Blur 2' }])).toBe('Blur 4');
-    expect(nextBlurName([{ name: 'Email' }])).toBe('Blur 2');
+    expect(nextBlurName([])).toBe('Hidden area 1');
+    expect(nextBlurName([{ name: 'Hidden area 1' }, { name: 'Hidden area 3' }])).toBe('Hidden area 4');
+    expect(nextBlurName([{ name: 'Hidden area 3' }, { name: 'Hidden area 2' }])).toBe('Hidden area 4');
+    expect(nextBlurName([{ name: 'Email' }])).toBe('Hidden area 2');
   });
 });
 

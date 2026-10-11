@@ -46,12 +46,12 @@ export function effectSummary(blur: Pick<Blur, 'effects'>): string {
   return blur.effects.filter(e => e.on).map(e => EFFECTS[e.type].name).join(' + ') || 'No effects';
 }
 
-/** "Blur N" with the lowest number no other region uses. */
+/** "Hidden area N" with the lowest number no other region uses. */
 export function nextBlurName(blurs: ReadonlyArray<Pick<Blur, 'name'>>): string {
   const used = new Set(blurs.map(b => b.name));
   let n = blurs.length + 1;
-  while (used.has(`Blur ${n}`)) n++;
-  return `Blur ${n}`;
+  while (used.has(`Hidden area ${n}`)) n++;
+  return `Hidden area ${n}`;
 }
 
 type Span = Pick<Blur, 'id' | 'start' | 'end' | 'layer'>;

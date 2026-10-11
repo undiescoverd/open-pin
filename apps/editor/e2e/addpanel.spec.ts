@@ -102,7 +102,7 @@ test.describe('Add, then adjust', () => {
   test('Hide adds a hidden area from here on, without needing a step', async ({ page }) => {
     await openRecording(page, { fullTimeline: false });
     await addButton(page, 'Hide').click();
-    await expect(inspector(page).getByRole('button', { name: 'Delete effect region' })).toBeVisible();
+    await expect(inspector(page).getByRole('button', { name: 'Remove hidden area' })).toBeVisible();
     await expect(stepCards(page)).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Filmstrip' }).getByLabel(/^Hidden/)).toHaveCount(1);
   });
