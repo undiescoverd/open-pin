@@ -214,17 +214,26 @@ export async function saveWaypost(): Promise<void> {
 
 /** Removes the folder of a project that failed before it opened, so a half-copied recording doesn't fill the storage unseen. */
 async function discardUnopened(id: string): Promise<void> {
-  if (selectProject(getEditor())?.id === id) return;
+  /* the project may already be on screen (a failed save after it opened), so it is closed as well */
+  if (selectProject(getEditor())?.id === id) {
+    await deleteProject(id).catch(() => undefined);
+    return;
+  }
   await deleteProjectFiles(id).catch(() => undefined);
 }
 
+/** Drops the autosave still waiting for this project, so it can't bring the folder and list entry back. */
+function dropPending(id: string): void {
+  if (pending?.id !== id) return;
+  clearTimeout(timer);
+  pending = null;
+}
+
 export async function deleteProject(id: string): Promise<void> {
-  /* a pending autosave of this project would bring its folder and list entry back */
-  if (pending?.id === id) {
-    clearTimeout(timer);
-    pending = null;
-  }
+  dropPending(id);
   await writing;
+  /* a write that was in flight may have failed and put the change back: drop it again before the files go */
+  dropPending(id);
   if (selectProject(getEditor())?.id === id) {
     releaseCurrent();
     resetEditor();

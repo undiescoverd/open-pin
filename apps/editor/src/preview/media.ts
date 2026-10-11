@@ -100,6 +100,8 @@ class LiveDriver implements SegmentDriver {
     if (!segment) return;
     const v = this.video;
     const mine = ++this.plays;
+    /* a segment starts from the top: a pause or resume in the gap before its first clip must not play the video early */
+    this.rolling = false;
     /* once aborted, a later play() may own the shared video; only the latest one stops it */
     const superseded = () => signal.aborted && this.plays !== mine;
     this.length = Math.max(1e-3, segment.to - segment.from);
