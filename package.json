@@ -17,7 +17,8 @@
     "typecheck": "pnpm -r --parallel typecheck",
     "test": "vitest run",
     "test:e2e": "pnpm --filter @waypost/editor test:e2e",
-    "check": "pnpm tokens:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm tokens:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "build:extension": "pnpm --filter @waypost/extension run zip"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

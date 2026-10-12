@@ -225,6 +225,13 @@ A Hide region keeps every effect it had: projects saved before Phase 4 open with
 - **A new project** is 16:9 on the Dusk gradient with no padding. Opening an older project keeps its frame.
 - **What the frame shows is what every export draws.** Where there is no background the editor draws the same near-black the video and the guide use, so there is never a see-through canvas, and PNG and WebP exports are opaque. The only difference allowed between the frame and a picture export is the antialiasing along the rounded corners.
 
+### 7.5 Recording a tab and the click review (Phase 5)
+
+- **Record a tab** (first-run screen only) opens the browser's tab picker. Cancelling it changes nothing. Once a tab is chosen the screen shows *Recording a tab*, a timer and **Stop recording**; Chrome's "Stop sharing" ends it too. The recording opens as a new project.
+- **With the extension**, the extension is told to log clicks when the recording starts and to stop when it ends; the clicks are matched to the video by time (`Date.now()` on both sides). The *Suggest a step at each click* switch, shown only when the extension answers, turns this off for a recording and is remembered.
+- **The review** (*Steps from your clicks*) opens over the new project when there are clicks. Each row: a checkbox (untick to drop), the time, an editable title (blank when the clicked thing had no readable name) and a button that folds the click into the step above as a further marker (disabled for the first kept row). **Add steps** adds the kept ones as one undo step, selects the first, and says how many; **Skip, I'll add my own** and Esc keep the plain recording and add nothing.
+- **Without clicks** (none captured, or no extension) there is no review, and the editor opens on the recording as usual.
+
 ## 8. Undo and redo
 
 The whole project is snapshotted before each change; 80 steps deep; a new edit clears redo. One step per: committed Inspector action (button, switch, selection of an option), field editing session, canvas drag, timeline drag, typed time. Undo and redo are `⌘Z` / `⇧⌘Z` and the top-bar buttons, and are ignored while typing in a text field (the browser's own text undo applies there).

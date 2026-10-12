@@ -8,3 +8,4 @@ blob-report/
 .DS_Store
 .env
 .env.*
+apps/extension/*.zip

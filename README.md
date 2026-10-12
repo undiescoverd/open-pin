@@ -2,11 +2,12 @@
 
 A web app that turns screen recordings into interactive, click-through product guides, with MP4, PDF and screenshot exports too. It's an alternative to [FramePin](https://framepin.com/) that you buy once instead of subscribing to.
 
-**Status:** Phases 1 to 4 of the [roadmap](docs/04-roadmap.md) are built: open a recording, add steps and explain each one, hide what needs hiding, frame it, and publish it as an interactive guide you can host anywhere and embed with two lines of HTML, or export a PDF, screenshots or an MP4. Phase 4 made the editor simple by default (steps first, one Add panel, precise controls under Advanced, the full timeline behind Trim & edit video; see [the simplify plan](docs/06-simplify-plan.md)); its first-guide test with new users is still to run. Next come click capture (a step proposed at every click you make while recording, easy to skip), SOP documents, one-click publishing and narration. The interactive guide has been tested in Chromium; Safari, Firefox and iPhone still need a check on real devices.
+**Status:** Phases 1 to 5 of the [roadmap](docs/04-roadmap.md) are built: open a recording, add steps and explain each one, hide what needs hiding, frame it, and publish it as an interactive guide you can host anywhere and embed with two lines of HTML, or export a PDF, screenshots or an MP4. Phase 4 made the editor simple by default (steps first, one Add panel, precise controls under Advanced, the full timeline behind Trim & edit video; see [the simplify plan](docs/06-simplify-plan.md)); its first-guide test with new users is still to run. Phase 5 added **Record a tab** and an optional Chrome extension that proposes a step at every click you make while recording (easy to skip at every point). Next come SOP documents, one-click publishing and narration. The interactive guide has been tested in Chromium; Safari, Firefox and iPhone still need a check on real devices.
 
 ## What works today
 
-- Drop in or choose a recording (MP4, MOV, WebM or MKV). It's copied into this browser's private storage; nothing is uploaded.
+- Drop in or choose a recording (MP4, MOV, WebM or MKV), or press **Record a tab** to record a browser tab in the app. It's copied into this browser's private storage; nothing is uploaded.
+- **A step at every click (optional):** with the [click-capture extension](apps/extension/README.md) installed, recording a tab also notes each click, and when you stop, Waypost proposes a step at each one with its click marker and a title like "Click Invite". Keep, merge or drop them, or skip them all. The extension logs only while you record, never reads what you type, and nothing leaves your browser.
 - Frame-exact preview with a transport (Space or K, L and J for faster or backward playback that stops at every step, arrow keys for single frames) and a millisecond timecode.
 - **Steps first:** a full-window drop zone to start, then a Steps list with **+ Add step** (⇧P) at the top. The selected step opens as a card with its title, note, what's on it, how it behaves in plain words, Duplicate (⌘D) and an Advanced section. A quiet line under the frame suggests the next useful thing.
 - **Add, then adjust:** six buttons at the top of the right panel (Callout, Arrow, Highlight, Zoom, Hide, Click) put the item on the step with one click, placed around the step's click; the keys draw it exactly instead. Right after a click marker drops, a small bar offers Add callout, Highlight and Zoom here. Each item shows a few simple controls, with exact positions and timing under Advanced. Callouts, arrows and highlights can appear with the step or after it, group by group.
@@ -55,6 +56,8 @@ pnpm tokens       # regenerate the CSS after editing design/tokens.json
 | Path | What's there |
 |---|---|
 | `apps/editor` | The editor web app (Vite, React 19, Tailwind 4) and its Playwright tests |
+| `apps/extension` | The click-capture browser extension (Chrome, Manifest V3): see its [README](apps/extension/README.md) |
+| `packages/capture` | The messages between the editor and the extension, and how captured clicks become proposed steps |
 | `packages/ui` | PinKit: generated token CSS plus `Button`, `IconButton`, `Tooltip`, `KeyCap`, `Surface`, `Icon`, `Dialog`, `Menu` and the inspector's form controls |
 | `packages/core` | The project model: schema (Zod), time mapping, clip editing, effect layers, the export plan, the `guide.json` format, commands with undo and redo, timecodes. No DOM |
 | `packages/render` | The compositor: framing, effect regions, zoom, annotations, logo and captions, shared by the editor, the player and every export |

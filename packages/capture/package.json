@@ -1,0 +1,18 @@
+{
+  "name": "@waypost/capture",
+  "description": "Click capture: the messages the editor and the browser extension send each other, and how captured clicks become proposed steps. No DOM.",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

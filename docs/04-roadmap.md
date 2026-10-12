@@ -128,7 +128,9 @@ Make the editor simple by default, as designed in [06-simplify-plan.md](06-simpl
 - **The canvas** (after the first build): framing, background, logo and annotation colour moved out of Export's Advanced into the **Canvas** tab in the right panel (replacing the Guide tab), shape first, with nothing above the frame. A new project is 16:9 on a gradient and opens on the Canvas tab. The editor now draws what exports draw where there is no background, so there is no checkerboard. See [06](06-simplify-plan.md), "The canvas".
 - **One annotation style per guide** is its colour only: **Annotation colour** (now on the Canvas tab), which new arrows, outlines and click markers take; changing it recolours every annotation still in the old colour, and one given its own colour keeps it. Callouts stay dark bubbles. Callout shape and text size aren't built, because the renderer has no such options yet.
 
-## Phase 5 — Click capture (next)
+## Phase 5 — Click capture
+
+**Status: built, tested in Chromium.** The acceptance tests are `apps/editor/e2e/capture.spec.ts` (with a stand-in for the extension) and `apps/editor/e2e/extension.spec.ts` (with the real one). Trying it on real tasks in real web apps, and the Chrome Web Store listing, are still to do. Differences from the plan are listed under [Phase 5 as built](#phase-5-as-built) below.
 
 Pinning every click by hand is the slowest part of making a guide. Capture the clicks while recording, so a guide starts with a step at each one, already in the right place. A web page can't see clicks outside its own tab, so this needs a small browser extension (Chrome first). It is always optional: anyone who doesn't want it skips it in one click and works exactly as in Phase 4.
 
@@ -145,7 +147,19 @@ Pinning every click by hand is the slowest part of making a guide. Capture the c
 
 **Done when** someone records a five-click task in a browser tab with the extension on and gets five steps, each with its click marker on what was clicked and a sensible title, without pinning anything by hand; and someone who skips it, at the install offer or at the review list, ends up with the plain recording and no extra steps or prompts.
 
-## Phase 6 — Documents and phones
+### Phase 5 as built
+
+- **Where the pieces are:** `packages/capture` (the messages between the editor and the extension, validated on both ends, and how clicks become proposed steps, with unit tests); `apps/extension` (the Manifest V3 extension: background worker, a click-capture script for every page and a bridge script for the editor's own pages; see its README); in the editor, `apps/editor/src/capture` (the recorder, the extension client and the flow) and `ClickReview`. The core command `addClickSteps` adds all the kept steps as one undo step.
+- **Recording:** *Record a tab* is beside *Choose a recording* on the first-run screen, never in front of it, and records video only (sound comes with Phase 8). While it records, the editor tab says so and has **Stop recording**; Chrome's own "Stop sharing" does the same. The recording is a WebM that goes into a new project like any other file.
+- **One clock:** clicks and the recording's start are both `Date.now()` on the same machine, so a click's place in the video needs no syncing. A step is pinned 0.15 s before its click.
+- **Which tab:** the browser doesn't say which tab was shared, so the extension logs clicks in every tab while recording and the editor keeps the tab whose title matches the shared tab's name, otherwise the tab clicked in most. Clicks in the editor's own tab (the one that stops the recording) are never logged.
+- **Clicks that count as one:** less than 0.3 s apart, or a second click on the same spot within 0.6 s.
+- **The review list** has a checkbox (drop), an editable title and a *merge into the step above* button per click. A merged click becomes a further marker on that step, shown after the first. **Add steps** adds the kept ones; **Skip, I'll add my own** and Esc add nothing and keep the recording.
+- **Remembered choices:** the *Suggest a step at each click* switch (shown only when the extension is installed) and *Not now* on the install line are kept in this browser.
+- **Privacy:** the extension records the time, position and the clicked thing's name (button text, link text, `aria-label`, a field's label or placeholder), never what was typed. It only logs while the editor is recording (the toolbar icon shows REC), and keeps no copy afterwards. The bridge runs only on the editor's own origins, set when the extension is built.
+- **Not done:** clicks inside iframes, desktop apps, Firefox and Safari extensions, recording sound, the Chrome Web Store listing and a hosted download link (the install line links to the extension's README). The bridge script is 87 KB because it carries the message validation (Zod); it can be slimmed if a store reviewer asks.
+
+## Phase 6 — Documents and phones (next)
 
 - **SOP document export:** Markdown with a folder of step images, and a single HTML file with the images inside. Added to the Export dialog as *Document*.
 - **Phone layout in the player:** each step's title and note under the picture in readable text on narrow screens.

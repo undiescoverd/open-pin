@@ -38,7 +38,8 @@ Phase 4 made the editor simple by default ([06 — Simplify plan](06-simplify-pl
 │ ╎                                       (film)                                       ╎ │
 │ ╎                            Drop a screen recording here                            ╎ │
 │ ╎      MP4, MOV, WebM or MKV, from QuickTime, Loom, OBS or any other recorder.       ╎ │
-│ ╎                   [Choose a recording…]  [Open a project file…]                    ╎ │
+│ ╎        [Choose a recording…]  [Record a tab]  [Open a project file…]               ╎ │
+│ ╎         Want a step at every click? Add the Waypost extension.  [Not now]          ╎ │
 │ ╎                                                                                    ╎ │
 │ ╎                  ① Add steps     ② Explain each one     ③ Export                   ╎ │
 │ ╎             Your recording stays in this browser. Nothing is uploaded.             ╎ │
@@ -47,7 +48,7 @@ Phase 4 made the editor simple by default ([06 — Simplify plan](06-simplify-pl
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Until there is a recording, the whole window is one drop zone (a file dropped anywhere opens too). Only the logo, **Projects** (projects saved in this browser) and the theme button sit above it. A recording the browser can't open says what to do ("Open it in QuickTime Player, choose File › Export As › 1080p…").
+Until there is a recording, the whole window is one drop zone (a file dropped anywhere opens too). Only the logo, **Projects** (projects saved in this browser) and the theme button sit above it. **Record a tab** (Phase 5) records a browser tab straight into a new project. With the click-capture extension installed, the quiet install line becomes the switch **Suggest a step at each click** (on by default, remembered). While recording, the screen says *Recording a tab* with a timer and **Stop recording**. When it stops, a **Steps from your clicks** dialog lists a step for each click to keep, retitle, merge into the one above or drop; **Add steps** or **Skip, I'll add my own** (Esc). A recording the browser can't open says what to do ("Open it in QuickTime Player, choose File › Export As › 1080p…").
 
 ### Editing a step
 

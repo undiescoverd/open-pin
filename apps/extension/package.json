@@ -1,0 +1,25 @@
+{
+  "name": "@waypost/extension",
+  "description": "The Waypost click-capture browser extension (Chrome, Manifest V3): logs clicks in a tab while Waypost records it.",
+  "private": true,
+  "license": "UNLICENSED",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "zip": "node scripts/build.mjs --zip"
+  },
+  "dependencies": {
+    "@waypost/capture": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/chrome": "^0.1.0",
+    "@types/node": "^22.19.0",
+    "fflate": "^0.8.3",
+    "jsdom": "^30.1.2",
+    "vite": "^8.3.4"
+  }
+}
