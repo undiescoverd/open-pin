@@ -18,7 +18,7 @@ It is optional. Without it, **Record a tab** is just a recording and every step 
 2. Open `chrome://extensions`, switch on **Developer mode**, press **Load unpacked** and choose `apps/extension/dist`.
 3. Open the Waypost editor. The first-run screen now shows **Suggest a step at each click**.
 
-The build allows the hosted editor (`https://waypost.pages.dev` and its preview URLs). To use it with the editor running locally, or with a copy you host yourself:
+The build allows the hosted editor (`https://waypost-ac2.pages.dev` and its preview URLs). To use it with the editor running locally, or with a copy you host yourself:
 
 ```sh
 node apps/extension/scripts/build.mjs --dev                         # also allows http://localhost and http://127.0.0.1

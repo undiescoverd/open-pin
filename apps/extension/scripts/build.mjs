@@ -15,7 +15,7 @@ const flags = new Set(args);
 const out = args.find(a => a.startsWith('--out='))?.slice('--out='.length);
 const dist = out ? path.resolve(out) : path.join(root, 'dist');
 
-const PRODUCTION = ['https://waypost.pages.dev/*', 'https://*.waypost.pages.dev/*'];
+const PRODUCTION = ['https://waypost-ac2.pages.dev/*', 'https://*.waypost-ac2.pages.dev/*'];
 const LOCAL = ['http://localhost/*', 'http://127.0.0.1/*'];
 const extra = (process.env.WAYPOST_EDITOR_ORIGINS ?? '')
   .split(',')
